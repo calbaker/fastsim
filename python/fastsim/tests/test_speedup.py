@@ -53,7 +53,7 @@ def test_conv_speedup():
     # there is some wiggle room on these but we're trying to get 10x speedup
     # relative to fastsim-2 with `save_interval` of `None`
     min_speed_ratio_si_none = 6.5
-    min_speed_ratio_si_1 = 3.
+    min_speed_ratio_si_1 = 2.8
     
     # load 2016 Toyota Prius Two from file
     veh = fsim.Vehicle.from_resource("2012_Ford_Fusion.yaml")

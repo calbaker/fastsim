@@ -472,7 +472,8 @@ impl Init for RESGreedyWithBuffers {
             .or(Some(60. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
-        self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.75));
+        self.fc_pwr_frac_demand_forced_on =
+            self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.75));
         Ok(())
     }
 }
