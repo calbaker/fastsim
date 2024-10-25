@@ -1,3 +1,5 @@
+use fmt::Display;
+
 use crate::prelude::{ElectricMachineState, FuelConverterState};
 
 use super::{vehicle_model::VehicleState, *};
@@ -79,7 +81,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         format_dbg!()
                     )
                 })? {
-                    self.state.fc_on_causes.push(FCOnCauses::OnTimeTooShort)
+                    self.state.fc_on_causes.push(FCOnCause::OnTimeTooShort)
                 }
             },
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
@@ -131,7 +133,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
             }
         };
         if pwr_aux_fc > si::Power::ZERO {
-            self.state.fc_on_causes.push(FCOnCauses::AuxPowerDemand);
+            self.state.fc_on_causes.push(FCOnCause::AuxPowerDemand);
         }
         self.fc
             .set_curr_pwr_prop_max(pwr_aux_fc)
@@ -277,20 +279,63 @@ impl Mass for HybridElectricVehicle {
 }
 
 #[fastsim_api]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct FCOnCauses(Vec<FCOnCause>);
+impl Init for FCOnCauses {}
+impl SerdeAPI for FCOnCauses {}
+impl FCOnCauses {
+    fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    #[allow(dead_code)]
+    fn pop(&mut self) -> Option<FCOnCause> {
+        self.0.pop()
+    }
+
+    fn push(&mut self, new: FCOnCause) {
+        self.0.push(new)
+    }
+}
+
+#[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 pub struct HEVState {
     /// time step index
     pub i: usize,
     /// Vector of posssible reasons the fc is forced on
     #[api(skip_get, skip_set)]
-    pub fc_on_causes: Vec<FCOnCauses>,
+    pub fc_on_causes: FCOnCauses,
 }
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
 
+// Custom serialization
+impl Serialize for FCOnCauses {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let joined = self
+            .0
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ");
+        serializer.serialize_str(&format!("\"[{}]\"", joined))
+    }
+}
+impl Display for FCOnCauses {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
+    }
+}
+
 #[fastsim_enum_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
-pub enum FCOnCauses {
+pub enum FCOnCause {
     /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,
     /// Engine must be on for high vehicle speed to ensure powertrain can meet
@@ -303,8 +348,15 @@ pub enum FCOnCauses {
     /// Aux power demand exceeds battery capability
     AuxPowerDemand,
 }
-impl SerdeAPI for FCOnCauses {}
-impl Init for FCOnCauses {}
+impl SerdeAPI for FCOnCause {}
+impl Init for FCOnCause {}
+impl fmt::Display for FCOnCause {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
+    }
+}
 
 /// Options for controlling simulation behavior
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -387,7 +439,7 @@ impl HEVPowertrainControls {
             if em_pwr < pwr_out_req * fc_pwr_frac_demand_forced_on {
                 hev_state
                     .fc_on_causes
-                    .push(FCOnCauses::PropulsionPowerDemand);
+                    .push(FCOnCause::PropulsionPowerDemand);
             }
 
             let fc_pwr = pwr_out_req - em_pwr;
