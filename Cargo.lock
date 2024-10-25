@@ -35,12 +35,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
-name = "arc-swap"
-version = "1.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
-
-[[package]]
 name = "argmin"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -627,7 +621,6 @@ dependencies = [
  "include_dir",
  "itertools 0.12.1",
  "lazy_static",
- "log",
  "ndarray",
  "nohash-hasher",
  "numpy",
@@ -679,9 +672,7 @@ version = "1.0.0"
 dependencies = [
  "fastsim-core 0.1.6",
  "fastsim-core 1.0.0",
- "log",
  "pyo3",
- "pyo3-log",
 ]
 
 [[package]]
@@ -1467,17 +1458,6 @@ checksum = "e53cee42e77ebe256066ba8aa77eff722b3bb91f3419177cf4cd0f304d3284d9"
 dependencies = [
  "libc",
  "pyo3-build-config",
-]
-
-[[package]]
-name = "pyo3-log"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c10808ee7250403bedb24bc30c32493e93875fef7ba3e4292226fe924f398bd"
-dependencies = [
- "arc-swap",
- "log",
- "pyo3",
 ]
 
 [[package]]

@@ -35,6 +35,7 @@ impl Powertrain for Box<ConventionalVehicle> {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
+        _veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
         self.fc
@@ -108,10 +109,6 @@ impl Mass for ConventionalVehicle {
             Some(new_mass) => {
                 if let Some(dm) = derived_mass {
                     if dm != new_mass {
-                        #[cfg(feature = "logging")]
-                        log::warn!(
-                            "Derived mass does not match provided mass, setting `{}` consituent mass fields to `None`",
-                            stringify!(ConventionalVehicle));
                         self.expunge_mass_fields();
                     }
                 }

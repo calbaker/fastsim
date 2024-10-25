@@ -21,13 +21,9 @@ pub(crate) fn history_vec_derive(input: TokenStream) -> TokenStream {
         .map(|f| {
             let ident = f.ident.as_ref().unwrap();
             let ty = &f.ty;
-            let doc_attrs = &f
-                .attrs
-                .iter()
-                .filter(|attr| attr.path().is_ident("doc"))
-                .collect::<Vec<&syn::Attribute>>();
+            let attrs = &f.attrs.iter().collect::<Vec<&syn::Attribute>>();
             quote! {
-                #(#doc_attrs)*
+                #(#attrs)*
                 pub #ident: Vec<#ty>,
             }
         })
@@ -85,8 +81,8 @@ pub(crate) fn history_vec_derive(input: TokenStream) -> TokenStream {
             }
 
             #push_doc
-            pub fn push(&mut self, value: #original_name) {
-                #(self.#field_names.push(value.#field_names);)*
+            pub fn push(&mut self, state: #original_name) {
+                #(self.#field_names.push(state.#field_names.clone());)*
             }
 
             /// clear all history vecs
@@ -102,7 +98,7 @@ pub(crate) fn history_vec_derive(input: TokenStream) -> TokenStream {
                     #(
                         let #field_names = self.#field_names.pop().unwrap();
                     )*
-                    Some(#original_name{#(#field_names: #field_names),*})
+                    Some(#original_name{#(#field_names: #field_names.clone()),*})
                 }
             }
 
@@ -122,7 +118,7 @@ pub(crate) fn history_vec_derive(input: TokenStream) -> TokenStream {
                 for i in 0..self.len() {
                     state_vec.push(
                         #original_name{
-                            #(#field_names: self.#field_names[i],)*
+                            #(#field_names: self.#field_names[i].clone(),)*
                         }
                     )
                 }

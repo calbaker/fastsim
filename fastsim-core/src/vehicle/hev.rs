@@ -27,6 +27,14 @@ pub struct HybridElectricVehicle {
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
     #[serde(default)]
     pub soc_bal_iters: u32,
+    /// field for tracking current state
+    #[serde(default)]
+    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    pub state: HEVState,
+    /// vector of [Self::state]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "HEVStateHistoryVec::is_empty")]
+    pub history: HEVStateHistoryVec,
 }
 
 impl SaveInterval for HybridElectricVehicle {
@@ -45,6 +53,7 @@ impl Init for HybridElectricVehicle {
         self.fc.init().with_context(|| anyhow!(format_dbg!()))?;
         self.res.init().with_context(|| anyhow!(format_dbg!()))?;
         self.em.init().with_context(|| anyhow!(format_dbg!()))?;
+        self.pt_cntrl.init()?;
         Ok(())
     }
 }
@@ -54,13 +63,57 @@ impl Powertrain for Box<HybridElectricVehicle> {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
+        veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
+        self.state.fc_on_cause.clear();
+        match &self.pt_cntrl {
+            HEVPowertrainControls::Fastsim2(rgwb) => {
+                if self.fc.state.time_on
+                    < rgwb.fc_min_time_on.with_context(|| {
+                    anyhow!(
+                        "{}\n Expected `ResGreedyWithBuffers::init` to have been called beforehand.",
+                        format_dbg!()
+                    )
+                })? {
+                    self.state.fc_on_cause.push(FCOnCauses::OnTimeTooShort)
+                }
+            },
+            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+                todo!()
+            }
+        };
         self.fc
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
+        let disch_buffer = match &self.pt_cntrl {
+            HEVPowertrainControls::Fastsim2(rgwb) => {
+                if veh_state.speed_ach
+                    < rgwb.speed_soc_buffer_for_accel_cutoff.with_context(|| {
+                        anyhow!(
+                        "{}\nExpected `ResGreedyWithBuffers::init` to have been called beforehand.",
+                        format_dbg!()
+                    )
+                    })?
+                {
+                    rgwb.soc_frac_buffer_for_accel.with_context(|| {
+                        anyhow!(
+                        "{}\nExpected `ResGreedyWithBuffers::init` to have been called beforehand.",
+                        format_dbg!()
+                    )
+                    })? * self.res.energy_capacity_usable()
+                } else {
+                    si::Energy::ZERO
+                }
+            }
+            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+                todo!()
+            }
+        };
+        // TODO: change this to something other than zero
+        let chrg_buffer = si::Energy::ZERO;
         self.res
-            .set_curr_pwr_out_max(None, None)
+            .set_curr_pwr_out_max(dt, disch_buffer, chrg_buffer)
             .with_context(|| anyhow!(format_dbg!()))?;
         let (pwr_aux_res, pwr_aux_fc) = {
             match self.aux_cntrl {
@@ -109,12 +162,13 @@ impl Powertrain for Box<HybridElectricVehicle> {
         let (fc_pwr_out_req, em_pwr_out_req) =
             self.pt_cntrl
                 .get_pwr_fc_and_em(pwr_out_req, &self.fc.state, &self.em.state)?;
-        // TODO: replace with a stop/start model
+        // TODO: add a stop/start model
         // TODO: figure out fancier way to handle apportionment of `pwr_aux` between `fc` and `res`
-        let enabled = true;
+
+        let fc_on = !self.state.fc_on_cause.is_empty();
 
         self.fc
-            .solve(fc_pwr_out_req, enabled, dt)
+            .solve(fc_pwr_out_req, fc_on, dt)
             .with_context(|| format_dbg!())?;
         let res_pwr_out_req = self
             .em
@@ -171,10 +225,6 @@ impl Mass for HybridElectricVehicle {
             Some(new_mass) => {
                 if let Some(dm) = derived_mass {
                     if dm != new_mass {
-                        #[cfg(feature = "logging")]
-                        log::warn!(
-                            "Derived mass does not match provided mass, setting `{}` consituent mass fields to `None`",
-                            stringify!(HybridElectricVehicle));
                         self.expunge_mass_fields();
                     }
                 }
@@ -217,6 +267,31 @@ impl Mass for HybridElectricVehicle {
     }
 }
 
+#[fastsim_api]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+pub struct HEVState {
+    /// time step index
+    pub i: usize,
+    #[api(skip_get, skip_set)]
+    pub fc_on_cause: Vec<FCOnCauses>,
+}
+impl Init for HEVState {}
+impl SerdeAPI for HEVState {}
+
+#[fastsim_enum_api]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+pub enum FCOnCauses {
+    /// Engine must be on to self heat
+    FCTemperatureTooLow,
+    /// Engine must be on for high vehicle speed to ensure powertrain can meet
+    /// any spikes in power demand
+    VehicleSpeedTooHigh,
+    /// Engine has not been on long enough (usually 30 s)
+    OnTimeTooShort,
+}
+impl SerdeAPI for FCOnCauses {}
+impl Init for FCOnCauses {}
+
 /// Options for controlling simulation behavior
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct HEVSimulationParams {
@@ -250,17 +325,30 @@ pub enum HEVAuxControls {
     AuxOnFcPriority,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum HEVPowertrainControls {
-    /// Controls that attempt to exactly match fastsim-2
-    Fastsim2,
-    /// Purely greedy controls that favor charging or discharging the
-    /// battery as much as possible.
-    #[default]
-    RESGreedy,
-    // TODO: add `SpeedAware` to enable buffers similar to fastsim-2 but without
-    // the feature from fastsim-2 that forces the fc to be greedily meet power demand
-    // when it's on
+    /// Controls that attempt to match fastsim-2
+    Fastsim2(RESGreedyWithBuffers),
+    /// Controls that have a dynamically updated discharge buffer but are otherwise similar to [Self::Fastsim2]
+    RESGreedyWithDynamicBuffers,
+}
+
+impl Default for HEVPowertrainControls {
+    fn default() -> Self {
+        Self::Fastsim2(Default::default())
+    }
+}
+
+impl Init for HEVPowertrainControls {
+    fn init(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::Fastsim2(rgwb) => rgwb.init()?,
+            Self::RESGreedyWithDynamicBuffers => {
+                todo!()
+            }
+        }
+        Ok(())
+    }
 }
 
 impl HEVPowertrainControls {
@@ -272,42 +360,91 @@ impl HEVPowertrainControls {
     ) -> anyhow::Result<(si::Power, si::Power)> {
         if pwr_out_req >= si::Power::ZERO {
             // positive net power out of the powertrain
-            match self {
-                Self::Fastsim2 => {
-                    bail!("{}\nnot yet implemented!", format_dbg!())
-                }
-                Self::RESGreedy => {
-                    // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
-                    let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-                    let fc_pwr = pwr_out_req - em_pwr;
+            // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
+            let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
+            let fc_pwr = pwr_out_req - em_pwr;
 
-                    ensure!(
-                        fc_pwr >= si::Power::ZERO,
-                        format_dbg!(fc_pwr >= si::Power::ZERO)
-                    );
-                    ensure!(
-                        pwr_out_req <= em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max,
-                        "{}\n`pwr_out_req`: {} kW\n`em_state.pwr_mech_fwd_out_max`: {} kW",
-                        format_dbg!(pwr_out_req <= em_state.pwr_mech_fwd_out_max),
-                        pwr_out_req.get::<si::kilowatt>(),
-                        em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>()
-                    );
-
-                    Ok((fc_pwr, em_pwr))
-                }
-            }
+            ensure!(
+                fc_pwr >= si::Power::ZERO,
+                format_dbg!(fc_pwr >= si::Power::ZERO)
+            );
+            ensure!(
+                pwr_out_req <= em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max,
+                "{}\n`pwr_out_req`: {} kW\n`em_state.pwr_mech_fwd_out_max`: {} kW",
+                format_dbg!(pwr_out_req <= em_state.pwr_mech_fwd_out_max),
+                pwr_out_req.get::<si::kilowatt>(),
+                em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>()
+            );
+            Ok((fc_pwr, em_pwr))
         } else {
-            // negative net power out of the powertrain -- i.e. positive net power _into_ powertrain
-            match self {
-                Self::Fastsim2 => {
-                    bail!("{}\nnot yet implemented!", format_dbg!())
-                }
-                Self::RESGreedy => {
-                    // if `em_pwr` is less than magnitude of `pwr_out_req`, friction brakes can handle excess
-                    let em_pwr = -em_state.pwr_mech_bwd_out_max.min(-pwr_out_req);
-                    Ok((0. * uc::W, em_pwr))
-                }
-            }
+            // negative net power out of the powertrain -- i.e. positive net
+            // power _into_ powertrain, aka regen
+            // if `em_pwr` is less than magnitude of `pwr_out_req`, friction brakes can handle excess
+            let em_pwr = -em_state.pwr_mech_bwd_out_max.min(-pwr_out_req);
+            Ok((0. * uc::W, em_pwr))
         }
+    }
+}
+
+// TODO: make sure this code has an equivalent in fastsim-3
+// if self.veh.no_elec_sys {
+//     self.regen_buff_soc[i] = 0.0;
+// } else if self.veh.charging_on {
+//     self.regen_buff_soc[i] = max(
+//         self.veh.max_soc - (self.veh.max_regen_kwh / self.veh.ess_max_kwh),
+//         (self.veh.max_soc + self.veh.min_soc) / 2.0,
+//     );
+// } else {
+//     self.regen_buff_soc[i] = max(
+//         (self.veh.ess_max_kwh * self.veh.max_soc
+//             - 0.5
+//                 * self.veh.veh_kg
+//                 * (self.cyc.mps[i].powi(2))
+//                 * (1.0 / 1_000.0)
+//                 * (1.0 / 3_600.0)
+//                 * self.veh.mc_peak_eff()
+//                 * self.veh.max_regen)
+//             / self.veh.ess_max_kwh,
+//         self.veh.min_soc,
+//     );
+
+/// Container for static controls parameters
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
+pub struct RESGreedyWithBuffers {
+    /// Fraction of usable battery energy above static minimum SOC that is reserved for acceleration.  Defaults to 0.2.
+    pub soc_frac_buffer_for_accel: Option<si::Ratio>,
+    /// Speed at which accel buffer becomes inactive.  Defaults to 60 mph.
+    // NOTE: for future control strategy, make this a ramp rather than a cutoff
+    pub speed_soc_buffer_for_accel_cutoff: Option<si::Velocity>,
+    /// Minimum time engine must remain on if it was on during the previous
+    /// simulation time step.  defaults to 30 s.
+    pub fc_min_time_on: Option<si::Time>,
+    /// Speed at which [fuelconverter] is forced on. Defaults to 75 mph.
+    //  TODO: make sure this is plumbed up
+    pub fc_speed_forced_on: Option<si::Velocity>,
+    /// Fraction of total aux and powertrain power demand at which [FuelConverter] is forced on.  Defaults to 0.75.
+    // TODO: make sure this is plumbed up
+    pub fc_pwr_frac_demand_forced_on: Option<si::Ratio>,
+    /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
+    // TODO: make sure this is plumbed up
+    pub frac_res_chrg_for_fc: si::Ratio,
+    /// Fraction of available discharging capacity to use toward running the engine efficiently. Defaults to 0.
+    // TODO: make sure this is plumbed up
+    pub frac_res_dschrg_for_fc: si::Ratio,
+    /// Fraction of usable battery energy to reserve for charging when decelerating from high speed
+    // TODO: make sure this is plumbed up
+    pub soc_frac_buffer_for_regen: Option<si::Ratio>,
+}
+
+impl Init for RESGreedyWithBuffers {
+    fn init(&mut self) -> anyhow::Result<()> {
+        self.soc_frac_buffer_for_accel = self.soc_frac_buffer_for_accel.or(Some(0.2 * uc::R));
+        self.speed_soc_buffer_for_accel_cutoff = self
+            .speed_soc_buffer_for_accel_cutoff
+            .or(Some(60. * uc::MPH));
+        self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
+        self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
+        self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.75));
+        Ok(())
     }
 }

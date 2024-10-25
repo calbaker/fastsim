@@ -34,19 +34,5 @@ fn fastsim(_py: Python, m: &PyModule) -> PyResult<()> {
     // List enabled features
     m.add_function(wrap_pyfunction!(fastsim_core::enabled_features, m)?)?;
 
-    // initialize logging
-    #[cfg(feature = "logging")]
-    m.add_function(wrap_pyfunction!(pyo3_log_init, m)?)?;
-
     Ok(())
-}
-
-#[cfg_attr(feature = "logging", pyfunction)]
-fn pyo3_log_init() {
-    #[cfg(feature = "logging")]
-    pyo3_log::init();
-    log::warn!(
-        "{}\n Logging has been initialized, and this comes with a significant performance penalty.",
-        fastsim_core::format_dbg!()
-    )
 }

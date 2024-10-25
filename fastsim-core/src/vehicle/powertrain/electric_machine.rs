@@ -80,6 +80,7 @@ pub struct ElectricMachine {
     /// ElectricMachine maximum output power \[W\]
     pub pwr_out_max: si::Power,
     /// ElectricMachine specific power
+    // TODO: fix `extract_type_from_option` to allow for not having this line
     #[api(skip_get, skip_set)]
     pub specific_pwr: Option<si::SpecificPower>,
     /// ElectricMachine mass
@@ -384,11 +385,6 @@ impl Mass for ElectricMachine {
             .with_context(|| anyhow!(format_dbg!()))?;
         if let (Some(derived_mass), Some(new_mass)) = (derived_mass, new_mass) {
             if derived_mass != new_mass {
-                #[cfg(feature = "logging")]
-                log::info!(
-                    "Derived mass from `self.specific_pwr` and `self.pwr_out_max` does not match {}",
-                    "provided mass. Updating based on `side_effect`"
-                );
                 match side_effect {
                     MassSideEffect::Extensive => {
                         self.pwr_out_max = self.specific_pwr.with_context(|| {
@@ -407,8 +403,6 @@ impl Mass for ElectricMachine {
                 }
             }
         } else if new_mass.is_none() {
-            #[cfg(feature = "logging")]
-            log::debug!("Provided mass is None, setting `self.specific_pwr` to None");
             self.specific_pwr = None;
         }
         self.mass = new_mass;

@@ -16,7 +16,9 @@ pub(crate) use crate::utils::{
 pub(crate) use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecWrapper};
 pub(crate) use derive_more::IsVariant;
 pub(crate) use eng_fmt::FormatEng;
-pub(crate) use fastsim_proc_macros::{fastsim_api, HistoryMethods, HistoryVec, SetCumulative};
+pub(crate) use fastsim_proc_macros::{
+    fastsim_api, fastsim_enum_api, HistoryMethods, HistoryVec, SetCumulative,
+};
 pub(crate) use lazy_static::lazy_static;
 
 pub(crate) use anyhow::{anyhow, bail, ensure, Context};

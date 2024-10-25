@@ -64,11 +64,6 @@ impl Mass for FuelStorage {
             .with_context(|| anyhow!(format_dbg!()))?;
         if let (Some(derived_mass), Some(new_mass)) = (derived_mass, new_mass) {
             if derived_mass != new_mass {
-                #[cfg(feature = "logging")]
-                log::info!(
-                    "Derived mass from `self.specific_energy` and `self.energy_capacity` does not match {}",
-                    "provided mass. Updating based on `side_effect`"
-                );
                 match side_effect {
                     MassSideEffect::Extensive => {
                         self.energy_capacity = self.specific_energy.with_context(|| {
@@ -87,8 +82,6 @@ impl Mass for FuelStorage {
                 }
             }
         } else if new_mass.is_none() {
-            #[cfg(feature = "logging")]
-            log::debug!("Provided mass is None, setting `self.specific_energy` to None");
             self.specific_energy = None;
         }
         self.mass = new_mass;

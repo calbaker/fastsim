@@ -18,12 +18,20 @@ pub fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
+/// macro for creating appropriate setters and getters for pyo3 struct attributes
+/// and other, non-python API functionality
+pub fn fastsim_enum_api(attr: TokenStream, item: TokenStream) -> TokenStream {
+    fastsim_api::fastsim_enum_api(attr, item)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
 /// macro for creating timing harness
 pub fn timer(attr: TokenStream, item: TokenStream) -> TokenStream {
     timer::timer(attr, item)
 }
 
-#[proc_macro_derive(HistoryVec)]
+#[proc_macro_derive(HistoryVec, attributes(api))]
 /// generate HistoryVec that acts like a vec of states but
 /// stores each field of state as a vec field.
 pub fn history_vec_derive(input: TokenStream) -> TokenStream {

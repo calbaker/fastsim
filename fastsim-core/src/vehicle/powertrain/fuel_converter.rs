@@ -79,7 +79,7 @@ pub struct FuelConverter {
     /// Custom vector of [Self::state]
     #[serde(default)]
     #[serde(skip_serializing_if = "FuelConverterStateHistoryVec::is_empty")]
-    pub history: FuelConverterStateHistoryVec, // TODO: spec out fuel tank size and track kg of fuel
+    pub history: FuelConverterStateHistoryVec,
     #[serde(skip)]
     // phantom private field to prevent direct instantiation in other modules
     #[api(skip_get, skip_set)]
@@ -128,11 +128,6 @@ impl Mass for FuelConverter {
             .with_context(|| anyhow!(format_dbg!()))?;
         if let (Some(derived_mass), Some(new_mass)) = (derived_mass, new_mass) {
             if derived_mass != new_mass {
-                #[cfg(feature = "logging")]
-                log::info!(
-                    "Derived mass from `self.specific_pwr` and `self.pwr_out_max` does not match {}",
-                    "provided mass. Updating based on `side_effect`"
-                );
                 match side_effect {
                     MassSideEffect::Extensive => {
                         self.pwr_out_max = self.specific_pwr.ok_or_else(|| {
@@ -151,8 +146,6 @@ impl Mass for FuelConverter {
                 }
             }
         } else if new_mass.is_none() {
-            #[cfg(feature = "logging")]
-            log::debug!("Provided mass is None, setting `self.specific_pwr` to None");
             self.specific_pwr = None;
         }
         self.mass = new_mass;
@@ -221,12 +214,12 @@ impl FuelConverter {
     /// Solves for this powertrain system/component efficiency and sets/returns power output values.
     /// # Arguments
     /// - `pwr_out_req`: tractive power output required to achieve presribed speed
-    /// - `enabled`: whether component is actively running
+    /// - `fc_on`: whether component is actively running
     /// - `dt`: time step size
     pub fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        enabled: bool,
+        fc_on: bool,
         _dt: si::Time,
     ) -> anyhow::Result<()> {
         ensure!(
@@ -234,6 +227,18 @@ impl FuelConverter {
             format!(
                 "{}\n`pwr_out_req` must be >= 0",
                 format_dbg!(pwr_out_req >= si::Power::ZERO),
+            )
+        );
+        // if the engine is not on, `pwr_out_req` should be 0.0
+        ensure!(
+            fc_on || (pwr_out_req == si::Power::ZERO && self.state.pwr_aux == si::Power::ZERO),
+            format!(
+                "{}\nEngine is off but pwr_out_req + pwr_aux is non-zero",
+                format_dbg!(
+                    fc_on
+                        || (pwr_out_req == si::Power::ZERO
+                            && self.state.pwr_aux == si::Power::ZERO)
+                )
             )
         );
         self.state.pwr_propulsion = pwr_out_req;
@@ -259,24 +264,14 @@ impl FuelConverter {
             )
         );
 
-        self.state.fc_on = enabled;
-        // if the engine is not on, `pwr_out_req` should be 0.0
-        ensure!(
-            self.state.fc_on
-                || (pwr_out_req == si::Power::ZERO && self.state.pwr_aux == si::Power::ZERO),
-            format!(
-                "{}\nEngine is off but pwr_out_req + pwr_aux is non-zero",
-                format_dbg!(
-                    self.state.fc_on
-                        || (pwr_out_req == si::Power::ZERO
-                            && self.state.pwr_aux == si::Power::ZERO)
-                )
-            )
-        );
+        self.state.fc_on = fc_on;
         // TODO: consider how idle is handled.  The goal is to make it so that even if `self.state.pwr_aux` is
         // zero, there will be fuel consumption to overcome internal dissipation.
-        self.state.pwr_fuel =
-            ((pwr_out_req + self.state.pwr_aux) / self.state.eff).max(self.pwr_idle_fuel);
+        self.state.pwr_fuel = if self.state.fc_on {
+            ((pwr_out_req + self.state.pwr_aux) / self.state.eff).max(self.pwr_idle_fuel)
+        } else {
+            si::Power::ZERO
+        };
         self.state.pwr_loss = self.state.pwr_fuel - self.state.pwr_propulsion;
 
         // TODO: put this in `SetCumulative::set_custom_cumulative`
@@ -327,6 +322,8 @@ pub struct FuelConverterState {
     pub energy_loss: si::Energy,
     /// If true, engine is on, and if false, off (no idle)
     pub fc_on: bool,
+    /// Time the engine has been on
+    pub time_on: si::Time,
 }
 
 impl SerdeAPI for FuelConverterState {}

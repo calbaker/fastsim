@@ -184,10 +184,6 @@ impl Mass for Vehicle {
             Some(new_mass) => {
                 if let Some(dm) = derived_mass {
                     if dm != new_mass {
-                        #[cfg(feature = "logging")]
-                        log::warn!(
-                            "Derived mass does not match provided mass, setting `{}` consituent mass fields to `None`",
-                            stringify!(Vehicle));
                         self.expunge_mass_fields();
                     }
                 }
@@ -271,163 +267,186 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
     /// # Arguments
     /// * `f2veh` - fastsim-2 vehicle
     fn try_from(f2veh: &fastsim_2::vehicle::RustVehicle) -> anyhow::Result<PowertrainType> {
-        if f2veh.veh_pt_type == CONV {
-            let conv = ConventionalVehicle {
-                fs: {
-                    let mut fs = FuelStorage {
-                        pwr_out_max: f2veh.fs_max_kw * uc::KW,
-                        pwr_ramp_lag: f2veh.fs_secs_to_peak_pwr * uc::S,
-                        energy_capacity: f2veh.fs_kwh * 3.6 * uc::MJ,
-                        specific_energy: Some(FUEL_LHV_MJ_PER_KG * uc::MJ / uc::KG),
-                        mass: None,
-                    };
-                    fs.set_mass(None, MassSideEffect::None)
-                        .with_context(|| anyhow!(format_dbg!()))?;
-                    fs
-                },
-                fc: {
-                    let mut fc = FuelConverter {
+        // TODO: implement the `_doc` fields in fastsim-3 and make sure they get carried over from fastsim-2
+        // see https://github.com/NREL/fastsim/blob/fastsim-2/rust/fastsim-core/fastsim-proc-macros/src/doc_field.rs and do something similar
+        match f2veh.veh_pt_type.as_str() {
+            CONV => {
+                let conv = ConventionalVehicle {
+                    fs: {
+                        let mut fs = FuelStorage {
+                            pwr_out_max: f2veh.fs_max_kw * uc::KW,
+                            pwr_ramp_lag: f2veh.fs_secs_to_peak_pwr * uc::S,
+                            energy_capacity: f2veh.fs_kwh * 3.6 * uc::MJ,
+                            specific_energy: Some(FUEL_LHV_MJ_PER_KG * uc::MJ / uc::KG),
+                            mass: None,
+                        };
+                        fs.set_mass(None, MassSideEffect::None)
+                            .with_context(|| anyhow!(format_dbg!()))?;
+                        fs
+                    },
+                    fc: {
+                        let mut fc = FuelConverter {
+                            state: Default::default(),
+                            mass: None,
+                            specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
+                            pwr_out_max: f2veh.fc_max_kw * uc::KW,
+                            // assumes 1 s time step
+                            pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
+                            pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
+                            eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
+                                f2veh.fc_pwr_out_perc.to_vec(),
+                                f2veh.fc_eff_map.to_vec(),
+                                Strategy::LeftNearest,
+                                Extrapolate::Error,
+                            )?),
+                            pwr_idle_fuel: f2veh.aux_kw
+                                / f2veh
+                                    .fc_eff_map
+                                    .to_vec()
+                                    .first()
+                                    .with_context(|| format_dbg!(f2veh.fc_eff_map))?
+                                * uc::KW,
+                            save_interval: Some(1),
+                            history: Default::default(),
+                            _phantom: PhantomData,
+                        };
+                        fc.init()?;
+                        fc.set_mass(None, MassSideEffect::None)
+                            .with_context(|| anyhow!(format_dbg!()))?;
+                        fc
+                    },
+                    mass: None,
+                    alt_eff: f2veh.alt_eff * uc::R,
+                };
+                Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
+            }
+            HEV => {
+                let pt_cntrl = HEVPowertrainControls::Fastsim2(hev::RESGreedyWithBuffers {
+                    soc_frac_buffer_for_accel: Some(
+                        f2veh.max_accel_buffer_perc_of_useable_soc * uc::R,
+                    ),
+                    speed_soc_buffer_for_accel_cutoff: Some(f2veh.max_accel_buffer_mph * uc::MPH),
+                    fc_min_time_on: Some(f2veh.min_fc_time_on * uc::S),
+                    fc_speed_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
+                    fc_pwr_frac_demand_forced_on: Some(
+                        f2veh.kw_demand_fc_on / f2veh.fc_max_kw * uc::R,
+                    ),
+                    // TODO: make sure these actually do something, if deemed worthwhile
+                    frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
+                    frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
+                    soc_frac_buffer_for_regen: Some(
+                        f2veh.max_regen_kwh / f2veh.ess_max_kwh * uc::R,
+                    ),
+                });
+                let hev = HybridElectricVehicle {
+                    fs: {
+                        let mut fs = FuelStorage {
+                            pwr_out_max: f2veh.fs_max_kw * uc::KW,
+                            pwr_ramp_lag: f2veh.fs_secs_to_peak_pwr * uc::S,
+                            energy_capacity: f2veh.fs_kwh * 3.6 * uc::MJ,
+                            specific_energy: None,
+                            mass: None,
+                        };
+                        fs.set_mass(None, MassSideEffect::None)
+                            .with_context(|| anyhow!(format_dbg!()))?;
+                        fs
+                    },
+                    fc: {
+                        let mut fc = FuelConverter {
+                            state: Default::default(),
+                            mass: None,
+                            specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
+                            pwr_out_max: f2veh.fc_max_kw * uc::KW,
+                            // assumes 1 s time step
+                            pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
+                            pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
+                            eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
+                                f2veh.fc_pwr_out_perc.to_vec(),
+                                f2veh.fc_eff_map.to_vec(),
+                                Strategy::LeftNearest,
+                                Extrapolate::Error,
+                            )?),
+                            pwr_idle_fuel: f2veh.aux_kw
+                                / f2veh
+                                    .fc_eff_map
+                                    .to_vec()
+                                    .first()
+                                    .with_context(|| format_dbg!(f2veh.fc_eff_map))?
+                                * uc::KW,
+                            save_interval: Some(1),
+                            history: Default::default(),
+                            _phantom: PhantomData,
+                        };
+                        fc.init()?;
+                        fc.set_mass(None, MassSideEffect::None)
+                            .with_context(|| anyhow!(format_dbg!()))?;
+                        fc
+                    },
+                    res: ReversibleEnergyStorage {
                         state: Default::default(),
                         mass: None,
-                        specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
-                        pwr_out_max: f2veh.fc_max_kw * uc::KW,
-                        // assumes 1 s time step
-                        pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
-                        pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
-                        eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
-                            f2veh.fc_pwr_out_perc.to_vec(),
-                            f2veh.fc_eff_map.to_vec(),
-                            Strategy::LeftNearest,
-                            Extrapolate::Error,
-                        )?),
-                        pwr_idle_fuel: f2veh.aux_kw
-                            / f2veh
-                                .fc_eff_map
-                                .to_vec()
-                                .first()
-                                .with_context(|| format_dbg!(f2veh.fc_eff_map))?
-                            * uc::KW,
-                        save_interval: Some(1),
-                        history: Default::default(),
-                        _phantom: PhantomData,
-                    };
-                    fc.init()?;
-                    fc.set_mass(None, MassSideEffect::None)
-                        .with_context(|| anyhow!(format_dbg!()))?;
-                    fc
-                },
-                mass: None,
-                alt_eff: f2veh.alt_eff * uc::R,
-            };
-            Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
-        } else if f2veh.veh_pt_type == HEV {
-            let hev = HybridElectricVehicle {
-                fs: {
-                    let mut fs = FuelStorage {
-                        pwr_out_max: f2veh.fs_max_kw * uc::KW,
-                        pwr_ramp_lag: f2veh.fs_secs_to_peak_pwr * uc::S,
-                        energy_capacity: f2veh.fs_kwh * 3.6 * uc::MJ,
                         specific_energy: None,
-                        mass: None,
-                    };
-                    fs.set_mass(None, MassSideEffect::None)
-                        .with_context(|| anyhow!(format_dbg!()))?;
-                    fs
-                },
-                fc: {
-                    let mut fc = FuelConverter {
-                        state: Default::default(),
-                        mass: None,
-                        specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
-                        pwr_out_max: f2veh.fc_max_kw * uc::KW,
-                        // assumes 1 s time step
-                        pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
-                        pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
-                        eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
-                            f2veh.fc_pwr_out_perc.to_vec(),
-                            f2veh.fc_eff_map.to_vec(),
-                            Strategy::LeftNearest,
-                            Extrapolate::Error,
-                        )?),
-                        pwr_idle_fuel: f2veh.aux_kw
-                            / f2veh
-                                .fc_eff_map
-                                .to_vec()
-                                .first()
-                                .with_context(|| format_dbg!(f2veh.fc_eff_map))?
-                            * uc::KW,
+                        pwr_out_max: f2veh.ess_max_kw * uc::KW,
+                        energy_capacity: f2veh.ess_max_kwh * uc::KWH,
+                        eff_interp: Interpolator::Interp0D(f2veh.ess_round_trip_eff.sqrt()),
+                        min_soc: f2veh.min_soc * uc::R,
+                        max_soc: f2veh.max_soc * uc::R,
                         save_interval: Some(1),
                         history: Default::default(),
-                        _phantom: PhantomData,
-                    };
-                    fc.init()?;
-                    fc.set_mass(None, MassSideEffect::None)
-                        .with_context(|| anyhow!(format_dbg!()))?;
-                    fc
-                },
-                res: ReversibleEnergyStorage {
-                    state: Default::default(),
+                    },
+                    em: ElectricMachine {
+                        state: Default::default(),
+                        eff_interp_fwd: (Interpolator::Interp1D(
+                            Interp1D::new(
+                                f2veh.mc_pwr_out_perc.to_vec(),
+                                f2veh.mc_eff_array.to_vec(),
+                                Strategy::LeftNearest,
+                                Extrapolate::Error,
+                            )
+                            .unwrap(),
+                        )),
+                        eff_interp_at_max_input: Some(Interpolator::Interp1D(
+                            Interp1D::new(
+                                // before adding the interpolator, pwr_in_frac_interp was set as Default::default(), can this
+                                // be transferred over as done here, or does a new defualt need to be defined?
+                                f2veh
+                                    .mc_pwr_out_perc
+                                    .to_vec()
+                                    .iter()
+                                    .zip(f2veh.mc_eff_array.to_vec().iter())
+                                    .map(|(x, y)| x / y)
+                                    .collect(),
+                                f2veh.mc_eff_array.to_vec(),
+                                Strategy::LeftNearest,
+                                Extrapolate::Error,
+                            )
+                            .unwrap(),
+                        )),
+                        // pwr_in_frac_interp: Default::default(),
+                        pwr_out_max: f2veh.mc_max_kw * uc::KW,
+                        specific_pwr: None,
+                        mass: None,
+                        save_interval: Some(1),
+                        history: Default::default(),
+                    },
+                    pt_cntrl,
                     mass: None,
-                    specific_energy: None,
-                    pwr_out_max: f2veh.ess_max_kw * uc::KW,
-                    energy_capacity: f2veh.ess_max_kwh * uc::KWH,
-                    eff_interp: Interpolator::Interp0D(f2veh.ess_round_trip_eff.sqrt()),
-                    min_soc: f2veh.min_soc * uc::R,
-                    max_soc: f2veh.max_soc * uc::R,
-                    soc_hi_ramp_start: None,
-                    soc_lo_ramp_start: None,
-                    save_interval: Some(1),
-                    history: Default::default(),
-                },
-                em: ElectricMachine {
+                    sim_params: Default::default(),
+                    soc_bal_iters: Default::default(),
+                    aux_cntrl: Default::default(),
                     state: Default::default(),
-                    eff_interp_fwd: (Interpolator::Interp1D(
-                        Interp1D::new(
-                            f2veh.mc_pwr_out_perc.to_vec(),
-                            f2veh.mc_eff_array.to_vec(),
-                            Strategy::LeftNearest,
-                            Extrapolate::Error,
-                        )
-                        .unwrap(),
-                    )),
-                    eff_interp_at_max_input: Some(Interpolator::Interp1D(
-                        Interp1D::new(
-                            // before adding the interpolator, pwr_in_frac_interp was set as Default::default(), can this
-                            // be transferred over as done here, or does a new defualt need to be defined?
-                            f2veh
-                                .mc_pwr_out_perc
-                                .to_vec()
-                                .iter()
-                                .zip(f2veh.mc_eff_array.to_vec().iter())
-                                .map(|(x, y)| x / y)
-                                .collect(),
-                            f2veh.mc_eff_array.to_vec(),
-                            Strategy::LeftNearest,
-                            Extrapolate::Error,
-                        )
-                        .unwrap(),
-                    )),
-                    // pwr_in_frac_interp: Default::default(),
-                    pwr_out_max: f2veh.mc_max_kw * uc::KW,
-                    specific_pwr: None,
-                    mass: None,
-                    save_interval: Some(1),
                     history: Default::default(),
-                },
-                pt_cntrl: HEVPowertrainControls::RESGreedy,
-                mass: None,
-                sim_params: Default::default(),
-                soc_bal_iters: Default::default(),
-                aux_cntrl: Default::default(),
-            };
-            Ok(PowertrainType::HybridElectricVehicle(Box::new(hev)))
-        } else {
-            bail!(
-                "Invalid powertrain type: {}.
+                };
+                Ok(PowertrainType::HybridElectricVehicle(Box::new(hev)))
+            }
+            _ => {
+                bail!(
+                    "Invalid powertrain type: {}.
 Expected one of {}",
-                f2veh.veh_pt_type,
-                [CONV, HEV, PHEV, BEV].join(", "),
-            )
+                    f2veh.veh_pt_type,
+                    [CONV, HEV, PHEV, BEV].join(", "),
+                )
+            }
         }
     }
 }
@@ -607,7 +626,7 @@ impl Vehicle {
         // TODO: account for traction limits here
 
         self.pt_type
-            .set_curr_pwr_prop_out_max(self.pwr_aux, dt)
+            .set_curr_pwr_prop_out_max(self.pwr_aux, dt, &self.state)
             .with_context(|| anyhow!(format_dbg!()))?;
 
         (self.state.pwr_prop_fwd_max, self.state.pwr_prop_bwd_max) = self

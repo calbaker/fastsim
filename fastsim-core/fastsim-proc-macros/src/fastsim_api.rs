@@ -4,16 +4,11 @@ use crate::utilities::parse_ts_as_fn_defs;
 use fastsim_api_utils::*;
 
 pub(crate) fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut ast = syn::parse_macro_input!(item as syn::ItemStruct);
-    let ident = &ast.ident;
-    // println!("{}", String::from("*").repeat(30));
-    // println!("struct: {}", ast.ident.to_string());
-
     let mut py_impl_block = TokenStream2::default();
     let mut impl_block = TokenStream2::default();
 
-    py_impl_block.extend::<TokenStream2>(parse_ts_as_fn_defs(attr, vec![], false, vec![]));
-
+    let mut ast = syn::parse_macro_input!(item as syn::ItemStruct);
+    let ident = &ast.ident;
     if let syn::Fields::Named(syn::FieldsNamed { named, .. }) = &mut ast.fields {
         process_named_field_struct(named, &mut py_impl_block);
     } else if let syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) = &mut ast.fields {
@@ -23,6 +18,36 @@ pub(crate) fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
             "Invalid use of `fastsim_api` macro.  Expected tuple struct or C-style struct."
         );
     };
+    let output: TokenStream2 = ast.to_token_stream();
+    // println!("{}", String::from("*").repeat(30));
+    // println!("struct: {}", ast.ident.to_string());
+
+    process_pyclass_generic(py_impl_block, attr, ident, output, impl_block, true)
+}
+
+pub(crate) fn fastsim_enum_api(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let py_impl_block = TokenStream2::default();
+    let impl_block = TokenStream2::default();
+
+    let ast = syn::parse_macro_input!(item as syn::ItemEnum);
+    let ident = &ast.ident;
+    let output: TokenStream2 = ast.to_token_stream();
+    // println!("{}", String::from("*").repeat(30));
+    // println!("struct: {}", ast.ident.to_string());
+
+    process_pyclass_generic(py_impl_block, attr, ident, output, impl_block, false)
+}
+
+/// Performs the processing steps that are not specific to structs or enums
+fn process_pyclass_generic(
+    mut py_impl_block: TokenStream2,
+    attr: TokenStream,
+    ident: &Ident,
+    mut output: TokenStream2,
+    impl_block: TokenStream2,
+    subclass: bool,
+) -> TokenStream {
+    py_impl_block.extend::<TokenStream2>(parse_ts_as_fn_defs(attr, vec![], false, vec![]));
 
     add_serde_methods(&mut py_impl_block);
 
@@ -36,10 +61,15 @@ pub(crate) fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
     let mut final_output = TokenStream2::default();
-    final_output.extend::<TokenStream2>(quote! {
-        #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", subclass))]
-    });
-    let mut output: TokenStream2 = ast.to_token_stream();
+    if subclass {
+        final_output.extend::<TokenStream2>(quote! {
+            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", subclass))]
+        });
+    } else {
+        final_output.extend::<TokenStream2>(quote! {
+            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim"))]
+        });
+    }
     output.extend(impl_block);
     output.extend(py_impl_block);
     // println!("{}", output.to_string());

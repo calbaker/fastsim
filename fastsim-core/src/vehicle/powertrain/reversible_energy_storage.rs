@@ -7,29 +7,6 @@ use crate::pyo3::*;
 const TOL: f64 = 1e-3;
 
 #[fastsim_api(
-    /// pyo3 getter for soc_lo_ramp_start
-    #[getter]
-    pub fn get_soc_lo_ramp_start(&self) -> PyResult<f64> {
-        Ok(self.soc_lo_ramp_start.unwrap().get::<si::ratio>())
-    }
-    /// pyo3 setter for soc_lo_ramp_start
-    #[setter("__soc_lo_ramp_start")]
-    pub fn set_soc_lo_ramp_start(&mut self, new_value: f64) -> PyResult<()> {
-        self.soc_lo_ramp_start = Some(new_value * uc::R);
-        Ok(())
-    }
-    /// pyo3 getter for soc_hi_ramp_start
-    #[getter]
-    pub fn get_soc_hi_ramp_start(&self) -> PyResult<f64> {
-        Ok(self.soc_hi_ramp_start.unwrap().get::<si::ratio>())
-    }
-    /// pyo3 setter for soc_hi_ramp_start
-    #[setter("__soc_hi_ramp_start")]
-    pub fn set_soc_hi_ramp_start(&mut self, new_value: f64) -> PyResult<()> {
-        self.soc_hi_ramp_start = Some(new_value * uc::R);
-        Ok(())
-    }
-
     // #[getter("eff_max")]
     // fn get_eff_max_py(&self) -> f64 {
     //     self.get_eff_max()
@@ -75,6 +52,11 @@ const TOL: f64 = 1e-3;
     fn get_specific_energy_kjoules_per_kg(&self) -> Option<f64> {
         self.specific_energy.map(|se| se.get::<si::kilojoule_per_kilogram>())
     }
+
+    #[getter]
+    fn get_energy_capacity_usable_joules(&self) -> f64 {
+        self.energy_capacity_usable().get::<si::joule>()
+    }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// Struct for modeling technology-naive Reversible Energy Storage (e.g. battery, flywheel).
@@ -104,16 +86,6 @@ pub struct ReversibleEnergyStorage {
     pub min_soc: si::Ratio,
     /// Hard limit on maximum SOC, e.g. 0.95
     pub max_soc: si::Ratio,
-    /// SOC at which negative/charge power begins to ramp down.
-    /// Should always be slightly below [Self::max_soc].
-    #[api(skip_get, skip_set)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub soc_hi_ramp_start: Option<si::Ratio>,
-    /// SOC at which positive/discharge power begins to ramp down.
-    /// Should always be slightly above [Self::min_soc].
-    #[api(skip_get, skip_set)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub soc_lo_ramp_start: Option<si::Ratio>,
     /// Time step interval at which history is saved
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
@@ -132,13 +104,13 @@ impl ReversibleEnergyStorage {
         let state = &mut self.state;
 
         ensure!(
-            state.soc <= state.max_soc || (pwr_out_req + state.pwr_aux) >= si::Power::ZERO,
+            state.soc <= self.max_soc || (pwr_out_req + state.pwr_aux) >= si::Power::ZERO,
             "{}\n{}",
             format_dbg!(pwr_out_req + state.pwr_aux),
             state.soc.get::<si::ratio>()
         );
         ensure!(
-            state.soc >= state.min_soc || (pwr_out_req + state.pwr_aux) <= si::Power::ZERO,
+            state.soc >= self.min_soc || (pwr_out_req + state.pwr_aux) <= si::Power::ZERO,
             "{}\n{}",
             format_dbg!(pwr_out_req + state.pwr_aux),
             state.soc.get::<si::ratio>()
@@ -257,36 +229,18 @@ impl ReversibleEnergyStorage {
     }
 
     /// Sets and returns max output and max regen power based on current state
-    /// #  Arguments:
-    /// - `charge_buffer`: buffer below max SOC to allow for anticipated future
-    ///    charging (i.e. decelerating while exiting a highway)
-    /// - `discharge_buffer`: buffer above min SOC to allow for anticipated
-    ///    future discharging (i.e. accelerating to enter a highway)
+    /// # Arguments
+    /// - `dt`: time step size
+    /// - `disch_buffer`: buffer offset from static SOC limit at which discharging is not allowed
+    /// - `chrg_buffer`: buffer offset from static SOC limit at which charging is not allowed
     pub fn set_curr_pwr_out_max(
         &mut self,
-        charge_buffer: Option<si::Energy>,
-        discharge_buffer: Option<si::Energy>,
+        dt: si::Time,
+        disch_buffer: si::Energy,
+        chrg_buffer: si::Energy,
     ) -> anyhow::Result<()> {
-        if self.soc_hi_ramp_start.is_none() {
-            self.soc_hi_ramp_start = Some(self.soc_hi_ramp_start_default());
-        }
-        if self.soc_lo_ramp_start.is_none() {
-            self.soc_lo_ramp_start = Some(self.soc_lo_ramp_start_default());
-        }
-
-        // TODO: consider having the buffer affect the max and min but not the ramp???
-        // operating lo_ramp_start and min_soc, allowing for buffer
-        // Set the dynamic minimum SOC to be the static min SOC plus the charge buffer
-        self.state.min_soc = (self.min_soc
-            + charge_buffer.unwrap_or_default() / self.energy_capacity)
-            .min(self.max_soc);
-        // Set the dynamic maximum SOC to be the static max SOC minus the discharge buffer
-        self.state.max_soc = (self.max_soc
-            - discharge_buffer.unwrap_or_default() / self.energy_capacity)
-            .max(self.min_soc);
-
-        self.set_pwr_disch_max()?;
-        self.set_pwr_charge_max()?;
+        self.set_pwr_disch_max(dt, disch_buffer)?;
+        self.set_pwr_charge_max(dt, chrg_buffer)?;
 
         let state = &mut self.state;
         ensure!(
@@ -304,67 +258,40 @@ impl ReversibleEnergyStorage {
         Ok(())
     }
 
-    pub fn set_pwr_charge_max(&mut self) -> anyhow::Result<()> {
-        self.state.pwr_charge_max =
-            // current SOC is less than or equal to current max and ramp down threshold
-            if self.state.soc <= self.state.max_soc
-            && self.state.soc <= self.soc_hi_ramp_start.with_context(|| format_dbg!())?
-        {
-            self.pwr_out_max
-        } // current SOC is greater than ramp down threshold and ramp down threshold is less than max soc
-        else if self.state.soc > self.soc_lo_ramp_start.unwrap()
-            && self.soc_hi_ramp_start.unwrap() < self.state.max_soc
-        {
-            uc::W
-            * Interpolator::Interp1D(Interp1D::new(
-                vec![
-                    self.state.max_soc.get::<si::ratio>(),
-                    self.soc_hi_ramp_start
-                        .with_context(|| format_dbg!())?
-                        .get::<si::ratio>(),
-                 ],
-            vec![0.0, self.pwr_out_max.get::<si::watt>()],
-                Strategy::Linear,
-                // TODO: figure out if it is ok to have Extrapolate::Clamp here
-                Extrapolate::Clamp,
-            )?).interpolate(&[self.state.soc.get::<si::ratio>()])?
-        }
-        // current SOC is less than ramp down threshold but greater than current
-        // max or current SOC is greater than both
-        else {
+    /// # Arguments
+    /// - `dt`: time step size
+    /// - `buffer`: buffer below static maximum SOC above which charging is disabled
+    pub fn set_pwr_charge_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
+        // to protect against excessive topping off of the battery
+        let soc_buffer = buffer / self.energy_capacity;
+        let pwr_max_for_dt =
+            ((self.max_soc - soc_buffer) - self.state.soc) * self.energy_capacity / dt;
+        self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
+            // current SOC is less than or equal to max
+            self.pwr_out_max.min(pwr_max_for_dt)
+        } else {
+            // current SOC is greater than both
             si::Power::ZERO
         };
         Ok(())
     }
 
-    pub fn set_pwr_disch_max(&mut self) -> anyhow::Result<()> {
-        self.state.pwr_disch_max =
-            // current SOC is greater than or equal to current min and ramp down threshold
-            if self.state.soc >= self.state.min_soc
-            && self.state.soc >= self.soc_lo_ramp_start.with_context(|| format_dbg!())?
-        {
-            self.pwr_out_max
-        } // current SOC is less than ramp down threshold and ramp down threshold is greater than min soc
-        else if self.state.soc < self.soc_lo_ramp_start.unwrap()
-            && self.soc_lo_ramp_start.unwrap() > self.state.min_soc
-        {
-            uc::W
-                * Interpolator::Interp1D(Interp1D::new(
-                    vec![
-                         self.state.min_soc.get::<si::ratio>(),
-                         self.soc_lo_ramp_start
-                             .with_context(|| format_dbg!())?
-                             .get::<si::ratio>(),
-                     ],
-                vec![0.0, self.pwr_out_max.get::<si::watt>()],
-                    Strategy::Linear,
-                    Extrapolate::Clamp,
-                )?).interpolate(&[self.state.soc.get::<si::ratio>()])?
-        }
-        // current SOC is greater than ramp down threshold but less than current min or current SOC is less than both
-        else {
+    /// # Arguments
+    /// - `dt`: time step size
+    /// - `buffer`: buffer above static minimum SOC above which charging is disabled
+    pub fn set_pwr_disch_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
+        // to protect against excessive bottoming out of the battery
+        let soc_buffer = buffer / self.energy_capacity;
+        let pwr_max_for_dt =
+            (self.state.soc - (self.min_soc + soc_buffer)) * self.energy_capacity / dt;
+        self.state.pwr_disch_max = if self.state.soc >= self.min_soc + soc_buffer {
+            // current SOC is greater than or equal to min
+            self.pwr_out_max.min(pwr_max_for_dt)
+        } else {
+            // current SOC is less than both
             si::Power::ZERO
         };
+
         Ok(())
     }
 
@@ -399,14 +326,6 @@ impl ReversibleEnergyStorage {
         );
 
         Ok(())
-    }
-
-    fn soc_hi_ramp_start_default(&self) -> si::Ratio {
-        self.max_soc - 0.05 * uc::R
-    }
-
-    fn soc_lo_ramp_start_default(&self) -> si::Ratio {
-        self.min_soc + 0.05 * uc::R
     }
 
     /// Sets specific energy and either mass or energy capacity of battery
@@ -458,6 +377,11 @@ impl ReversibleEnergyStorage {
     pub fn set_eff_range(&mut self, _eff_range: f64) -> anyhow::Result<()> {
         todo!("adapt from ALTRIOS");
     }
+
+    /// Usable energy capacity, accounting for SOC limits
+    pub fn energy_capacity_usable(&self) -> si::Energy {
+        self.energy_capacity * (self.max_soc - self.min_soc)
+    }
 }
 
 impl SetCumulative for ReversibleEnergyStorage {
@@ -493,11 +417,6 @@ impl Mass for ReversibleEnergyStorage {
             .with_context(|| anyhow!(format_dbg!()))?;
         if let (Some(derived_mass), Some(new_mass)) = (derived_mass, new_mass) {
             if derived_mass != new_mass {
-                #[cfg(feature = "logging")]
-                log::info!(
-                    "Derived mass from `self.specific_energy` and `self.energy_capacity` does not match {}",
-                    "provided mass. Updating based on `side_effect`"
-                );
                 match side_effect {
                     MassSideEffect::Extensive => {
                         self.energy_capacity = self.specific_energy.ok_or_else(|| {
@@ -516,8 +435,6 @@ impl Mass for ReversibleEnergyStorage {
                 }
             }
         } else if new_mass.is_none() {
-            #[cfg(feature = "logging")]
-            log::debug!("Provided mass is None, setting `self.specific_energy` to None");
             self.specific_energy = None;
         }
         self.mass = new_mass;
@@ -544,21 +461,11 @@ impl Init for ReversibleEnergyStorage {
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
         // TODO: make some kind of data validation framework to replace this code.
         ensure!(
-            self.max_soc > self.min_soc
-                && match self.soc_hi_ramp_start {
-                    Some(soc_hi_ramp_start) => soc_hi_ramp_start <= self.max_soc,
-                    None => true,
-                }
-                && match self.soc_lo_ramp_start {
-                    Some(soc_lo_ramp_start) => soc_lo_ramp_start >= self.min_soc,
-                    None => true,
-                },
+            self.max_soc > self.min_soc,
             format!(
-                "{}\n`max_soc`: {} must be greater than `soc_hi_ramp_start`: {:?}, which must be greater than `soc_lo_ramp_start`: {:?}`, which must be greater than `min_soc`: {}`",
+                "{}\n`max_soc`: {} must be greater than `min_soc`: {}`",
                 format_dbg!(),
                 self.max_soc.get::<si::ratio>(),
-                self.soc_hi_ramp_start.map(|x| x.get::<si::ratio>()),
-                self.soc_lo_ramp_start.map(|x| x.get::<si::ratio>()),
                 self.min_soc.get::<si::ratio>(),
             )
         );
@@ -580,9 +487,6 @@ pub enum SpecificEnergySideEffect {
 /// ReversibleEnergyStorage state variables
 pub struct ReversibleEnergyStorageState {
     // limits
-    // TODO: create separate binning for cat power and
-    /// maximum catenary power capability
-    pub pwr_cat_max: si::Power,
     /// max output power for propulsion during positive traction
     pub pwr_prop_max: si::Power,
     /// max regen power for propulsion during negative traction
@@ -627,11 +531,6 @@ pub struct ReversibleEnergyStorageState {
     /// cumulative chemical energy; positive is discharging
     pub energy_out_chemical: si::Energy,
 
-    /// dynamically updated max SOC limit
-    pub max_soc: si::Ratio,
-    /// dynamically updated min SOC limit
-    pub min_soc: si::Ratio,
-
     /// component temperature
     // TODO: make this uom or figure out why it's not!
     pub temperature_celsius: f64,
@@ -640,7 +539,6 @@ pub struct ReversibleEnergyStorageState {
 impl Default for ReversibleEnergyStorageState {
     fn default() -> Self {
         Self {
-            pwr_cat_max: si::Power::ZERO,
             pwr_prop_max: si::Power::ZERO,
             pwr_regen_max: si::Power::ZERO,
             pwr_disch_max: si::Power::ZERO,
@@ -659,8 +557,6 @@ impl Default for ReversibleEnergyStorageState {
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,
-            max_soc: si::Ratio::ZERO,
-            min_soc: si::Ratio::ZERO,
             temperature_celsius: 22.,
         }
     }

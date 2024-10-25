@@ -36,7 +36,7 @@ if ENABLE_ASSERTS:
     print("Checking output of `variable_path_list()`")
     with open(ref_dir / "variable_path_list_expected.txt", 'r') as f:
         variable_path_list_expected = [line.strip() for line in f.readlines()]
-    assert variable_path_list_expected == sd.variable_path_list()
+    assert variable_path_list_expected == sd.variable_path_list(), "Try setting `ENABLE_REF_OVERRIDE=true`."
 print("\n")
 
 # print out all subpaths for history variables in SimDrive
@@ -52,6 +52,6 @@ if ENABLE_REF_OVERRIDE:
 if ENABLE_ASSERTS:
     print("Checking output of `to_dataframe`")
     to_dataframe_expected = pl.scan_csv(ref_dir / "to_dataframe_expected.csv").collect()
-    assert to_dataframe_expected.equals(sd.to_dataframe())
+    assert to_dataframe_expected.equals(sd.to_dataframe()), "Try setting `ENABLE_REF_OVERRIDE=true`."
     print("Success!")
 

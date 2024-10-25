@@ -1,5 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
-// INFO: uncomment when docs are somewhat mature to check for missing docs
+// TODO: uncomment when docs are somewhat mature to check for missing docs
 // #![warn(missing_docs)]
 // #![warn(missing_docs_in_private_items)]
 
@@ -47,7 +47,5 @@ pub fn enabled_features() -> Vec<String> {
         "toml".into(),
         #[cfg(feature = "yaml")]
         "yaml".into(),
-        #[cfg(feature = "logging")]
-        "logging".into(),
     ]
 }

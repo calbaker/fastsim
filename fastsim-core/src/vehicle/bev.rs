@@ -59,10 +59,6 @@ impl Mass for BatteryElectricVehicle {
             Some(new_mass) => {
                 if let Some(dm) = derived_mass {
                     if dm != new_mass {
-                        #[cfg(feature = "logging")]
-                        log::warn!(
-                            "Derived mass does not match provided mass, setting `{}` consituent mass fields to `None`",
-                            stringify!(BatteryElectricVehicle));
                         self.expunge_mass_fields();
                     }
                 }
@@ -156,6 +152,7 @@ impl Powertrain for BatteryElectricVehicle {
         &mut self,
         _pwr_aux: si::Power,
         _dt: si::Time,
+        _veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
         todo!();

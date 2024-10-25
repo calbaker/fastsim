@@ -190,13 +190,10 @@ impl Init for InterpND {}
 impl InterpMethods for InterpND {
     fn validate(&self) -> anyhow::Result<()> {
         let n = self.ndim();
-
-        if n <= 3 {
-            #[cfg(feature = "logging")]
-            log::warn!("Using N-D interpolator for {n}-D interpolation, use hardcoded {n}-D interpolator for better performance");
-        }
-
-        ensure!(!matches!(self.extrapolate, Extrapolate::Extrapolate), "`Extrapolate` is not implemented for N-D, use `Clamp` or `Error` extrapolation strategy instead");
+        ensure!(
+            !matches!(self.extrapolate, Extrapolate::Extrapolate), 
+            "`Extrapolate` is not implemented for N-D, use `Clamp` or `Error` extrapolation strategy instead"
+        );
 
         // Check that each grid dimension has elements
         for i in 0..n {

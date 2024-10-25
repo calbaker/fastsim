@@ -24,11 +24,12 @@ impl Powertrain for PowertrainType {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
+        veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         match self {
-            Self::ConventionalVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt),
-            Self::HybridElectricVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt),
-            Self::BatteryElectricVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt),
+            Self::ConventionalVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt, veh_state),
+            Self::HybridElectricVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt, veh_state),
+            Self::BatteryElectricVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt, veh_state),
         }
     }
 

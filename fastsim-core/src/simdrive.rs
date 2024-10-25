@@ -98,16 +98,16 @@ impl SimDrive {
     // - [x] come up with a mechanism of enabling or disabling SOC balance iteration
     // - [x] warn after ~2 (make configurable) iterations and error after ~10 iterations
     // - [x] figure out speed trace miss -- resulted from not having enough SOC buffer
-    // - [ ] make sure that when doing lefthand interpolation we have same array length as f2
+    // - [ ] probably done already -- make sure that when doing lefthand interpolation we have same array length as f2
     // ## Features
+    // - [ ] engine min time on per f2
     // - [ ] accel buffer per f2
     // - [ ] regen buffer per f2
-    // - [ ] regen curve per f2
+    // - [ ] regen limiting curve during speeds approaching zero per f2 -- less urgent
     // - [ ] controls to make the engine recharge the battery if below buffers
     // - [ ] controls to make engine run efficiency when on. In f2, this just maxes out
     //       the engine.  We should be able to actually get near peak efficiency in a
     //       smarter way in f3 because the performance penalty is less problematic.
-    // - [ ] engine min time on per f2
     // - [ ] ability to manipulate friction/regen brake split based on required braking
     //       power -- new feature
     // - [ ] make enum `EngineOnCause::{AlreadyOn, TooCold,
@@ -140,15 +140,6 @@ impl SimDrive {
                         .soc;
                     let res_per_fuel = self.veh.res().unwrap().state.energy_out_chemical
                         / self.veh.fc().unwrap().state.energy_fuel;
-                    if soc_bal_iters > self.veh.hev().unwrap().sim_params.soc_balance_iter_warn {
-                        log::warn!(
-                            "{}",
-                            format_dbg!((
-                                soc_bal_iters,
-                                self.veh.hev().unwrap().sim_params.soc_balance_iter_warn
-                            ))
-                        );
-                    }
                     if soc_bal_iters > self.veh.hev().unwrap().sim_params.soc_balance_iter_err {
                         bail!(
                             "{}",
@@ -193,8 +184,6 @@ impl SimDrive {
     /// Solves current time step
     /// # Arguments
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
-        #[cfg(feature = "logging")]
-        log::debug!("{}", format_dbg!(self.veh.state.i));
         let i = self.veh.state.i;
         let dt = self.cyc.dt_at_i(i)?;
         self.veh
@@ -220,15 +209,11 @@ impl SimDrive {
         speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
-        #[cfg(feature = "logging")]
-        log::debug!("{}: {}", format_dbg!(), "set_pwr_prop_for_speed");
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
         let speed_prev = vs.speed_ach;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
         vs.grade_curr = if !vs.any_pwr_not_met {
-            #[cfg(feature = "logging")]
-            log::debug!("{}", format_dbg!(vs.any_pwr_not_met));
             *self.cyc.grade.get(i).with_context(|| format_dbg!())?
         } else {
             uc::R
@@ -287,12 +272,8 @@ impl SimDrive {
         let vs = &mut self.veh.state;
         if vs.curr_pwr_met {
             vs.speed_ach = cyc_speed;
-            #[cfg(feature = "logging")]
-            log::debug!("{}", format_dbg!("early return from `set_ach_speed`"));
             return Ok(());
         } else {
-            #[cfg(feature = "logging")]
-            log::debug!("{}", format_dbg!("proceeding through `set_ach_speed`"));
             match self.sim_params.trace_miss_opts {
                 TraceMissOptions::Allow => {
                     // do nothing because `set_ach_speed` should be allowed to proceed to handle this
@@ -393,19 +374,7 @@ impl SimDrive {
         // speed achieved iteration counter
         let mut spd_ach_iter_counter = 1;
         let mut converged = pwr_err <= si::Power::ZERO;
-        #[cfg(feature = "logging")]
-        log::debug!(
-            "{}\n{}",
-            format_dbg!(vs.i),
-            format_dbg!(spd_ach_iter_counter)
-        );
         while spd_ach_iter_counter < max_iter && !converged {
-            #[cfg(feature = "logging")]
-            log::debug!(
-                "{}\n{}",
-                format_dbg!(vs.i),
-                format_dbg!(spd_ach_iter_counter)
-            );
             let speed_guess = *speed_guesses.iter().last().with_context(|| format_dbg!())?
                 * (1.0 - g)
                 - g * *new_speed_guesses
