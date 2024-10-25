@@ -191,6 +191,7 @@ impl SimDrive {
             .with_context(|| anyhow!(format_dbg!()))?;
         self.set_pwr_prop_for_speed(self.cyc.speed[i], dt)
             .with_context(|| anyhow!(format_dbg!()))?;
+        self.veh.state.pwr_tractive_req = self.veh.state.pwr_tractive;
         self.set_ach_speed(self.cyc.speed[i], dt)
             .with_context(|| anyhow!(format_dbg!()))?;
         self.veh
@@ -211,6 +212,7 @@ impl SimDrive {
     ) -> anyhow::Result<()> {
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
+        // achieved speed from previous time step
         let speed_prev = vs.speed_ach;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
         vs.grade_curr = if !vs.any_pwr_not_met {
@@ -281,10 +283,15 @@ impl SimDrive {
                 TraceMissOptions::Error => bail!(
                     "{}\nFailed to meet speed trace.
 prescribed speed: {} mph
-achieved speed: {} mph",
+achieved speed: {} mph
+pwr for prescribed speed: {} kW
+pwr available: {} kW
+",
                     format_dbg!(),
                     cyc_speed.get::<si::mile_per_hour>(),
-                    vs.speed_ach.get::<si::mile_per_hour>()
+                    vs.speed_ach.get::<si::mile_per_hour>(),
+                    vs.pwr_tractive_req.get::<si::kilowatt>(),
+                    vs.pwr_tractive.get::<si::kilowatt>()
                 ),
                 TraceMissOptions::Correct => todo!(),
             }

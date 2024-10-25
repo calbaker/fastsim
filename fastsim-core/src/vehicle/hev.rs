@@ -509,7 +509,7 @@ pub struct RESGreedyWithBuffers {
     /// Speed at which [fuelconverter] is forced on. Defaults to 75 mph.
     //  TODO: make sure this is plumbed up
     pub fc_speed_forced_on: Option<si::Velocity>,
-    /// Fraction of total aux and powertrain power demand at which [FuelConverter] is forced on.  Defaults to 0.75.
+    /// Fraction of total aux and powertrain power demand at which [FuelConverter] is forced on.  Defaults to 0.4.
     // TODO: make sure this is plumbed up
     pub fc_pwr_frac_demand_forced_on: Option<si::Ratio>,
     /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
@@ -531,8 +531,7 @@ impl Init for RESGreedyWithBuffers {
             .or(Some(60. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
-        self.fc_pwr_frac_demand_forced_on =
-            self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.75));
+        self.fc_pwr_frac_demand_forced_on = self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.4));
         Ok(())
     }
 }

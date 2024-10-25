@@ -52,6 +52,7 @@ pt_type:
             - 0.33
             - 0.32
           strategy: LeftNearest
+          extrapolate: Error
       pwr_idle_fuel_watts: 13125.0
       save_interval: 1
     em:
@@ -82,12 +83,29 @@ pt_type:
             - 0.93
             - 0.92
           strategy: LeftNearest
+          extrapolate: Error
       pwr_out_max_watts: 53000.0
       specific_pwr_watts_per_kilogram: ~
       mass_kilograms: ~
       save_interval: 1
-    hev_controls: RESGreedy
+    pt_cntrl:
+      Fastsim2:
+        soc_frac_buffer_for_accel: 0.2
+        speed_soc_buffer_for_accel_cutoff: 26.8224
+        fc_min_time_on: 60.0
+        fc_speed_forced_on: 37.9984
+        fc_pwr_frac_demand_forced_on: 0.9859154929577465
+        frac_res_chrg_for_fc: 0.0
+        frac_res_dschrg_for_fc: 1.0
+        soc_frac_buffer_for_regen: 0.22072499999999998
+    aux_cntrl: AuxOnResPriority
     mass: ~
+    sim_params:
+      res_per_fuel_lim: 0.005
+      soc_balance_iter_warn: 3
+      soc_balance_iter_err: 5
+      balance_soc: true
+    soc_bal_iters: 0
 chassis:
   drag_coef: 0.306
   frontal_area_square_meters: 2.22

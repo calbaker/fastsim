@@ -938,8 +938,10 @@ pub struct VehicleState {
     /// pwr exerted on wheels by powertrain
     /// maximum backward propulsive power (e.g. regenerative braking) vehicle can produce
     pub pwr_prop_bwd_max: si::Power,
-    /// Tractive power required for achieved speed
+    /// Tractive power for achieved speed
     pub pwr_tractive: si::Power,
+    /// Tractive power required for prescribed speed
+    pub pwr_tractive_req: si::Power,
     /// integral of [Self::pwr_out]
     pub energy_tractive: si::Energy,
     /// time varying aux load
@@ -996,6 +998,7 @@ impl Default for VehicleState {
             pwr_prop_fwd_max: si::Power::ZERO,
             pwr_prop_bwd_max: si::Power::ZERO,
             pwr_tractive: si::Power::ZERO,
+            pwr_tractive_req: si::Power::ZERO,
             energy_tractive: si::Energy::ZERO,
             pwr_aux: si::Power::ZERO,
             energy_aux: si::Energy::ZERO,
