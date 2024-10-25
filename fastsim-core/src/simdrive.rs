@@ -278,7 +278,14 @@ impl SimDrive {
                 TraceMissOptions::Allow => {
                     // do nothing because `set_ach_speed` should be allowed to proceed to handle this
                 }
-                TraceMissOptions::Error => bail!("{}\nFailed to meet speed trace.", format_dbg!()),
+                TraceMissOptions::Error => bail!(
+                    "{}\nFailed to meet speed trace.
+prescribed speed: {} mph
+achieved speed: {} mph",
+                    format_dbg!(),
+                    cyc_speed.get::<si::mile_per_hour>(),
+                    vs.speed_ach.get::<si::mile_per_hour>()
+                ),
                 TraceMissOptions::Correct => todo!(),
             }
         }

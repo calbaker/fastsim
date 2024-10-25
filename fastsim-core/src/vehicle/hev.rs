@@ -74,7 +74,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
         self.state.fc_on_causes.clear();
         match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
-                if self.fc.state.time_on
+                if self.fc.state.fc_on && self.fc.state.time_on
                     < rgwb.fc_min_time_on.with_context(|| {
                     anyhow!(
                         "{}\n Expected `ResGreedyWithBuffers::init` to have been called beforehand.",
@@ -298,6 +298,7 @@ impl FCOnCauses {
     }
 }
 
+// TODO: figure out why this is not turning in the dataframe but is in teh pydict
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 pub struct HEVState {
@@ -306,9 +307,12 @@ pub struct HEVState {
     /// Vector of posssible reasons the fc is forced on
     #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
+    // TODO: store the soc buffer here or somewhere
 }
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
+
+// TODO: implement `Deserialize`
 
 // Custom serialization
 impl Serialize for FCOnCauses {
@@ -436,13 +440,16 @@ impl HEVPowertrainControls {
                     .with_context(|| format_dbg!())?,
                 HEVPowertrainControls::RESGreedyWithDynamicBuffers => uc::R * f64::NAN,
             };
-            if em_pwr < pwr_out_req * fc_pwr_frac_demand_forced_on {
+            let fc_pwr = pwr_out_req - em_pwr;
+            // If the motor cannot produce more than the required power times a
+            // 0..1 fraction, then the engine should be on
+            if em_state.pwr_mech_fwd_out_max < pwr_out_req * fc_pwr_frac_demand_forced_on
+                || fc_pwr > si::Power::ZERO
+            {
                 hev_state
                     .fc_on_causes
                     .push(FCOnCause::PropulsionPowerDemand);
             }
-
-            let fc_pwr = pwr_out_req - em_pwr;
 
             ensure!(
                 fc_pwr >= si::Power::ZERO,
