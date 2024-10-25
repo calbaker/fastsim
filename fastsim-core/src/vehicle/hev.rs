@@ -69,7 +69,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
         veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
-        self.state.fc_on_cause.clear();
+        self.state.fc_on_causes.clear();
         match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
                 if self.fc.state.time_on
@@ -79,7 +79,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         format_dbg!()
                     )
                 })? {
-                    self.state.fc_on_cause.push(FCOnCauses::OnTimeTooShort)
+                    self.state.fc_on_causes.push(FCOnCauses::OnTimeTooShort)
                 }
             },
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
@@ -162,13 +162,16 @@ impl Powertrain for Box<HybridElectricVehicle> {
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
-        let (fc_pwr_out_req, em_pwr_out_req) =
-            self.pt_cntrl
-                .get_pwr_fc_and_em(pwr_out_req, &self.fc.state, &self.em.state)?;
+        let (fc_pwr_out_req, em_pwr_out_req) = self.pt_cntrl.get_pwr_fc_and_em(
+            pwr_out_req,
+            &mut self.state,
+            &mut self.fc.state,
+            &self.em.state,
+        )?;
         // TODO: add a stop/start model
         // TODO: figure out fancier way to handle apportionment of `pwr_aux` between `fc` and `res`
 
-        let fc_on = !self.state.fc_on_cause.is_empty();
+        let fc_on: bool = !self.state.fc_on_causes.is_empty();
 
         self.fc
             .solve(fc_pwr_out_req, fc_on, dt)
@@ -275,8 +278,9 @@ impl Mass for HybridElectricVehicle {
 pub struct HEVState {
     /// time step index
     pub i: usize,
+    /// Vector of posssible reasons the fc is forced on
     #[api(skip_get, skip_set)]
-    pub fc_on_cause: Vec<FCOnCauses>,
+    pub fc_on_causes: Vec<FCOnCauses>,
 }
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
@@ -284,13 +288,15 @@ impl SerdeAPI for HEVState {}
 #[fastsim_enum_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub enum FCOnCauses {
-    /// Engine must be on to self heat
+    /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,
     /// Engine must be on for high vehicle speed to ensure powertrain can meet
     /// any spikes in power demand
     VehicleSpeedTooHigh,
     /// Engine has not been on long enough (usually 30 s)
     OnTimeTooShort,
+    /// Powertrain power demand exceeds motor and/or battery capabilities
+    PowerDemand,
 }
 impl SerdeAPI for FCOnCauses {}
 impl Init for FCOnCauses {}
@@ -358,13 +364,25 @@ impl HEVPowertrainControls {
     fn get_pwr_fc_and_em(
         &self,
         pwr_out_req: si::Power,
-        fc_state: &FuelConverterState,
+        hev_state: &mut HEVState,
+        fc_state: &mut FuelConverterState,
         em_state: &ElectricMachineState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
         if pwr_out_req >= si::Power::ZERO {
             // positive net power out of the powertrain
             // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
             let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
+
+            let fc_pwr_frac_demand_forced_on = match &self {
+                HEVPowertrainControls::Fastsim2(rgwb) => rgwb
+                    .fc_pwr_frac_demand_forced_on
+                    .with_context(|| format_dbg!())?,
+                HEVPowertrainControls::RESGreedyWithDynamicBuffers => uc::R * f64::NAN,
+            };
+            if em_pwr < pwr_out_req * fc_pwr_frac_demand_forced_on {
+                hev_state.fc_on_causes.push(FCOnCauses::PowerDemand);
+            }
+
             let fc_pwr = pwr_out_req - em_pwr;
 
             ensure!(

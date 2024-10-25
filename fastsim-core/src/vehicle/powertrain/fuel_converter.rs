@@ -220,8 +220,15 @@ impl FuelConverter {
         &mut self,
         pwr_out_req: si::Power,
         fc_on: bool,
-        _dt: si::Time,
+        dt: si::Time,
     ) -> anyhow::Result<()> {
+        self.state.fc_on = fc_on;
+        if fc_on {
+            self.state.time_on += dt;
+        } else {
+            self.state.time_on = si::Time::ZERO;
+        }
+        // NOTE: think about the possibility of engine braking, not urgent
         ensure!(
             pwr_out_req >= si::Power::ZERO,
             format!(
@@ -233,38 +240,43 @@ impl FuelConverter {
         ensure!(
             fc_on || (pwr_out_req == si::Power::ZERO && self.state.pwr_aux == si::Power::ZERO),
             format!(
-                "{}\nEngine is off but pwr_out_req + pwr_aux is non-zero",
+                "{}\nEngine is off but pwr_out_req + pwr_aux is non-zero\n`pwr_out_req`: {} kW\n`self.state.pwr_aux`: {} kW",
                 format_dbg!(
                     fc_on
                         || (pwr_out_req == si::Power::ZERO
                             && self.state.pwr_aux == si::Power::ZERO)
-                )
+                ), 
+               pwr_out_req.get::<si::kilowatt>(),
+               self.state.pwr_aux.get::<si::kilowatt>() 
             )
         );
         self.state.pwr_propulsion = pwr_out_req;
-        self.state.eff = uc::R
-            * self
-                .eff_interp_from_pwr_out
-                .interpolate(&[
-                    ((pwr_out_req + self.state.pwr_aux) / self.pwr_out_max).get::<si::ratio>()
-                ])
-                .with_context(|| {
-                    anyhow!(
-                        "{}\n failed to calculate {}",
-                        format_dbg!(),
-                        stringify!(self.state.eff)
-                    )
-                })?;
+        self.state.eff = if fc_on {
+            uc::R
+                * self
+                    .eff_interp_from_pwr_out
+                    .interpolate(&[
+                        ((pwr_out_req + self.state.pwr_aux) / self.pwr_out_max).get::<si::ratio>()
+                    ])
+                    .with_context(|| {
+                        anyhow!(
+                            "{}\n failed to calculate {}",
+                            format_dbg!(),
+                            stringify!(self.state.eff)
+                        )
+                    })?
+        } else {
+            uc::R * f64::NAN
+        };
         ensure!(
-            self.state.eff >= 0.0 * uc::R || self.state.eff <= 1.0 * uc::R,
+            (self.state.eff >= 0.0 * uc::R && self.state.eff <= 1.0 * uc::R)
+                || self.state.eff.is_nan(),
             format!(
-                "{}\nfc efficiency ({}) must be between 0 and 1",
-                format_dbg!(self.state.eff >= 0.0 * uc::R || self.state.eff <= 1.0 * uc::R),
+                "fc efficiency ({}) must be either between 0 and 1 or NAN",
                 self.state.eff.get::<si::ratio>()
             )
         );
 
-        self.state.fc_on = fc_on;
         // TODO: consider how idle is handled.  The goal is to make it so that even if `self.state.pwr_aux` is
         // zero, there will be fuel consumption to overcome internal dissipation.
         self.state.pwr_fuel = if self.state.fc_on {
