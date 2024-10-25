@@ -53,7 +53,10 @@ impl Init for HybridElectricVehicle {
         self.fc.init().with_context(|| anyhow!(format_dbg!()))?;
         self.res.init().with_context(|| anyhow!(format_dbg!()))?;
         self.em.init().with_context(|| anyhow!(format_dbg!()))?;
-        self.pt_cntrl.init()?;
+        self.pt_cntrl
+            .init()
+            .with_context(|| anyhow!(format_dbg!()))?;
+        self.state.init().with_context(|| anyhow!(format_dbg!()))?;
         Ok(())
     }
 }
