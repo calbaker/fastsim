@@ -130,6 +130,9 @@ impl Powertrain for Box<HybridElectricVehicle> {
                 HEVAuxControls::AuxOnFcPriority => (si::Power::ZERO, pwr_aux),
             }
         };
+        if pwr_aux_fc > si::Power::ZERO {
+            self.state.fc_on_causes.push(FCOnCauses::AuxPowerDemand);
+        }
         self.fc
             .set_curr_pwr_prop_max(pwr_aux_fc)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -296,7 +299,9 @@ pub enum FCOnCauses {
     /// Engine has not been on long enough (usually 30 s)
     OnTimeTooShort,
     /// Powertrain power demand exceeds motor and/or battery capabilities
-    PowerDemand,
+    PropulsionPowerDemand,
+    /// Aux power demand exceeds battery capability
+    AuxPowerDemand,
 }
 impl SerdeAPI for FCOnCauses {}
 impl Init for FCOnCauses {}
@@ -380,7 +385,9 @@ impl HEVPowertrainControls {
                 HEVPowertrainControls::RESGreedyWithDynamicBuffers => uc::R * f64::NAN,
             };
             if em_pwr < pwr_out_req * fc_pwr_frac_demand_forced_on {
-                hev_state.fc_on_causes.push(FCOnCauses::PowerDemand);
+                hev_state
+                    .fc_on_causes
+                    .push(FCOnCauses::PropulsionPowerDemand);
             }
 
             let fc_pwr = pwr_out_req - em_pwr;
