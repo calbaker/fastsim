@@ -1,6 +1,6 @@
 use fmt::Display;
 
-use crate::prelude::{ElectricMachineState, FuelConverterState};
+use crate::prelude::ElectricMachineState;
 
 use super::{vehicle_model::VehicleState, *};
 
@@ -167,15 +167,10 @@ impl Powertrain for Box<HybridElectricVehicle> {
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
-        let (fc_pwr_out_req, em_pwr_out_req) = self.pt_cntrl.get_pwr_fc_and_em(
-            pwr_out_req,
-            &mut self.state,
-            &mut self.fc.state,
-            &self.em.state,
-        )?;
-        // TODO: add a stop/start model
-        // TODO: figure out fancier way to handle apportionment of `pwr_aux` between `fc` and `res`
-
+        let (fc_pwr_out_req, em_pwr_out_req) = self
+            .pt_cntrl
+            .get_pwr_fc_and_em(pwr_out_req, &mut self.state, &self.fc, &self.em.state)
+            .with_context(|| format_dbg!())?;
         let fc_on: bool = !self.state.fc_on_causes.is_empty();
 
         self.fc
@@ -426,42 +421,77 @@ impl HEVPowertrainControls {
         &self,
         pwr_out_req: si::Power,
         hev_state: &mut HEVState,
-        fc_state: &mut FuelConverterState,
+        fc: &FuelConverter,
         em_state: &ElectricMachineState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
+        let fc_state = &fc.state;
         if pwr_out_req >= si::Power::ZERO {
-            // positive net power out of the powertrain
-            // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
-            let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-
-            let fc_pwr_frac_demand_forced_on = match &self {
-                HEVPowertrainControls::Fastsim2(rgwb) => rgwb
-                    .fc_pwr_frac_demand_forced_on
-                    .with_context(|| format_dbg!())?,
-                HEVPowertrainControls::RESGreedyWithDynamicBuffers => uc::R * f64::NAN,
-            };
-            let fc_pwr = pwr_out_req - em_pwr;
-            // If the motor cannot produce more than the required power times a
-            // 0..1 fraction, then the engine should be on
-            if em_state.pwr_mech_fwd_out_max < pwr_out_req * fc_pwr_frac_demand_forced_on
-                || fc_pwr > si::Power::ZERO
-            {
-                hev_state
-                    .fc_on_causes
-                    .push(FCOnCause::PropulsionPowerDemand);
-            }
-
             ensure!(
-                fc_pwr >= si::Power::ZERO,
-                format_dbg!(fc_pwr >= si::Power::ZERO)
-            );
-            ensure!(
-                pwr_out_req <= em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max,
-                "{}\n`pwr_out_req`: {} kW\n`em_state.pwr_mech_fwd_out_max`: {} kW",
-                format_dbg!(pwr_out_req <= em_state.pwr_mech_fwd_out_max),
+                almost_le_uom(
+                    &pwr_out_req,
+                    &(em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max),
+                    None
+                ),
+                "{}
+`pwr_out_req`: {} kW
+`em_state.pwr_mech_fwd_out_max`: {} kW
+`fc_state.pwr_prop_max`: {} kW",
+                format_dbg!(),
                 pwr_out_req.get::<si::kilowatt>(),
-                em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>()
+                em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
+                fc_state.pwr_prop_max.get::<si::kilowatt>()
             );
+            // positive net power out of the powertrain
+            let (fc_pwr, em_pwr) = match &self {
+                HEVPowertrainControls::Fastsim2(rgwb) => {
+                    // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
+                    let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
+                    let fc_pwr_frac_demand_forced_on: si::Ratio = rgwb
+                        .fc_pwr_frac_demand_forced_on
+                        .with_context(|| format_dbg!())?;
+                    let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwb
+                        .frac_of_most_eff_pwr_to_run_fc
+                        .with_context(|| format_dbg!())?;
+                    // If the motor cannot produce more than the required power times a
+                    // 0..=1 fraction, then the engine should be on
+                    if em_state.pwr_mech_fwd_out_max < pwr_out_req * fc_pwr_frac_demand_forced_on
+                        || pwr_out_req - em_pwr >= si::Power::ZERO
+                    {
+                        hev_state
+                            .fc_on_causes
+                            .push(FCOnCause::PropulsionPowerDemand);
+                    }
+
+                    let fc_pwr: si::Power = if !hev_state.fc_on_causes.is_empty() {
+                        (pwr_out_req - em_pwr).max(
+                            // if the engine is on, load it up to get closer to peak efficiency
+                            // TODO: figure out a way to precalculate this
+                            (fc.eff_interp_from_pwr_out
+                                .f_x()
+                                .with_context(|| format_dbg!())?
+                                .iter()
+                                .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
+                                * uc::W
+                                * frac_of_most_eff_pwr_to_run_fc)
+                                .min(pwr_out_req),
+                        )
+                    } else {
+                        si::Power::ZERO
+                    };
+                    // recalculate `em_pwr` based on `fc_pwr`
+                    let em_pwr = pwr_out_req - fc_pwr;
+
+                    ensure!(
+                        fc_pwr >= si::Power::ZERO,
+                        format_dbg!(fc_pwr >= si::Power::ZERO)
+                    );
+                    (fc_pwr, em_pwr)
+                }
+                HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+                    (uc::W * f64::NAN, uc::W * f64::NAN)
+                }
+            };
+
             Ok((fc_pwr, em_pwr))
         } else {
             // negative net power out of the powertrain -- i.e. positive net
@@ -521,6 +551,8 @@ pub struct RESGreedyWithBuffers {
     /// Fraction of usable battery energy to reserve for charging when decelerating from high speed
     // TODO: make sure this is plumbed up
     pub soc_frac_buffer_for_regen: Option<si::Ratio>,
+    /// Force engine, if on, to run at this fraction of power at which peak efficiency occurs
+    pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
 }
 
 impl Init for RESGreedyWithBuffers {

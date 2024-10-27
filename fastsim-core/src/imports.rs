@@ -11,7 +11,8 @@ pub(crate) use crate::uc;
 pub(crate) use crate::utils;
 pub(crate) use crate::utils::interp::*;
 pub(crate) use crate::utils::{
-    almost_eq, check_interp_frac_data, check_monotonicity, is_sorted, InterpRange, DIRECT_SET_ERR,
+    abs_checked_x_val, almost_eq, almost_le_uom, check_interp_frac_data, check_monotonicity,
+    is_sorted, InterpRange, DIRECT_SET_ERR,
 };
 pub(crate) use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecWrapper};
 pub(crate) use derive_more::IsVariant;

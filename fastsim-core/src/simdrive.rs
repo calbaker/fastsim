@@ -186,13 +186,14 @@ impl SimDrive {
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
         let i = self.veh.state.i;
         let dt = self.cyc.dt_at_i(i)?;
+        let speed_prev = self.veh.state.speed_ach;
         self.veh
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
-        self.set_pwr_prop_for_speed(self.cyc.speed[i], dt)
+        self.set_pwr_prop_for_speed(self.cyc.speed[i], speed_prev, dt)
             .with_context(|| anyhow!(format_dbg!()))?;
-        self.veh.state.pwr_tractive_req = self.veh.state.pwr_tractive;
-        self.set_ach_speed(self.cyc.speed[i], dt)
+        self.veh.state.pwr_tractive_for_cyc = self.veh.state.pwr_tractive;
+        self.set_ach_speed(self.cyc.speed[i], speed_prev, dt)
             .with_context(|| anyhow!(format_dbg!()))?;
         self.veh
             .solve_powertrain(dt)
@@ -204,16 +205,16 @@ impl SimDrive {
     /// Sets power required for given prescribed speed
     /// # Arguments
     /// - `speed`: prescribed or achieved speed
+    /// - `speed_prev`: previously achieved speed
     /// - `dt`: time step size
     pub fn set_pwr_prop_for_speed(
         &mut self,
         speed: si::Velocity,
+        speed_prev: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
-        // achieved speed from previous time step
-        let speed_prev = vs.speed_ach;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
         vs.grade_curr = if !vs.any_pwr_not_met {
             *self.cyc.grade.get(i).with_context(|| format_dbg!())?
@@ -268,8 +269,15 @@ impl SimDrive {
 
     /// Sets achieved speed based on known current max power
     /// # Arguments
+    /// - `cyc_speed`: prescribed speed
     /// - `dt`: time step size
-    pub fn set_ach_speed(&mut self, cyc_speed: si::Velocity, dt: si::Time) -> anyhow::Result<()> {
+    /// - `speed_prev`: previously achieved speed
+    pub fn set_ach_speed(
+        &mut self,
+        cyc_speed: si::Velocity,
+        speed_prev: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
         // borrow state as `vs` for shorthand
         let vs = &mut self.veh.state;
         if vs.curr_pwr_met {
@@ -290,7 +298,7 @@ pwr available: {} kW
                     format_dbg!(),
                     cyc_speed.get::<si::mile_per_hour>(),
                     vs.speed_ach.get::<si::mile_per_hour>(),
-                    vs.pwr_tractive_req.get::<si::kilowatt>(),
+                    vs.pwr_tractive_for_cyc.get::<si::kilowatt>(),
                     vs.pwr_tractive.get::<si::kilowatt>()
                 ),
                 TraceMissOptions::Correct => todo!(),
@@ -300,7 +308,6 @@ pwr available: {} kW
             .veh
             .mass
             .with_context(|| format!("{}\nMass should have been set before now", format_dbg!()))?;
-        let speed_prev = vs.speed_ach;
 
         let drag3 = 1.0 / 16.0
             * vs.air_density
@@ -417,7 +424,9 @@ pwr available: {} kW
                 .with_context(|| format_dbg!("should have had at least one element"))?
                 .max(0.0 * uc::MPS);
         }
-        self.set_pwr_prop_for_speed(self.veh.state.speed_ach, dt)
+
+        // Run it again to make sure it has been updated for achieved speed
+        self.set_pwr_prop_for_speed(self.veh.state.speed_ach, speed_prev, dt)
             .with_context(|| format_dbg!())?;
 
         Ok(())

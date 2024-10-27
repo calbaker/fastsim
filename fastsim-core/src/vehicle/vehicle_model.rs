@@ -337,6 +337,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     soc_frac_buffer_for_regen: Some(
                         f2veh.max_regen_kwh / f2veh.ess_max_kwh * uc::R,
                     ),
+                    frac_of_most_eff_pwr_to_run_fc: Some(uc::R * 1.),
                 });
                 let hev = HybridElectricVehicle {
                     fs: {
@@ -941,7 +942,7 @@ pub struct VehicleState {
     /// Tractive power for achieved speed
     pub pwr_tractive: si::Power,
     /// Tractive power required for prescribed speed
-    pub pwr_tractive_req: si::Power,
+    pub pwr_tractive_for_cyc: si::Power,
     /// integral of [Self::pwr_out]
     pub energy_tractive: si::Energy,
     /// time varying aux load
@@ -998,7 +999,7 @@ impl Default for VehicleState {
             pwr_prop_fwd_max: si::Power::ZERO,
             pwr_prop_bwd_max: si::Power::ZERO,
             pwr_tractive: si::Power::ZERO,
-            pwr_tractive_req: si::Power::ZERO,
+            pwr_tractive_for_cyc: si::Power::ZERO,
             energy_tractive: si::Energy::ZERO,
             pwr_aux: si::Power::ZERO,
             energy_aux: si::Energy::ZERO,
@@ -1043,8 +1044,8 @@ pub(crate) mod tests {
             veh.unwrap()
         };
 
-        // veh.to_file(vehicles_dir().join("2012_Ford_Fusion.yaml"))
-        //     .unwrap();
+        veh.to_file(vehicles_dir().join("2012_Ford_Fusion.yaml"))
+            .unwrap();
         assert!(veh.pt_type.is_conventional_vehicle());
         veh
     }
@@ -1059,8 +1060,8 @@ pub(crate) mod tests {
             veh.unwrap()
         };
 
-        // veh.to_file(vehicles_dir().join("2016_TOYOTA_Prius_Two.yaml"))
-        //     .unwrap();
+        veh.to_file(vehicles_dir().join("2016_TOYOTA_Prius_Two.yaml"))
+            .unwrap();
         assert!(veh.pt_type.is_hybrid_electric_vehicle());
         veh
     }

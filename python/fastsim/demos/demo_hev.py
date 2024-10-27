@@ -447,4 +447,44 @@ if SHOW_PLOTS:
     fig, ax = plot_res_pwr()
     fig, ax = plot_res_energy()
 
-# %%
+# troubleshooting stuff
+fig, ax = plt.subplots(3, 1, sharex=True)
+
+ax[0].plot(
+    df['cyc.time_seconds'],
+    df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_prop_max_watts'],
+    label='prop_max',
+)
+
+ax[0].plot(
+    df['cyc.time_seconds'],
+    df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_propulsion_watts'],
+    label='prop ach',
+)
+ax[0].plot(
+    df['cyc.time_seconds'],
+    df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts'],
+    label='aux',
+)
+ax[0].set_ylabel("FC Power [W]")
+
+ax[1].plot(
+    df['cyc.time_seconds'],
+    df['veh.pt_type.HybridElectricVehicle.fc.history.fc_on']
+)
+ax[1].set_ylabel("cyc_met")
+
+
+ax[-1].plot(
+    df['cyc.time_seconds'],
+    df['cyc.speed_meters_per_second'],
+    label='cyc'
+)
+ax[-1].plot(
+    df['cyc.time_seconds'],
+    df['veh.history.speed_ach_meters_per_second'],
+    label='ach'
+)
+ax[-1].set_xlabel('Time [s]')
+ax[-1].set_ylabel("Speed [mph]")
+
