@@ -1,7 +1,4 @@
-use self::vehicle_model::VehicleState;
-
 use super::*;
-// use crate::imports::*;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, HistoryMethods)]
 /// Battery electric vehicle
@@ -150,27 +147,36 @@ impl Powertrain for BatteryElectricVehicle {
 
     fn set_curr_pwr_prop_out_max(
         &mut self,
-        _pwr_aux: si::Power,
-        _dt: si::Time,
+        pwr_aux: si::Power,
+        dt: si::Time,
         _veh_state: &VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
-        todo!();
-        // self.res.set_cur_pwr_out_max(pwr_aux.unwrap(), None, None)?;
-        // self.em.set_cur_pwr_max_out(self.res.state.pwr_prop_out_max, None)?;
-        // self.em.set_cur_pwr_regen_max(self.res.state.pwr_regen_out_max)?;
+        // TODO: change these to something other than zero
+        let disch_buffer = si::Energy::ZERO;
+        let chrg_buffer = si::Energy::ZERO;
+        self.res
+            .set_curr_pwr_out_max(dt, disch_buffer, chrg_buffer)
+            .with_context(|| anyhow!(format_dbg!()))?;
 
-        // // power rate is never limiting in BEL, but assuming dt will be same
-        // // in next time step, we can synthesize a rate
-        // self.em.set_pwr_rate_out_max(
-        //     (self.em.state.pwr_mech_out_max - self.em.state.pwr_mech_prop_out) / dt,
-        // );
+        self.res
+            .set_curr_pwr_prop_max(pwr_aux)
+            .with_context(|| anyhow!(format_dbg!()))?;
+        self.em
+            .set_curr_pwr_prop_out_max(
+                self.res.state.pwr_prop_max,
+                self.res.state.pwr_regen_max,
+                dt,
+            )
+            .with_context(|| anyhow!(format_dbg!()))?;
+
+        Ok(())
     }
 
     fn pwr_regen(&self) -> si::Power {
         // When `pwr_mech_prop_out` is negative, regen is happening.  First, clip it at 0, and then negate it.
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d
         // for example
-        -self.em.state.pwr_mech_prop_out.min(0. * uc::W)
+        -self.em.state.pwr_mech_prop_out.min(si::Power::ZERO)
     }
 }

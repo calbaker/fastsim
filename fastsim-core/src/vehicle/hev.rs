@@ -176,7 +176,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
         // TODO: add a stop/start model
         // TODO: figure out fancier way to handle apportionment of `pwr_aux` between `fc` and `res`
 
-        let fc_on: bool = !self.state.fc_on_causes.is_empty();
+        let fc_on: bool = !self.state.fc_on_causes.0.is_empty(); // placeholder, delete on merge conflict
 
         self.fc
             .solve(fc_pwr_out_req, fc_on, dt)
