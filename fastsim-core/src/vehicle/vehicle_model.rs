@@ -328,9 +328,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     speed_soc_buffer_for_accel_cutoff: Some(f2veh.max_accel_buffer_mph * uc::MPH),
                     fc_min_time_on: Some(f2veh.min_fc_time_on * uc::S),
                     fc_speed_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
-                    fc_pwr_frac_demand_forced_on: Some(
-                        f2veh.kw_demand_fc_on / f2veh.fc_max_kw * uc::R,
-                    ),
+                    frac_pwr_demand_fc_forced_on: None,
                     // TODO: make sure these actually do something, if deemed worthwhile
                     frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
                     frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
@@ -339,7 +337,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     ),
                     frac_of_most_eff_pwr_to_run_fc: Some(uc::R * 1.),
                 });
-                let hev = HybridElectricVehicle {
+                let mut hev = HybridElectricVehicle {
                     fs: {
                         let mut fs = FuelStorage {
                             pwr_out_max: f2veh.fs_max_kw * uc::KW,
@@ -438,6 +436,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     state: Default::default(),
                     history: Default::default(),
                 };
+                hev.init()?;
                 Ok(PowertrainType::HybridElectricVehicle(Box::new(hev)))
             }
             _ => {
@@ -976,10 +975,10 @@ pub struct VehicleState {
     /// whether powertrain can achieve power demand to achieve prescribed speed
     /// in current time step
     // because it should be assumed true in the first time step
-    pub curr_pwr_met: bool,
+    pub cyc_met: bool,
     /// whether powertrain can achieve power demand to achieve prescribed speed
     /// in entire cycle
-    pub any_pwr_not_met: bool,
+    pub cyc_met_overall: bool,
     /// actual achieved speed
     pub speed_ach: si::Velocity,
     /// cumulative distance traveled, integral of [Self::speed_ach]
@@ -1015,8 +1014,8 @@ impl Default for VehicleState {
             energy_whl_inertia: si::Energy::ZERO,
             pwr_brake: si::Power::ZERO,
             energy_brake: si::Energy::ZERO,
-            curr_pwr_met: true,
-            any_pwr_not_met: false,
+            cyc_met: true,
+            cyc_met_overall: true,
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
             grade_curr: si::Ratio::ZERO,

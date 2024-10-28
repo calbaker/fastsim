@@ -300,6 +300,7 @@ impl ReversibleEnergyStorage {
     /// - `pwr_aux`: aux power demand on `ReversibleEnergyStorage`
     pub fn set_curr_pwr_prop_max(&mut self, pwr_aux: si::Power) -> anyhow::Result<()> {
         let state = &mut self.state;
+        state.pwr_aux = pwr_aux;
         state.pwr_prop_max = state.pwr_disch_max - pwr_aux;
         state.pwr_regen_max = state.pwr_charge_max + pwr_aux;
 

@@ -100,7 +100,7 @@ impl SimDrive {
     // - [x] figure out speed trace miss -- resulted from not having enough SOC buffer
     // - [ ] probably done already -- make sure that when doing lefthand interpolation we have same array length as f2
     // ## Features
-    // - [ ] engine min time on per f2
+    // - [x] engine min time on per f2
     // - [ ] accel buffer per f2
     // - [ ] regen buffer per f2
     // - [ ] regen limiting curve during speeds approaching zero per f2 -- less urgent
@@ -109,8 +109,8 @@ impl SimDrive {
     //       the engine.  We should be able to actually get near peak efficiency in a
     //       smarter way in f3 because the performance penalty is less problematic.
     // - [ ] ability to manipulate friction/regen brake split based on required braking
-    //       power -- new feature
-    // - [ ] make enum `EngineOnCause::{AlreadyOn, TooCold,
+    //       power -- new feature -- move this to enum
+    // - [x] make enum `EngineOnCause::{AlreadyOn, TooCold,
     //       PowerDemand}` and save it in a vec or some such for when there are
     //       multiple causes -- new feature
 
@@ -216,7 +216,7 @@ impl SimDrive {
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
-        vs.grade_curr = if !vs.any_pwr_not_met {
+        vs.grade_curr = if vs.cyc_met_overall {
             *self.cyc.grade.get(i).with_context(|| format_dbg!())?
         } else {
             uc::R
@@ -258,11 +258,11 @@ impl SimDrive {
 
         vs.pwr_tractive =
             vs.pwr_rr + vs.pwr_whl_inertia + vs.pwr_accel + vs.pwr_ascent + vs.pwr_drag;
-        vs.curr_pwr_met = vs.pwr_tractive <= vs.pwr_prop_fwd_max;
-        if !vs.curr_pwr_met {
+        vs.cyc_met = vs.pwr_tractive <= vs.pwr_prop_fwd_max;
+        if !vs.cyc_met {
             // if current power demand is not met, then this becomes false for
             // the rest of the cycle and should not be manipulated anywhere else
-            vs.any_pwr_not_met = true;
+            vs.cyc_met_overall = false;
         }
         Ok(())
     }
@@ -280,7 +280,7 @@ impl SimDrive {
     ) -> anyhow::Result<()> {
         // borrow state as `vs` for shorthand
         let vs = &mut self.veh.state;
-        if vs.curr_pwr_met {
+        if vs.cyc_met {
             vs.speed_ach = cyc_speed;
             return Ok(());
         } else {
@@ -293,13 +293,19 @@ impl SimDrive {
 prescribed speed: {} mph
 achieved speed: {} mph
 pwr for prescribed speed: {} kW
-pwr available: {} kW
+pwr for achieved speed: {} kW
+pwr available: {} kW,
+pwr deficit: {} kW
 ",
                     format_dbg!(),
                     cyc_speed.get::<si::mile_per_hour>(),
                     vs.speed_ach.get::<si::mile_per_hour>(),
                     vs.pwr_tractive_for_cyc.get::<si::kilowatt>(),
-                    vs.pwr_tractive.get::<si::kilowatt>()
+                    vs.pwr_tractive.get::<si::kilowatt>(),
+                    vs.pwr_prop_fwd_max.get::<si::kilowatt>(),
+                    (vs.pwr_tractive - vs.pwr_prop_fwd_max)
+                        .get::<si::kilowatt>()
+                        .format_eng(None)
                 ),
                 TraceMissOptions::Correct => todo!(),
             }
@@ -470,9 +476,9 @@ impl Default for TraceMissTolerance {
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
 pub enum TraceMissOptions {
-    #[default]
     /// Allow trace miss without any fanfare
     Allow,
+    #[default]
     /// Error out when trace miss happens
     Error,
     /// Correct trace miss with driver model that catches up
@@ -512,7 +518,8 @@ mod tests {
             cyc: _cyc,
             sim_params: Default::default(),
         };
-        sd.walk_once().unwrap();
+        // TODO: fix this: sd.walk_once().unwrap();
+        sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);

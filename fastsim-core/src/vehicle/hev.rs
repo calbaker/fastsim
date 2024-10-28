@@ -424,6 +424,8 @@ impl HEVPowertrainControls {
         fc: &FuelConverter,
         em_state: &ElectricMachineState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
+        // TODO:
+        // - [ ] make buffers soft limits that aren't enforced, just suggested
         let fc_state = &fc.state;
         if pwr_out_req >= si::Power::ZERO {
             ensure!(
@@ -446,37 +448,44 @@ impl HEVPowertrainControls {
                 HEVPowertrainControls::Fastsim2(rgwb) => {
                     // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
                     let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-                    let fc_pwr_frac_demand_forced_on: si::Ratio = rgwb
-                        .fc_pwr_frac_demand_forced_on
+                    let frac_pwr_demand_fc_forced_on: si::Ratio = rgwb
+                        .frac_pwr_demand_fc_forced_on
                         .with_context(|| format_dbg!())?;
                     let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwb
                         .frac_of_most_eff_pwr_to_run_fc
                         .with_context(|| format_dbg!())?;
                     // If the motor cannot produce more than the required power times a
-                    // 0..=1 fraction, then the engine should be on
-                    if em_state.pwr_mech_fwd_out_max < pwr_out_req * fc_pwr_frac_demand_forced_on
-                        || pwr_out_req - em_pwr >= si::Power::ZERO
+                    // `fc_pwr_frac_demand_forced_on`, then the engine should be on
+                    if pwr_out_req
+                        > frac_pwr_demand_fc_forced_on
+                            // TODO: pipe in vehicle state and use that maybe???
+                            * (em_state.pwr_mech_fwd_out_max + 
+                                // TODO: account for transmission efficiency here
+                                fc_state.pwr_out_max)
+                        || pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO
                     {
                         hev_state
                             .fc_on_causes
                             .push(FCOnCause::PropulsionPowerDemand);
                     }
 
-                    let fc_pwr: si::Power = if !hev_state.fc_on_causes.is_empty() {
-                        (pwr_out_req - em_pwr).max(
-                            // if the engine is on, load it up to get closer to peak efficiency
-                            // TODO: figure out a way to precalculate this
-                            (fc.eff_interp_from_pwr_out
-                                .f_x()
-                                .with_context(|| format_dbg!())?
-                                .iter()
-                                .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
-                                * uc::W
-                                * frac_of_most_eff_pwr_to_run_fc)
-                                .min(pwr_out_req),
-                        )
-                    } else {
+                    let fc_pwr: si::Power = if hev_state.fc_on_causes.is_empty() {
                         si::Power::ZERO
+                    } else {
+                        (pwr_out_req - em_pwr)
+                            .max(
+                                // if the engine is on, load it up to get closer to peak efficiency
+                                // TODO: figure out a way to precalculate this
+                                (fc.eff_interp_from_pwr_out
+                                    .f_x()
+                                    .with_context(|| format_dbg!())?
+                                    .iter()
+                                    .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
+                                    * uc::W
+                                    * frac_of_most_eff_pwr_to_run_fc)
+                                    .min(pwr_out_req),
+                            )
+                            .min(fc.state.pwr_out_max)
                     };
                     // recalculate `em_pwr` based on `fc_pwr`
                     let em_pwr = pwr_out_req - fc_pwr;
@@ -540,8 +549,7 @@ pub struct RESGreedyWithBuffers {
     //  TODO: make sure this is plumbed up
     pub fc_speed_forced_on: Option<si::Velocity>,
     /// Fraction of total aux and powertrain power demand at which [FuelConverter] is forced on.  Defaults to 0.4.
-    // TODO: make sure this is plumbed up
-    pub fc_pwr_frac_demand_forced_on: Option<si::Ratio>,
+    pub frac_pwr_demand_fc_forced_on: Option<si::Ratio>,
     /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
     // TODO: make sure this is plumbed up
     pub frac_res_chrg_for_fc: si::Ratio,
@@ -551,7 +559,8 @@ pub struct RESGreedyWithBuffers {
     /// Fraction of usable battery energy to reserve for charging when decelerating from high speed
     // TODO: make sure this is plumbed up
     pub soc_frac_buffer_for_regen: Option<si::Ratio>,
-    /// Force engine, if on, to run at this fraction of power at which peak efficiency occurs
+    /// Force engine, if on, to run at this fraction of power at which peak
+    /// efficiency occurs or the required power, whichever is greater. Defaults to 1.
     pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
 }
 
@@ -563,7 +572,10 @@ impl Init for RESGreedyWithBuffers {
             .or(Some(60. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
-        self.fc_pwr_frac_demand_forced_on = self.fc_pwr_frac_demand_forced_on.or(Some(uc::R * 0.4));
+        self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
+        self.frac_of_most_eff_pwr_to_run_fc =
+        // TODO: consider changing this default
+            self.frac_of_most_eff_pwr_to_run_fc.or(Some(1. * uc::R));
         Ok(())
     }
 }
