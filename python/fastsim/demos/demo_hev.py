@@ -486,6 +486,7 @@ ax[0].plot(
 ax[0].plot(
     df['cyc.time_seconds'][plt_slice],
     np.array(sd2.fc_kw_out_ach.tolist())[plt_slice],
+    linestyle="-.",
     label='f2 fc shaft',
 )
 ax[0].plot(
@@ -504,13 +505,21 @@ ax[0].legend()
 
 ax[1].plot(
     df['cyc.time_seconds'][plt_slice],
-    np.array(sd2.soc.tolist())[plt_slice],
+    df['veh.pt_type.HybridElectricVehicle.res.history.soc'][plt_slice],
+    linestyle="-.",
     label='f3 soc',
 )
 ax[1].plot(
     df['cyc.time_seconds'][plt_slice],
-    df['veh.pt_type.HybridElectricVehicle.res.history.soc'][plt_slice],
+    np.array(sd2.soc.tolist())[plt_slice],
+    linestyle="-.",
     label='f2 soc',
+)
+ax[1].plot(
+    df['cyc.time_seconds'][plt_slice],
+    np.array(sd2.accel_buff_soc.tolist())[plt_slice],
+    linestyle="--",
+    label='f2 soc acc buff',
 )
 ax[1].set_ylabel("[-]")
 ax[1].legend()
