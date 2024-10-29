@@ -86,6 +86,7 @@ pub struct ReversibleEnergyStorage {
     pub min_soc: si::Ratio,
     /// Hard limit on maximum SOC, e.g. 0.95
     pub max_soc: si::Ratio,
+
     /// Time step interval at which history is saved
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
@@ -182,7 +183,7 @@ impl ReversibleEnergyStorage {
         // TODO: replace this with something correct.
         // This should trip the `ensure` below
         state.eff = match self.eff_interp.to_owned() {
-            Interpolator::Interp0D(round_trip_eff) => round_trip_eff * uc::R,
+            Interpolator::Interp0D(eff) => eff * uc::R,
             Interpolator::Interp1D(interp1d) => {
                 interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()])? * uc::R
             }
@@ -205,7 +206,7 @@ impl ReversibleEnergyStorage {
             state.eff >= 0.0 * uc::R && state.eff <= 1.0 * uc::R,
             format!(
                 "{}\nres efficiency ({}) must be between 0 and 1",
-                format_dbg!(state.eff >= 0.0 * uc::R || state.eff <= 1.0 * uc::R),
+                format_dbg!(state.eff >= 0.0 * uc::R && state.eff <= 1.0 * uc::R),
                 state.eff.get::<si::ratio>()
             )
         );
@@ -300,6 +301,7 @@ impl ReversibleEnergyStorage {
     /// - `pwr_aux`: aux power demand on `ReversibleEnergyStorage`
     pub fn set_curr_pwr_prop_max(&mut self, pwr_aux: si::Power) -> anyhow::Result<()> {
         let state = &mut self.state;
+        state.pwr_aux = pwr_aux;
         state.pwr_prop_max = state.pwr_disch_max - pwr_aux;
         state.pwr_regen_max = state.pwr_charge_max + pwr_aux;
 

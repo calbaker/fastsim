@@ -48,7 +48,7 @@ impl Powertrain for Box<ConventionalVehicle> {
     }
 
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
-        Ok((self.fc.state.pwr_prop_max, 0. * uc::W))
+        Ok((self.fc.state.pwr_prop_max, si::Power::ZERO))
     }
 
     fn solve(
@@ -139,8 +139,8 @@ impl Mass for ConventionalVehicle {
     }
 
     fn expunge_mass_fields(&mut self) {
-        self.fc.mass = None;
-        self.fs.mass = None;
+        self.fc.expunge_mass_fields();
+        self.fs.expunge_mass_fields();
         self.mass = None;
     }
 }
