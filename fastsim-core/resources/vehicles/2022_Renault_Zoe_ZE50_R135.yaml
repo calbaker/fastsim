@@ -46,6 +46,11 @@ pt_type:
       specific_pwr_watts_per_kilogram: ~
       mass_kilograms: ~
       save_interval: 1
+    transmission:
+      mass_kilograms: ~
+      eff_interp:
+        Interp0D: 0.92
+      save_interval: 1
     mass: ~
 chassis:
   drag_coef: 0.33
