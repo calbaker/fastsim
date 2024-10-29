@@ -1,5 +1,3 @@
-use fmt::Display;
-
 use crate::prelude::ElectricMachineState;
 
 use super::{vehicle_model::VehicleState, *};
@@ -91,32 +89,32 @@ impl Powertrain for Box<HybridElectricVehicle> {
         self.fc
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
-        let disch_buffer = match &self.pt_cntrl {
+        let disch_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
-                if veh_state.speed_ach
-                    < rgwb.speed_soc_buffer_for_accel_cutoff.with_context(|| {
-                        anyhow!(
-                        "{}\nExpected `ResGreedyWithBuffers::init` to have been called beforehand.",
-                        format_dbg!()
-                    )
-                    })?
-                {
-                    rgwb.soc_frac_buffer_for_accel.with_context(|| {
-                        anyhow!(
-                        "{}\nExpected `ResGreedyWithBuffers::init` to have been called beforehand.",
-                        format_dbg!()
-                    )
-                    })? * self.res.energy_capacity_usable()
-                } else {
-                    si::Energy::ZERO
-                }
+                0.5 * veh_state.mass
+                    * (rgwb
+                        .speed_min_soc_buffer_for_accel
+                        .with_context(|| format_dbg!())?
+                        - veh_state.speed_ach)
+                        .powi(typenum::P2::new())
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
             }
         };
-        // TODO: change this to something other than zero
-        let chrg_buffer = si::Energy::ZERO;
+        let chrg_buffer: si::Energy = match &self.pt_cntrl {
+            HEVPowertrainControls::Fastsim2(rgwb) => {
+                0.5 * veh_state.mass
+                    * (veh_state.speed_ach
+                        - rgwb
+                            .speed_max_soc_buffer_for_decel
+                            .with_context(|| format_dbg!())?)
+                    .powi(typenum::P2::new())
+            }
+            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+                todo!()
+            }
+        };
         self.res
             .set_curr_pwr_out_max(dt, disch_buffer, chrg_buffer)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -163,13 +161,19 @@ impl Powertrain for Box<HybridElectricVehicle> {
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        _veh_state: &VehicleState,
+        veh_state: &VehicleState,
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let (fc_pwr_out_req, em_pwr_out_req) = self
             .pt_cntrl
-            .get_pwr_fc_and_em(pwr_out_req, &mut self.state, &self.fc, &self.em.state)
+            .get_pwr_fc_and_em(
+                pwr_out_req,
+                veh_state,
+                &mut self.state,
+                &self.fc,
+                &self.em.state,
+            )
             .with_context(|| format_dbg!())?;
         let fc_on: bool = !self.state.fc_on_causes.is_empty();
 
@@ -324,7 +328,7 @@ impl Serialize for FCOnCauses {
         serializer.serialize_str(&format!("\"[{}]\"", joined))
     }
 }
-impl Display for FCOnCauses {
+impl std::fmt::Display for FCOnCauses {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
         // or, alternatively:
@@ -344,6 +348,8 @@ pub enum FCOnCause {
     OnTimeTooShort,
     /// Powertrain power demand exceeds motor and/or battery capabilities
     PropulsionPowerDemand,
+    /// Powertrain power demand exceeds optimal motor and/or battery output
+    PropulsionPowerDemandSoft,
     /// Aux power demand exceeds battery capability
     AuxPowerDemand,
 }
@@ -420,6 +426,7 @@ impl HEVPowertrainControls {
     fn get_pwr_fc_and_em(
         &self,
         pwr_out_req: si::Power,
+        veh_state: &VehicleState,
         hev_state: &mut HEVState,
         fc: &FuelConverter,
         em_state: &ElectricMachineState,
@@ -456,14 +463,23 @@ impl HEVPowertrainControls {
                         .with_context(|| format_dbg!())?;
                     // If the motor cannot produce more than the required power times a
                     // `fc_pwr_frac_demand_forced_on`, then the engine should be on
+                    // TODO: account for transmission efficiency here or somewhere
                     if pwr_out_req
                         > frac_pwr_demand_fc_forced_on
-                            // TODO: pipe in vehicle state and use that maybe???
-                            * (em_state.pwr_mech_fwd_out_max + 
-                                // TODO: account for transmission efficiency here
-                                fc_state.pwr_out_max)
-                        || pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO
+                            * (em_state.pwr_mech_fwd_out_max + fc_state.pwr_out_max)
                     {
+                        hev_state
+                            .fc_on_causes
+                            .push(FCOnCause::PropulsionPowerDemandSoft);
+                    }
+
+                    if veh_state.speed_ach
+                        > rgwb.fc_speed_forced_on.with_context(|| format_dbg!())?
+                    {
+                        hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
+                    }
+
+                    if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
                         hev_state
                             .fc_on_causes
                             .push(FCOnCause::PropulsionPowerDemand);
@@ -537,11 +553,16 @@ impl HEVPowertrainControls {
 /// Container for static controls parameters
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 pub struct RESGreedyWithBuffers {
-    /// Fraction of usable battery energy above static minimum SOC that is reserved for acceleration.  Defaults to 0.2.
-    pub soc_frac_buffer_for_accel: Option<si::Ratio>,
-    /// Speed at which accel buffer becomes inactive.  Defaults to 60 mph.
-    // NOTE: for future control strategy, make this a ramp rather than a cutoff
-    pub speed_soc_buffer_for_accel_cutoff: Option<si::Velocity>,
+    /// Speed at which accel buffer becomes inactive.  Buffer linearly decreases
+    /// up to this speed.  Defaults to 60 mph.
+    // TODO: in future control strategy, have a coeff to control how big the
+    // buffer is relative to this speed
+    pub speed_min_soc_buffer_for_accel: Option<si::Velocity>,
+    /// Speed at which decel buffer maxes.  Buffer linearly increases
+    /// up to this speed.  Defaults to 60 mph.
+    // TODO: in future control strategy, have a coeff to control how big the
+    // buffer is relative to this speed
+    pub speed_max_soc_buffer_for_decel: Option<si::Velocity>,
     /// Minimum time engine must remain on if it was on during the previous
     /// simulation time step.  defaults to 30 s.
     pub fc_min_time_on: Option<si::Time>,
@@ -553,12 +574,9 @@ pub struct RESGreedyWithBuffers {
     /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
     // TODO: make sure this is plumbed up
     pub frac_res_chrg_for_fc: si::Ratio,
+    // TODO: make sure this is plumbed up
     /// Fraction of available discharging capacity to use toward running the engine efficiently. Defaults to 0.
-    // TODO: make sure this is plumbed up
     pub frac_res_dschrg_for_fc: si::Ratio,
-    /// Fraction of usable battery energy to reserve for charging when decelerating from high speed
-    // TODO: make sure this is plumbed up
-    pub soc_frac_buffer_for_regen: Option<si::Ratio>,
     /// Force engine, if on, to run at this fraction of power at which peak
     /// efficiency occurs or the required power, whichever is greater. Defaults to 1.
     pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
@@ -566,13 +584,13 @@ pub struct RESGreedyWithBuffers {
 
 impl Init for RESGreedyWithBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
-        self.soc_frac_buffer_for_accel = self.soc_frac_buffer_for_accel.or(Some(0.2 * uc::R));
-        self.speed_soc_buffer_for_accel_cutoff = self
-            .speed_soc_buffer_for_accel_cutoff
-            .or(Some(60. * uc::MPH));
+        self.speed_min_soc_buffer_for_accel =
+            self.speed_min_soc_buffer_for_accel.or(Some(60. * uc::MPH));
+        self.speed_max_soc_buffer_for_decel =
+            self.speed_max_soc_buffer_for_decel.or(Some(60. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
-        self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
+        self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.4));
         self.frac_of_most_eff_pwr_to_run_fc =
         // TODO: consider changing this default
             self.frac_of_most_eff_pwr_to_run_fc.or(Some(1. * uc::R));

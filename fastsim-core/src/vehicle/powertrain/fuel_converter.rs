@@ -245,9 +245,9 @@ impl FuelConverter {
                     fc_on
                         || (pwr_out_req == si::Power::ZERO
                             && self.state.pwr_aux == si::Power::ZERO)
-                ), 
+                ),
                pwr_out_req.get::<si::kilowatt>(),
-               self.state.pwr_aux.get::<si::kilowatt>() 
+               self.state.pwr_aux.get::<si::kilowatt>()
             )
         );
         self.state.pwr_propulsion = pwr_out_req;

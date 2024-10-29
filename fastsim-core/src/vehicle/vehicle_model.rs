@@ -322,19 +322,18 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
             }
             HEV => {
                 let pt_cntrl = HEVPowertrainControls::Fastsim2(hev::RESGreedyWithBuffers {
-                    soc_frac_buffer_for_accel: Some(
-                        f2veh.max_accel_buffer_perc_of_useable_soc * uc::R,
-                    ),
-                    speed_soc_buffer_for_accel_cutoff: Some(f2veh.max_accel_buffer_mph * uc::MPH),
+                    speed_min_soc_buffer_for_accel: Some(f2veh.max_accel_buffer_mph * uc::MPH),
+                    speed_max_soc_buffer_for_decel: Some(f2veh.max_accel_buffer_mph * uc::MPH),
                     fc_min_time_on: Some(f2veh.min_fc_time_on * uc::S),
                     fc_speed_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
-                    frac_pwr_demand_fc_forced_on: None,
+                    frac_pwr_demand_fc_forced_on: Some(
+                        f2veh.kw_demand_fc_on
+                            / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
+                            * uc::R,
+                    ),
                     // TODO: make sure these actually do something, if deemed worthwhile
                     frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
                     frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
-                    soc_frac_buffer_for_regen: Some(
-                        f2veh.max_regen_kwh / f2veh.ess_max_kwh * uc::R,
-                    ),
                     frac_of_most_eff_pwr_to_run_fc: Some(uc::R * 1.),
                 });
                 let mut hev = HybridElectricVehicle {
@@ -987,6 +986,9 @@ pub struct VehicleState {
     pub grade_curr: si::Ratio,
     /// current air density
     pub air_density: si::MassDensity,
+    /// current mass
+    // TODO: make sure this gets updated appropriately
+    pub mass: si::Mass,
 }
 
 impl SerdeAPI for VehicleState {}
@@ -1020,6 +1022,7 @@ impl Default for VehicleState {
             dist: si::Length::ZERO,
             grade_curr: si::Ratio::ZERO,
             air_density: crate::air_properties::get_density_air(None, None),
+            mass: uc::KG * f64::NAN,
         }
     }
 }

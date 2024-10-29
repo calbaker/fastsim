@@ -469,7 +469,8 @@ assert component_to_plot in ["fc", "em", "res"]
 df = sd.to_dataframe(allow_partial=True)
 sd_dict = sd.to_pydict()
 
-plt_slice = slice(150, len(df))
+sd3_slice = slice(165, len(df))
+sd2_slice = slice(165, len(df) + 5)
 
 sd2 = sd0.to_fastsim2()
 with fsim.utils.without_logging():  # suppresses known warning
@@ -477,56 +478,55 @@ with fsim.utils.without_logging():  # suppresses known warning
 
 fig, ax = plt.subplots(3, 1, sharex=True, figsize=(10, 12))
 # if component_to_plot == "fc":
+ax[0].set_prop_cycle(get_paired_cycler())
 ax[0].plot(
-    df['cyc.time_seconds'][plt_slice],
+    df['cyc.time_seconds'][sd3_slice],
     (df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_propulsion_watts'] +
-     df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts'])[plt_slice] / 1e3,
+     df['veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts'])[sd3_slice] / 1e3,
     label='f3 fc shaft',
 )
 ax[0].plot(
-    df['cyc.time_seconds'][plt_slice],
-    np.array(sd2.fc_kw_out_ach.tolist())[plt_slice],
-    linestyle="-.",
+    np.array(sd2.cyc.time_s.tolist())[sd2_slice],
+    np.array(sd2.fc_kw_out_ach.tolist())[sd2_slice],
     label='f2 fc shaft',
 )
 ax[0].plot(
-    df['cyc.time_seconds'][plt_slice],
-    df['veh.pt_type.HybridElectricVehicle.em.history.pwr_mech_prop_out_watts'][plt_slice] / 1e3,
+    df['cyc.time_seconds'][sd3_slice],
+    df['veh.pt_type.HybridElectricVehicle.em.history.pwr_mech_prop_out_watts'][sd3_slice] / 1e3,
     label='f3 em shaft',
 )
 ax[0].plot(
-    df['cyc.time_seconds'][plt_slice],
-    np.array(sd2.mc_mech_kw_out_ach.tolist())[plt_slice],
-    linestyle="-.",
+    np.array(sd2.cyc.time_s.tolist())[sd2_slice],
+    np.array(sd2.mc_mech_kw_out_ach.tolist())[sd2_slice],
     label='f2 em shaft',
 )
 ax[0].set_ylabel("Pwr [W]")
 ax[0].legend()
 
+ax[1].set_prop_cycle(get_paired_cycler())
 ax[1].plot(
-    df['cyc.time_seconds'][plt_slice],
-    df['veh.pt_type.HybridElectricVehicle.res.history.soc'][plt_slice],
-    linestyle="-.",
+    df['cyc.time_seconds'][sd3_slice],
+    df['veh.pt_type.HybridElectricVehicle.res.history.soc'][sd3_slice],
     label='f3 soc',
 )
 ax[1].plot(
-    df['cyc.time_seconds'][plt_slice],
-    np.array(sd2.soc.tolist())[plt_slice],
-    linestyle="-.",
+    np.array(sd2.cyc.time_s.tolist())[sd2_slice],
+    np.array(sd2.soc.tolist())[sd2_slice],
     label='f2 soc',
 )
 ax[1].plot(
-    df['cyc.time_seconds'][plt_slice],
-    np.array(sd2.accel_buff_soc.tolist())[plt_slice],
-    linestyle="--",
-    label='f2 soc acc buff',
+    np.array(sd2.cyc.time_s.tolist())[sd2_slice],
+    np.array(sd2.accel_buff_soc.tolist())[sd2_slice],
+    label='f2 soc accel',
+    linestyle=BASE_LINE_STYLES[1],
+    color=BASE_COLORS[1],
 )
 ax[1].set_ylabel("[-]")
 ax[1].legend()
 
 ax[-1].plot(
-    df['cyc.time_seconds'][plt_slice],
-    df['cyc.speed_meters_per_second'][plt_slice]
+    df['cyc.time_seconds'][sd3_slice],
+    df['cyc.speed_meters_per_second'][sd3_slice]
 )
 ax[-1].set_xlabel('Time [s]')
 ax[-1].set_ylabel('Speed [m/s]')

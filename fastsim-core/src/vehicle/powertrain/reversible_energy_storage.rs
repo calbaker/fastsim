@@ -263,16 +263,19 @@ impl ReversibleEnergyStorage {
     /// - `buffer`: buffer below static maximum SOC above which charging is disabled
     pub fn set_pwr_charge_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
         // to protect against excessive topping off of the battery
-        let soc_buffer = buffer / self.energy_capacity;
-        let pwr_max_for_dt =
-            ((self.max_soc - soc_buffer) - self.state.soc) * self.energy_capacity / dt;
+        let soc_buffer = buffer / (self.energy_capacity * (self.max_soc - self.min_soc));
+        self.state.max_soc_buffer = self.max_soc - soc_buffer;
+        let pwr_max_for_dt = (self.max_soc - self.state.soc) * self.energy_capacity / dt;
         self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
-            // current SOC is less than or equal to max
-            self.pwr_out_max.min(pwr_max_for_dt)
+            self.pwr_out_max
+        } else if self.state.soc < self.max_soc {
+            self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
         } else {
-            // current SOC is greater than both
+            // current SOC is less than both
             si::Power::ZERO
-        };
+        }
+        .min(pwr_max_for_dt);
+
         Ok(())
     }
 
@@ -281,16 +284,18 @@ impl ReversibleEnergyStorage {
     /// - `buffer`: buffer above static minimum SOC above which charging is disabled
     pub fn set_pwr_disch_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
         // to protect against excessive bottoming out of the battery
-        let soc_buffer = buffer / self.energy_capacity;
-        let pwr_max_for_dt =
-            (self.state.soc - (self.min_soc + soc_buffer)) * self.energy_capacity / dt;
+        let soc_buffer = buffer / (self.energy_capacity * (self.max_soc - self.min_soc));
+        self.state.min_soc_buffer = self.min_soc + soc_buffer;
+        let pwr_max_for_dt = (self.state.soc - self.min_soc) * self.energy_capacity / dt;
         self.state.pwr_disch_max = if self.state.soc >= self.min_soc + soc_buffer {
-            // current SOC is greater than or equal to min
-            self.pwr_out_max.min(pwr_max_for_dt)
+            self.pwr_out_max
+        } else if self.state.soc > self.min_soc {
+            self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
         } else {
             // current SOC is less than both
             si::Power::ZERO
-        };
+        }
+        .min(pwr_max_for_dt);
 
         Ok(())
     }
@@ -502,6 +507,10 @@ pub struct ReversibleEnergyStorageState {
 
     /// state of charge (SOC)
     pub soc: si::Ratio,
+    /// max state of charge (SOC) buffer
+    pub max_soc_buffer: si::Ratio,
+    /// min state of charge (SOC) buffer
+    pub min_soc_buffer: si::Ratio,
     /// Chemical <-> Electrical conversion efficiency based on current power demand
     pub eff: si::Ratio,
     /// State of Health (SOH)
@@ -546,6 +555,8 @@ impl Default for ReversibleEnergyStorageState {
             pwr_charge_max: si::Power::ZERO,
             i: Default::default(),
             soc: uc::R * 0.5,
+            max_soc_buffer: uc::R * f64::NAN,
+            min_soc_buffer: uc::R * f64::NAN,
             eff: si::Ratio::ZERO,
             soh: 0.,
             pwr_out_electrical: si::Power::ZERO,

@@ -118,6 +118,11 @@ impl SimDrive {
     /// corrections (e.g. iterate `walk` until SOC balance is achieved -- i.e. initial
     /// and final SOC are nearly identical)
     pub fn walk(&mut self) -> anyhow::Result<()> {
+        self.veh.state.mass = self
+            .veh
+            .mass()
+            .with_context(|| format_dbg!())?
+            .with_context(|| format_dbg!("Expected mass to have been set."))?;
         match self.veh.pt_type {
             PowertrainType::HybridElectricVehicle(_) => {
                 let res = &mut self.veh.res_mut().unwrap();
