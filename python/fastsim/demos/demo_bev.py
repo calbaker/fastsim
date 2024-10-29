@@ -86,36 +86,45 @@ print(f"{t_fsim2/t_fsim3_si_none:.3g}x")
 # # Visualize results
 
 def plot_res_pwr() -> Tuple[Figure, Axes]:
-    fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
+    fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Reversible Energy Storage Power")
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_electrical_watts"] / 1e3,
-        label="f3 ess kw out",
+        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_chemical_watts"] / 1e3,
+        label="f3 res kw out",
     )
     ax[0].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.array(sd2.ess_kw_out_ach.tolist()),
-        label="f2 ess kw out",
+        label="f2 res kw out",
     )
-    ax[0].set_ylabel("ESS Power [kW]")
+    ax[0].set_ylabel("RES Power [kW]")
     ax[0].legend()
 
-    ax[1].set_prop_cycle(get_paired_cycler())
+    ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
+        df['cyc.time_seconds'],
+        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_chemical_watts"] / 1e3 - np.array(sd2.ess_kw_out_ach.tolist()),
+        label="f3 res kw out",
+    )
+    ax[1].set_ylabel("RES Power\nDelta (f3-f2) [kW]")
+    ax[1].legend()
+
+    ax[2].set_prop_cycle(get_paired_cycler())
+    ax[2].plot(
         df['cyc.time_seconds'],
         df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] - (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
         label="f3 soc",
     )
-    ax[1].plot(
+    ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.array(sd2.soc.tolist()),
         label="f2 soc",
     )
-    ax[1].set_ylabel("SOC")
-    ax[1].legend()
+    ax[2].set_ylabel("SOC")
+    ax[2].legend()
     
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
@@ -134,59 +143,56 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
 
     plt.tight_layout()
     if SAVE_FIGS:
-        plt.savefig(Path("./plots/fc_pwr.svg"))
+        plt.savefig(Path("./plots/res_pwr.svg"))
     plt.show()
 
     return fig, ax
 
-def plot_fc_energy() -> Tuple[Figure, Axes]:
-    fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
-    plt.suptitle("Fuel Converter Energy")
+def plot_res_energy() -> Tuple[Figure, Axes]:
+    fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
+    plt.suptitle("Reversible Energy Storage Energy")
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        (np.array(sd.veh.fc.history.energy_propulsion_joules) +
-            np.array(sd.veh.fc.history.energy_aux_joules)) / 1e6,
-        label="f3 shaft",
+        df['cyc.time_seconds'],
+        df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"] / 1e3,
+        label="f3 res kj out",
     )
     ax[0].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fc_cumu_mj_out_ach.tolist()),
-        label="f2 shaft",
+        np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) * np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
+        label="f2 res kj out",
     )
-    ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.fc.history.energy_fuel_joules) / 1e6,
-        label="f3 fuel",
-    )
-    ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fs_cumu_mj_out_ach.tolist()),
-        label="f2 fuel",
-    )
-    ax[0].set_ylabel("FC Energy [MJ]")
+    ax[0].set_ylabel("RES Energy [kW]")
     ax[0].legend()
 
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        (np.array(sd.veh.fc.history.energy_propulsion_joules) +
-            np.array(sd.veh.fc.history.energy_aux_joules)) / 1e6 - np.array(sd2.fc_cumu_mj_out_ach.tolist()),
-        label="shaft",
+        df['cyc.time_seconds'],
+        df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"] / 1e3 - np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) * np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
+        label="res kj out",
     )
-    ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.fc.history.pwr_fuel_watts) / 1e3 - np.array(sd2.fs_kw_out_ach.tolist()),
-        label="fuel",
-    )
-    ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]")
+    ax[1].set_ylabel("RES Energy\nDelta (f3-f2) [kJ]")
     ax[1].legend()
 
+    ax[2].set_prop_cycle(get_paired_cycler())
+    ax[2].plot(
+        df['cyc.time_seconds'],
+        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] - (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
+        label="f3 soc",
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
+        np.array(sd2.soc.tolist()),
+        label="f2 soc",
+    )
+    ax[2].set_ylabel("SOC")
+    ax[2].legend()
+    
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.speed_ach_meters_per_second),
+        df['cyc.time_seconds'],
+        df["veh.history.speed_ach_meters_per_second"],
         label="f3",
     )
     ax[-1].plot(
@@ -200,7 +206,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
 
     plt.tight_layout()
     if SAVE_FIGS:
-        plt.savefig(Path("./plots/fc_energy.svg"))
+        plt.savefig(Path("./plots/res_energy.svg"))
     plt.show()
 
     return fig, ax
@@ -248,8 +254,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         label="rr",
         linestyle=BASE_LINE_STYLES[1],
     )
-    ax[1].text(
-        500, -0.125, "Drag error is due to more\naccurate air density model .")
+    # ax[1].text(
+    #     500, -0.125, "Drag error is due to more\naccurate air density model .")
     ax[1].set_ylabel("Power\nDelta (f3-f2) [kW]")
     ax[1].legend()
 
@@ -277,69 +283,7 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
 
 if SHOW_PLOTS:
     fig, ax = plot_res_pwr() 
-    # fig, ax = plot_fc_energy()
-    # fig, ax = plot_road_loads()
+    fig, ax = plot_res_energy()
+    fig, ax = plot_road_loads()
 
-# # Benchmarking
-# 
-# ## CPU Performance
-# See above for cpu benchmarking.
-# 
-# ## Memory Profiling
-# Within [benchmarks](./../../../benchmarks/), here are the results of running the benchmarking tests.
-# 
-# These benchmarks show that `fastsim-3` uses about 63% less memory than `fastsim-2`, which results in a substantially greater potential to leverage HPC and cloud computing via multiprocessing parallelization, enabling more capacity to use FASTSim for large scale simulations.  
-# 
-# ### python -m memory_profiler f2.py
-# 
-# ```
-# Filename: /Users/cbaker2/Documents/GitHub/fastsim-3/benchmarks/./f2.py  
-# Line #    Mem usage    Increment  Occurrences   Line Contents
-# =============================================================
-# 10  163.438 MiB  163.438 MiB           1   @profile(precision=3)
-# 11                                         def build_and_run_sim_drive():
-# 12  164.234 MiB    0.797 MiB           2       veh = fsr.RustVehicle.from_file(
-# 13  163.438 MiB    0.000 MiB           1           str(fsim.package_root() / "resources/vehdb/2012_Ford_Fusion.yaml")
-# 14                                             )
-# 15  164.375 MiB    0.141 MiB           1       cyc = fsr.RustCycle.from_resource("cycles/udds.csv")
-# 16  165.453 MiB    1.078 MiB           1       sd = fsr.RustSimDrive(cyc, veh)
-# 17  165.656 MiB    0.203 MiB           1       sd.sim_drive()
-# ```
-# 
-# ### python -m memory_profiler f3-save-int-1.py
-# 
-# ```
-# Filename: /Users/cbaker2/Documents/GitHub/fastsim-3/benchmarks/./f3-save-int-1.py
-# Line #    Mem usage    Increment  Occurrences   Line Contents
-# =============================================================
-#     5   61.562 MiB   61.562 MiB           1   @profile(precision=3)
-#     6                                         def build_and_run_sim_drive():
-#     7   62.125 MiB    0.562 MiB           2       veh = fsim.Vehicle.from_file(
-#     8                                                 
-#     9   61.562 MiB    0.000 MiB           1           fsim.package_root() / "../../tests/assets/2012_Ford_Fusion.yaml"
-#     10                                             )
-#     11   62.125 MiB    0.000 MiB           1       veh.save_interval = 1
-#     12   62.312 MiB    0.188 MiB           1       cyc = fsim.Cycle.from_resource("cycles/udds.csv")
-#     13   62.406 MiB    0.094 MiB           1       sd = fsim.SimDrive(veh, cyc)
-#     14   62.953 MiB    0.547 MiB           1       sd.walk()
-# ```
-# 
-# ### python -m memory_profiler f3-save-int-none.py
-# 
-# ```
-# Filename: /Users/cbaker2/Documents/GitHub/fastsim-3/benchmarks/./f3-save-int-none.py
-# Line #    Mem usage    Increment  Occurrences   Line Contents
-# =============================================================
-#      5   61.203 MiB   61.203 MiB           1   @profile(precision=3)
-#      6                                         def build_and_run_sim_drive():
-#      7   61.766 MiB    0.562 MiB           2       veh = fsim.Vehicle.from_file(
-#      8                                                 
-#      9   61.203 MiB    0.000 MiB           1           fsim.package_root() / "../../tests/assets/2012_Ford_Fusion.yaml"
-#     10                                             )
-#     11   61.766 MiB    0.000 MiB           1       veh.save_interval = None
-#     12   61.938 MiB    0.172 MiB           1       cyc = fsim.Cycle.from_resource("cycles/udds.csv")
-#     13   62.031 MiB    0.094 MiB           1       sd = fsim.SimDrive(veh, cyc)
-#     14   62.031 MiB    0.000 MiB           1       sd.walk()
-# ```
-
-
+# %%
