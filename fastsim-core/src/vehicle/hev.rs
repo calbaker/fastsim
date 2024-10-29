@@ -101,7 +101,8 @@ impl Powertrain for Box<HybridElectricVehicle> {
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
             }
-        };
+        }
+        .max(si::Energy::ZERO);
         let chrg_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
                 0.5 * veh_state.mass
@@ -114,7 +115,8 @@ impl Powertrain for Box<HybridElectricVehicle> {
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
             }
-        };
+        }
+        .max(si::Energy::ZERO);
         self.res
             .set_curr_pwr_out_max(dt, disch_buffer, chrg_buffer)
             .with_context(|| anyhow!(format_dbg!()))?;

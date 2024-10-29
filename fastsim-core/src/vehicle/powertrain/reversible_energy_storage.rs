@@ -242,19 +242,6 @@ impl ReversibleEnergyStorage {
         self.set_pwr_disch_max(dt, disch_buffer)?;
         self.set_pwr_charge_max(dt, chrg_buffer)?;
 
-        let state = &mut self.state;
-        ensure!(
-            state.pwr_disch_max >= si::Power::ZERO,
-            "`{}` ({} W) must be greater than or equal to zero",
-            stringify!(state.pwr_disch_max),
-            state.pwr_disch_max.get::<si::watt>().format_eng(None)
-        );
-        ensure!(
-            state.pwr_charge_max >= si::Power::ZERO,
-            "`{}` ({} W) must be greater than or equal to zero",
-            stringify!(state.pwr_charge_max),
-            state.pwr_charge_max.get::<si::watt>().format_eng(None)
-        );
         Ok(())
     }
 
@@ -263,18 +250,29 @@ impl ReversibleEnergyStorage {
     /// - `buffer`: buffer below static maximum SOC above which charging is disabled
     pub fn set_pwr_charge_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
         // to protect against excessive topping off of the battery
-        let soc_buffer = buffer / (self.energy_capacity * (self.max_soc - self.min_soc));
+        let soc_buffer =
+            (buffer / (self.energy_capacity * (self.max_soc - self.min_soc))).max(si::Ratio::ZERO);
+        ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
         self.state.max_soc_buffer = self.max_soc - soc_buffer;
         let pwr_max_for_dt = (self.max_soc - self.state.soc) * self.energy_capacity / dt;
         self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
             self.pwr_out_max
-        } else if self.state.soc < self.max_soc {
+        } else if self.state.soc < self.max_soc && soc_buffer > si::Ratio::ZERO {
             self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
         } else {
             // current SOC is less than both
             si::Power::ZERO
         }
         .min(pwr_max_for_dt);
+
+        ensure!(
+            self.state.pwr_charge_max >= si::Power::ZERO,
+            "{}\n`{}` ({} W) must be greater than or equal to zero\n{}",
+            format_dbg!(),
+            stringify!(self.state.pwr_charge_max),
+            self.state.pwr_charge_max.get::<si::watt>().format_eng(None),
+            format_dbg!(soc_buffer)
+        );
 
         Ok(())
     }
@@ -284,18 +282,29 @@ impl ReversibleEnergyStorage {
     /// - `buffer`: buffer above static minimum SOC above which charging is disabled
     pub fn set_pwr_disch_max(&mut self, dt: si::Time, buffer: si::Energy) -> anyhow::Result<()> {
         // to protect against excessive bottoming out of the battery
-        let soc_buffer = buffer / (self.energy_capacity * (self.max_soc - self.min_soc));
+        let soc_buffer =
+            (buffer / (self.energy_capacity * (self.max_soc - self.min_soc))).max(si::Ratio::ZERO);
+        ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
         self.state.min_soc_buffer = self.min_soc + soc_buffer;
         let pwr_max_for_dt = (self.state.soc - self.min_soc) * self.energy_capacity / dt;
-        self.state.pwr_disch_max = if self.state.soc >= self.min_soc + soc_buffer {
+        self.state.pwr_disch_max = if self.state.soc > self.min_soc + soc_buffer {
             self.pwr_out_max
-        } else if self.state.soc > self.min_soc {
+        } else if self.state.soc > self.min_soc && soc_buffer > si::Ratio::ZERO {
             self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
         } else {
             // current SOC is less than both
             si::Power::ZERO
         }
         .min(pwr_max_for_dt);
+
+        ensure!(
+            self.state.pwr_disch_max >= si::Power::ZERO,
+            "{}\n`{}` ({} W) must be greater than or equal to zero\n{}",
+            format_dbg!(),
+            stringify!(self.state.pwr_disch_max),
+            self.state.pwr_disch_max.get::<si::watt>().format_eng(None),
+            format_dbg!(soc_buffer)
+        );
 
         Ok(())
     }
