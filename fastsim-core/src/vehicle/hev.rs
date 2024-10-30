@@ -500,34 +500,9 @@ impl HEVPowertrainControls {
                         si::Power::ZERO
                     } else {
                         let fc_pwr_req = pwr_out_req - em_pwr;
-                        println!("{}", format_dbg!(fc_pwr_req));
                         // if the engine is on, load it up to get closer to peak efficiency
-                        // TODO: figure out a way to precalculate this
-                        let fc_pwr_for_peak_eff = {
-                            let eff_max = fc
-                                .eff_interp_from_pwr_out
-                                .f_x()
-                                .with_context(|| format_dbg!())?
-                                .iter()
-                                .fold(f64::NEG_INFINITY, |acc, &curr| acc.max(curr));
-                            *fc.eff_interp_from_pwr_out
-                                .x()
-                                .with_context(|| format_dbg!())?
-                                .get(
-                                    fc.eff_interp_from_pwr_out
-                                        .f_x()
-                                        .unwrap()
-                                        .iter()
-                                        .position(|&eff| eff == eff_max)
-                                        .with_context(|| format_dbg!())?,
-                                )
-                                .with_context(|| format_dbg!())?
-                                * uc::KW
-                                * frac_of_most_eff_pwr_to_run_fc
-                        };
-                        println!("{}", format_dbg!(fc_pwr_for_peak_eff));
                         fc_pwr_req
-                            .max(fc_pwr_for_peak_eff)
+                            .max(fc.pwr_for_peak_eff * frac_of_most_eff_pwr_to_run_fc)
                             .min(fc.state.pwr_out_max)
                             .max(pwr_out_req)
                     };
@@ -625,7 +600,7 @@ impl Init for RESGreedyWithBuffers {
             self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
         // TODO: consider changing this default
         self.frac_of_most_eff_pwr_to_run_fc =
-            self.frac_of_most_eff_pwr_to_run_fc.or(Some(2. * uc::R));
+            self.frac_of_most_eff_pwr_to_run_fc.or(Some(1. * uc::R));
         Ok(())
     }
 }

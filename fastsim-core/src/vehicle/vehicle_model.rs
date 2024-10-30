@@ -299,6 +299,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )?),
+                            pwr_for_peak_eff: uc::KW * f64::NAN, // this gets updated in `init`
                             pwr_idle_fuel: f2veh.aux_kw
                                 / f2veh
                                     .fc_eff_map
@@ -364,6 +365,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )?),
+                            pwr_for_peak_eff: uc::KW * f64::NAN, // this gets updated in `init`
                             pwr_idle_fuel: f2veh.aux_kw
                                 / f2veh
                                     .fc_eff_map
