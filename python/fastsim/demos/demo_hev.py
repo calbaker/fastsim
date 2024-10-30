@@ -469,8 +469,8 @@ assert component_to_plot in ["fc", "em", "res"]
 df = sd.to_dataframe(allow_partial=True)
 sd_dict = sd.to_pydict()
 
-sd3_slice = slice(165, len(df))
-sd2_slice = slice(165, len(df) + 5)
+sd3_slice = slice(len(df))
+sd2_slice = slice(len(df) + 5)
 
 sd2 = sd0.to_fastsim2()
 with fsim.utils.without_logging():  # suppresses known warning

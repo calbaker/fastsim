@@ -1,3 +1,5 @@
+use powertrain::reversible_energy_storage::ReversibleEnergyStorageState;
+
 use crate::prelude::ElectricMachineState;
 
 use super::{vehicle_model::VehicleState, *};
@@ -175,6 +177,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                 &mut self.state,
                 &self.fc,
                 &self.em.state,
+                &self.res.state,
             )
             .with_context(|| format_dbg!())?;
         let fc_on: bool = !self.state.fc_on_causes.is_empty();
@@ -354,6 +357,8 @@ pub enum FCOnCause {
     PropulsionPowerDemandSoft,
     /// Aux power demand exceeds battery capability
     AuxPowerDemand,
+    /// SOC is below min buffer so FC is charging RES
+    ChargingForLowSOC,
 }
 impl SerdeAPI for FCOnCause {}
 impl Init for FCOnCause {}
@@ -432,6 +437,7 @@ impl HEVPowertrainControls {
         hev_state: &mut HEVState,
         fc: &FuelConverter,
         em_state: &ElectricMachineState,
+        res_state: &ReversibleEnergyStorageState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
         // TODO:
         // - [ ] make buffers soft limits that aren't enforced, just suggested
@@ -481,6 +487,9 @@ impl HEVPowertrainControls {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
 
+                    if res_state.soc < res_state.min_soc_buffer {
+                        hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
+                    }
                     if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
                         hev_state
                             .fc_on_causes
@@ -490,19 +499,22 @@ impl HEVPowertrainControls {
                     let fc_pwr: si::Power = if hev_state.fc_on_causes.is_empty() {
                         si::Power::ZERO
                     } else {
-                        (pwr_out_req - em_pwr)
-                            .max(
-                                // if the engine is on, load it up to get closer to peak efficiency
-                                // TODO: figure out a way to precalculate this
-                                (fc.eff_interp_from_pwr_out
-                                    .f_x()
-                                    .with_context(|| format_dbg!())?
-                                    .iter()
-                                    .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
-                                    * uc::W
-                                    * frac_of_most_eff_pwr_to_run_fc)
-                                    .min(pwr_out_req),
-                            )
+                        let fc_pwr_req = pwr_out_req - em_pwr;
+                        println!("{}", format_dbg!(fc_pwr_req));
+                        // if the engine is on, load it up to get closer to peak efficiency
+                        // TODO: figure out a way to precalculate this
+                        let fc_pwr_for_peak_eff = (fc
+                            .eff_interp_from_pwr_out
+                            .f_x()
+                            .with_context(|| format_dbg!())?
+                            .iter()
+                            .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
+                            * uc::W
+                            * frac_of_most_eff_pwr_to_run_fc)
+                            .min(pwr_out_req);
+                        println!("{}", format_dbg!(fc_pwr_for_peak_eff));
+                        fc_pwr_req
+                            .max(fc_pwr_for_peak_eff)
                             .min(fc.state.pwr_out_max)
                     };
                     // recalculate `em_pwr` based on `fc_pwr`
@@ -580,7 +592,9 @@ pub struct RESGreedyWithBuffers {
     /// Fraction of available discharging capacity to use toward running the engine efficiently. Defaults to 0.
     pub frac_res_dschrg_for_fc: si::Ratio,
     /// Force engine, if on, to run at this fraction of power at which peak
-    /// efficiency occurs or the required power, whichever is greater. Defaults to 1.
+    /// efficiency occurs or the required power, whichever is greater. If SOC
+    /// is below min buffer, engine will run at this level and charge.  Defaults
+    /// to 1.
     pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
 }
 
@@ -594,8 +608,8 @@ impl Init for RESGreedyWithBuffers {
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.4));
-        self.frac_of_most_eff_pwr_to_run_fc =
         // TODO: consider changing this default
+        self.frac_of_most_eff_pwr_to_run_fc =
             self.frac_of_most_eff_pwr_to_run_fc.or(Some(1. * uc::R));
         Ok(())
     }
