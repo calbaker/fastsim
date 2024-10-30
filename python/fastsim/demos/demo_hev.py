@@ -545,3 +545,5 @@ ax[-1].plot(
 ax[-1].set_xlabel('Time [s]')
 ax[-1].set_ylabel('Speed [m/s]')
 
+
+# %%
