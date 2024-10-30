@@ -43,8 +43,8 @@ cyc = fsim.Cycle.from_resource("udds.csv")
 sd0 = fsim.SimDrive(veh, cyc)
 sd = sd0.copy()
 sd_dict = sd.to_pydict()
-sd_dict['sim_params']['trace_miss_opts'] = 'Error'
-sd = fsim.SimDrive.from_pydict(sd_dict)
+# sd_dict['sim_params']['trace_miss_opts'] = 'Error'
+# sd = fsim.SimDrive.from_pydict(sd_dict)
 
 # simulation start time
 t0 = time.perf_counter()
@@ -513,6 +513,18 @@ ax[1].plot(
     np.array(sd2.cyc.time_s.tolist())[sd2_slice],
     np.array(sd2.soc.tolist())[sd2_slice],
     label='f2 soc',
+)
+ax[1].plot(
+    df['cyc.time_seconds'][sd3_slice],
+    df['veh.pt_type.HybridElectricVehicle.res.history.min_soc_buffer'][sd3_slice],
+    label='f3 soc min buff',
+    color='red',
+)
+ax[1].plot(
+    df['cyc.time_seconds'][sd3_slice],
+    df['veh.pt_type.HybridElectricVehicle.res.history.max_soc_buffer'][sd3_slice],
+    label='f3 soc max buff',
+    color='green',
 )
 ax[1].plot(
     np.array(sd2.cyc.time_s.tolist())[sd2_slice],

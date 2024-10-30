@@ -254,7 +254,8 @@ impl ReversibleEnergyStorage {
             (buffer / (self.energy_capacity * (self.max_soc - self.min_soc))).max(si::Ratio::ZERO);
         ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
         self.state.max_soc_buffer = self.max_soc - soc_buffer;
-        let pwr_max_for_dt = (self.max_soc - self.state.soc) * self.energy_capacity / dt;
+        let pwr_max_for_dt =
+            ((self.max_soc - self.state.soc) * self.energy_capacity / dt).max(si::Power::ZERO);
         self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
             self.pwr_out_max
         } else if self.state.soc < self.max_soc && soc_buffer > si::Ratio::ZERO {
@@ -286,7 +287,8 @@ impl ReversibleEnergyStorage {
             (buffer / (self.energy_capacity * (self.max_soc - self.min_soc))).max(si::Ratio::ZERO);
         ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
         self.state.min_soc_buffer = self.min_soc + soc_buffer;
-        let pwr_max_for_dt = (self.state.soc - self.min_soc) * self.energy_capacity / dt;
+        let pwr_max_for_dt =
+            ((self.state.soc - self.min_soc) * self.energy_capacity / dt).max(si::Power::ZERO);
         self.state.pwr_disch_max = if self.state.soc > self.min_soc + soc_buffer {
             self.pwr_out_max
         } else if self.state.soc > self.min_soc && soc_buffer > si::Ratio::ZERO {
@@ -564,8 +566,8 @@ impl Default for ReversibleEnergyStorageState {
             pwr_charge_max: si::Power::ZERO,
             i: Default::default(),
             soc: uc::R * 0.5,
-            max_soc_buffer: uc::R * f64::NAN,
-            min_soc_buffer: uc::R * f64::NAN,
+            max_soc_buffer: uc::R * 1.,
+            min_soc_buffer: si::Ratio::ZERO,
             eff: si::Ratio::ZERO,
             soh: 0.,
             pwr_out_electrical: si::Power::ZERO,

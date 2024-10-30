@@ -13,28 +13,6 @@ pt_type:
       min_soc: 0.25
       max_soc: 0.95
       save_interval: 1
-      state:
-        pwr_prop_max_watts: 0.0
-        pwr_regen_max_watts: 0.0
-        pwr_disch_max_watts: 0.0
-        pwr_charge_max_watts: 0.0
-        i: 0
-        soc: 0.5
-        max_soc_buffer: .nan
-        min_soc_buffer: .nan
-        eff: 0.0
-        soh: 0.0
-        pwr_out_electrical_watts: 0.0
-        pwr_out_propulsion_watts: 0.0
-        pwr_aux_watts: 0.0
-        pwr_loss_watts: 0.0
-        pwr_out_chemical_watts: 0.0
-        energy_out_electrical_joules: 0.0
-        energy_out_propulsion_joules: 0.0
-        energy_aux_joules: 0.0
-        energy_loss_joules: 0.0
-        energy_out_chemical_joules: 0.0
-        temperature_celsius: 22.0
     fs:
       pwr_out_max_watts: 2000000.0
       pwr_ramp_lag_seconds: 1.1
@@ -112,8 +90,8 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       Fastsim2:
-        speed_min_soc_buffer_for_accel: 26.8224
-        speed_max_soc_buffer_for_decel: 26.8224
+        speed_min_soc_buffer_for_accel: 40.2336
+        speed_max_soc_buffer_for_decel: 31.2928
         fc_min_time_on: 60.0
         fc_speed_forced_on: 37.9984
         frac_pwr_demand_fc_forced_on: 0.5645161290322581

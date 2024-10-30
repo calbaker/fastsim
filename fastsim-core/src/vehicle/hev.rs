@@ -586,10 +586,11 @@ pub struct RESGreedyWithBuffers {
 
 impl Init for RESGreedyWithBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
+        // TODO: make sure these values propagate to the documented defaults above
         self.speed_min_soc_buffer_for_accel =
-            self.speed_min_soc_buffer_for_accel.or(Some(60. * uc::MPH));
+            self.speed_min_soc_buffer_for_accel.or(Some(90. * uc::MPH));
         self.speed_max_soc_buffer_for_decel =
-            self.speed_max_soc_buffer_for_decel.or(Some(60. * uc::MPH));
+            self.speed_max_soc_buffer_for_decel.or(Some(70. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.4));
