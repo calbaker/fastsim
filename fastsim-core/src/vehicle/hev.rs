@@ -503,19 +503,33 @@ impl HEVPowertrainControls {
                         println!("{}", format_dbg!(fc_pwr_req));
                         // if the engine is on, load it up to get closer to peak efficiency
                         // TODO: figure out a way to precalculate this
-                        let fc_pwr_for_peak_eff = (fc
-                            .eff_interp_from_pwr_out
-                            .f_x()
-                            .with_context(|| format_dbg!())?
-                            .iter()
-                            .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr))
-                            * uc::W
-                            * frac_of_most_eff_pwr_to_run_fc)
-                            .min(pwr_out_req);
+                        let fc_pwr_for_peak_eff = {
+                            let eff_max = fc
+                                .eff_interp_from_pwr_out
+                                .f_x()
+                                .with_context(|| format_dbg!())?
+                                .iter()
+                                .fold(f64::NEG_INFINITY, |acc, &curr| acc.max(curr));
+                            *fc.eff_interp_from_pwr_out
+                                .x()
+                                .with_context(|| format_dbg!())?
+                                .get(
+                                    fc.eff_interp_from_pwr_out
+                                        .f_x()
+                                        .unwrap()
+                                        .iter()
+                                        .position(|&eff| eff == eff_max)
+                                        .with_context(|| format_dbg!())?,
+                                )
+                                .with_context(|| format_dbg!())?
+                                * uc::W
+                                * frac_of_most_eff_pwr_to_run_fc
+                        };
                         println!("{}", format_dbg!(fc_pwr_for_peak_eff));
                         fc_pwr_req
                             .max(fc_pwr_for_peak_eff)
                             .min(fc.state.pwr_out_max)
+                            .min(pwr_out_req)
                     };
                     // recalculate `em_pwr` based on `fc_pwr`
                     let em_pwr = pwr_out_req - fc_pwr;
