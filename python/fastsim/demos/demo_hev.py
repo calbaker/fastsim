@@ -469,8 +469,8 @@ assert component_to_plot in ["fc", "em", "res"]
 df = sd.to_dataframe(allow_partial=True)
 sd_dict = sd.to_pydict()
 
-sd3_slice = slice(len(df))
-sd2_slice = slice(len(df) + 5)
+sd3_slice = slice(165, len(df))
+sd2_slice = slice(165, len(df) + 5)
 
 sd2 = sd0.to_fastsim2()
 with fsim.utils.without_logging():  # suppresses known warning
@@ -503,6 +503,27 @@ ax[0].plot(
 ax[0].set_ylabel("Pwr [W]")
 ax[0].legend()
 
+ax[1].plot(
+    df['cyc.time_seconds'][sd3_slice],
+    df['veh.pt_type.HybridElectricVehicle.res.history.min_soc_buffer'][sd3_slice],
+    label='f3 soc min buff',
+    color='red',
+    alpha=0.5,
+)
+# ax[1].plot(
+#     df['cyc.time_seconds'][sd3_slice],
+#     df['veh.pt_type.HybridElectricVehicle.res.history.max_soc_buffer'][sd3_slice],
+#     label='f3 soc max buff',
+#     color='green',
+#     alpha=0.5,
+# )
+# ax[1].plot(
+#     np.array(sd2.cyc.time_s.tolist())[sd2_slice],
+#     np.array(sd2.accel_buff_soc.tolist())[sd2_slice],
+#     label='f2 soc accel',
+#     linestyle=BASE_LINE_STYLES[1],
+#     color=BASE_COLORS[1],
+# )
 ax[1].set_prop_cycle(get_paired_cycler())
 ax[1].plot(
     df['cyc.time_seconds'][sd3_slice],
@@ -514,25 +535,6 @@ ax[1].plot(
     np.array(sd2.soc.tolist())[sd2_slice],
     label='f2 soc',
 )
-ax[1].plot(
-    df['cyc.time_seconds'][sd3_slice],
-    df['veh.pt_type.HybridElectricVehicle.res.history.min_soc_buffer'][sd3_slice],
-    label='f3 soc min buff',
-    color='red',
-)
-ax[1].plot(
-    df['cyc.time_seconds'][sd3_slice],
-    df['veh.pt_type.HybridElectricVehicle.res.history.max_soc_buffer'][sd3_slice],
-    label='f3 soc max buff',
-    color='green',
-)
-ax[1].plot(
-    np.array(sd2.cyc.time_s.tolist())[sd2_slice],
-    np.array(sd2.accel_buff_soc.tolist())[sd2_slice],
-    label='f2 soc accel',
-    linestyle=BASE_LINE_STYLES[1],
-    color=BASE_COLORS[1],
-)
 ax[1].set_ylabel("[-]")
 ax[1].legend()
 
@@ -542,3 +544,4 @@ ax[-1].plot(
 )
 ax[-1].set_xlabel('Time [s]')
 ax[-1].set_ylabel('Speed [m/s]')
+
