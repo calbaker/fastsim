@@ -325,7 +325,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     speed_min_soc_buffer_for_accel: None,
                     speed_max_soc_buffer_for_decel: None,
                     fc_min_time_on: Some(f2veh.min_fc_time_on * uc::S),
-                    fc_speed_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
+                    speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
                     frac_pwr_demand_fc_forced_on: Some(
                         f2veh.kw_demand_fc_on
                             / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
@@ -334,7 +334,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     // TODO: make sure these actually do something, if deemed worthwhile
                     frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
                     frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
-                    frac_of_most_eff_pwr_to_run_fc: Some(uc::R * 1.),
+                    frac_of_most_eff_pwr_to_run_fc: None,
                 });
                 let mut hev = HybridElectricVehicle {
                     fs: {

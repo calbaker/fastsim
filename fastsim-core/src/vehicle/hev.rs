@@ -482,7 +482,7 @@ impl HEVPowertrainControls {
                     }
 
                     if veh_state.speed_ach
-                        > rgwb.fc_speed_forced_on.with_context(|| format_dbg!())?
+                        > rgwb.speed_fc_forced_on.with_context(|| format_dbg!())?
                     {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
@@ -522,14 +522,14 @@ impl HEVPowertrainControls {
                                         .with_context(|| format_dbg!())?,
                                 )
                                 .with_context(|| format_dbg!())?
-                                * uc::W
+                                * uc::KW
                                 * frac_of_most_eff_pwr_to_run_fc
                         };
                         println!("{}", format_dbg!(fc_pwr_for_peak_eff));
                         fc_pwr_req
                             .max(fc_pwr_for_peak_eff)
                             .min(fc.state.pwr_out_max)
-                            .min(pwr_out_req)
+                            .max(pwr_out_req)
                     };
                     // recalculate `em_pwr` based on `fc_pwr`
                     let em_pwr = pwr_out_req - fc_pwr;
@@ -582,12 +582,12 @@ impl HEVPowertrainControls {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 pub struct RESGreedyWithBuffers {
     /// Speed at which accel buffer becomes inactive.  Buffer linearly decreases
-    /// up to this speed.  Defaults to 60 mph.
+    /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
     pub speed_min_soc_buffer_for_accel: Option<si::Velocity>,
-    /// Speed at which decel buffer maxes.  Buffer linearly increases
-    /// up to this speed.  Defaults to 60 mph.
+    /// Speed at which decel buffer maxes out.  Buffer linearly increases
+    /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
     pub speed_max_soc_buffer_for_decel: Option<si::Velocity>,
@@ -595,9 +595,9 @@ pub struct RESGreedyWithBuffers {
     /// simulation time step.  defaults to 30 s.
     pub fc_min_time_on: Option<si::Time>,
     /// Speed at which [fuelconverter] is forced on. Defaults to 75 mph.
-    //  TODO: make sure this is plumbed up
-    pub fc_speed_forced_on: Option<si::Velocity>,
-    /// Fraction of total aux and powertrain power demand at which [FuelConverter] is forced on.  Defaults to 0.4.
+    pub speed_fc_forced_on: Option<si::Velocity>,
+    /// Fraction of total aux and powertrain power demand at which
+    /// [FuelConverter] is forced on.  Defaults to ???.
     pub frac_pwr_demand_fc_forced_on: Option<si::Ratio>,
     /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
     // TODO: make sure this is plumbed up
@@ -616,15 +616,16 @@ impl Init for RESGreedyWithBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
         self.speed_min_soc_buffer_for_accel =
-            self.speed_min_soc_buffer_for_accel.or(Some(90. * uc::MPH));
+            self.speed_min_soc_buffer_for_accel.or(Some(60. * uc::MPH));
         self.speed_max_soc_buffer_for_decel =
-            self.speed_max_soc_buffer_for_decel.or(Some(70. * uc::MPH));
+            self.speed_max_soc_buffer_for_decel.or(Some(60. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
-        self.fc_speed_forced_on = self.fc_speed_forced_on.or(Some(uc::MPH * 75.));
-        self.frac_pwr_demand_fc_forced_on = self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.4));
+        self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
+        self.frac_pwr_demand_fc_forced_on =
+            self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
         // TODO: consider changing this default
         self.frac_of_most_eff_pwr_to_run_fc =
-            self.frac_of_most_eff_pwr_to_run_fc.or(Some(1. * uc::R));
+            self.frac_of_most_eff_pwr_to_run_fc.or(Some(2. * uc::R));
         Ok(())
     }
 }

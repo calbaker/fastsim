@@ -90,14 +90,14 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       Fastsim2:
-        speed_min_soc_buffer_for_accel: 40.2336
-        speed_max_soc_buffer_for_decel: 31.2928
+        speed_min_soc_buffer_for_accel: 26.8224
+        speed_max_soc_buffer_for_decel: 26.8224
         fc_min_time_on: 60.0
-        fc_speed_forced_on: 37.9984
+        speed_fc_forced_on: 37.9984
         frac_pwr_demand_fc_forced_on: 0.5645161290322581
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 1.0
-        frac_of_most_eff_pwr_to_run_fc: 1.0
+        frac_of_most_eff_pwr_to_run_fc: 2.0
     aux_cntrl: AuxOnResPriority
     mass: ~
     sim_params:
