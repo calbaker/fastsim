@@ -98,6 +98,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         .speed_min_soc_buffer_for_accel
                         .with_context(|| format_dbg!())?
                         - veh_state.speed_ach)
+                        .max(si::Velocity::ZERO)
                         .powi(typenum::P2::new())
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
@@ -112,6 +113,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         - rgwb
                             .speed_max_soc_buffer_for_decel
                             .with_context(|| format_dbg!())?)
+                    .max(si::Velocity::ZERO)
                     .powi(typenum::P2::new())
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
