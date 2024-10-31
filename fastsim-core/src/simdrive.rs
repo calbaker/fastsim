@@ -125,9 +125,6 @@ impl SimDrive {
             .with_context(|| format_dbg!("Expected mass to have been set."))?;
         match self.veh.pt_type {
             PowertrainType::HybridElectricVehicle(_) => {
-                let res = &mut self.veh.res_mut().unwrap();
-                res.state.soc = 0.5 * (res.min_soc + res.max_soc);
-
                 // Net battery energy used per amount of fuel used
                 // clone initial vehicle to preserve starting state (TODO: figure out if this is a huge CPU burden)
                 let veh_init = self.veh.clone();
@@ -154,17 +151,21 @@ impl SimDrive {
                             ))
                         );
                     }
-                    if res_per_fuel < self.veh.hev().unwrap().sim_params.res_per_fuel_lim
+                    if res_per_fuel.abs() < self.veh.hev().unwrap().sim_params.res_per_fuel_lim
                         || !self.veh.hev().unwrap().sim_params.balance_soc
                     {
                         break;
                     } else {
-                        if self.veh.hev().unwrap().sim_params.save_soc_bal_iters {
-                            let hev = self.veh.hev_mut().unwrap();
-                            hev.soc_bal_iter_history.push(hev.clone());
+                        if let Some(&mut ref mut hev) = self.veh.hev_mut() {
+                            if hev.sim_params.save_soc_bal_iters {
+                                hev.soc_bal_iter_history.push(hev.clone());
+                            }
                         }
+                        let soc_bal_iters = self.veh.hev().unwrap().state.soc_bal_iters;
                         // reset vehicle to initial state
                         self.veh = veh_init.clone();
+                        // retain soc_bal_iters
+                        self.veh.hev_mut().unwrap().state.soc_bal_iters = soc_bal_iters;
                         // start SOC at previous final value
                         self.veh.res_mut().unwrap().state.soc = soc_final;
                     }
