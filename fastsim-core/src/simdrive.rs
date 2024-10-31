@@ -138,6 +138,7 @@ impl SimDrive {
                         .unwrap()
                         .state
                         .soc;
+                    dbg!(soc_final);
                     let res_per_fuel = self.veh.res().unwrap().state.energy_out_chemical
                         / self.veh.fc().unwrap().state.energy_fuel;
                     if self.veh.hev().unwrap().state.soc_bal_iters

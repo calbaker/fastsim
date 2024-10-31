@@ -579,17 +579,17 @@ pub struct RESGreedyWithBuffers {
     /// Fraction of total aux and powertrain power demand at which
     /// [FuelConverter] is forced on.  Defaults to ???.
     pub frac_pwr_demand_fc_forced_on: Option<si::Ratio>,
+    /// Force engine, if on, to run at this fraction of power at which peak
+    /// efficiency occurs or the required power, whichever is greater. If SOC
+    /// is below min buffer, engine will run at this level and charge.  Defaults
+    /// to 1.
+    pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
     /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
     // TODO: make sure this is plumbed up
     pub frac_res_chrg_for_fc: si::Ratio,
     // TODO: make sure this is plumbed up
     /// Fraction of available discharging capacity to use toward running the engine efficiently. Defaults to 0.
     pub frac_res_dschrg_for_fc: si::Ratio,
-    /// Force engine, if on, to run at this fraction of power at which peak
-    /// efficiency occurs or the required power, whichever is greater. If SOC
-    /// is below min buffer, engine will run at this level and charge.  Defaults
-    /// to 1.
-    pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
 }
 
 impl Init for RESGreedyWithBuffers {
