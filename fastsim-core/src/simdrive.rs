@@ -131,10 +131,8 @@ impl SimDrive {
                 // Net battery energy used per amount of fuel used
                 // clone initial vehicle to preserve starting state (TODO: figure out if this is a huge CPU burden)
                 let veh_init = self.veh.clone();
-                let mut soc_bal_iters: u32 = 0;
                 loop {
-                    soc_bal_iters += 1;
-                    self.veh.hev_mut().unwrap().soc_bal_iters = soc_bal_iters;
+                    self.veh.hev_mut().unwrap().state.soc_bal_iters += 1;
                     self.walk_once()?;
                     let soc_final = self
                         .veh
@@ -145,11 +143,13 @@ impl SimDrive {
                         .soc;
                     let res_per_fuel = self.veh.res().unwrap().state.energy_out_chemical
                         / self.veh.fc().unwrap().state.energy_fuel;
-                    if soc_bal_iters > self.veh.hev().unwrap().sim_params.soc_balance_iter_err {
+                    if self.veh.hev().unwrap().state.soc_bal_iters
+                        > self.veh.hev().unwrap().sim_params.soc_balance_iter_err
+                    {
                         bail!(
                             "{}",
                             format_dbg!((
-                                soc_bal_iters,
+                                self.veh.hev().unwrap().state.soc_bal_iters,
                                 self.veh.hev().unwrap().sim_params.soc_balance_iter_err
                             ))
                         );
@@ -159,6 +159,10 @@ impl SimDrive {
                     {
                         break;
                     } else {
+                        if self.veh.hev().unwrap().sim_params.save_soc_bal_iters {
+                            let hev = self.veh.hev_mut().unwrap();
+                            hev.soc_bal_iter_history.push(hev.clone());
+                        }
                         // reset vehicle to initial state
                         self.veh = veh_init.clone();
                         // start SOC at previous final value
@@ -508,7 +512,7 @@ mod tests {
             cyc: _cyc,
             sim_params: Default::default(),
         };
-        sd.walk_once().unwrap();
+        sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
     }
@@ -523,7 +527,6 @@ mod tests {
             cyc: _cyc,
             sim_params: Default::default(),
         };
-        // TODO: fix this: sd.walk_once().unwrap();
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);

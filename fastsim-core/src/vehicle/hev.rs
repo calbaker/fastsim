@@ -25,10 +25,6 @@ pub struct HybridElectricVehicle {
     pub(crate) mass: Option<si::Mass>,
     #[serde(default)]
     pub sim_params: HEVSimulationParams,
-    /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
-    /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
-    #[serde(default)]
-    pub soc_bal_iters: u32,
     /// field for tracking current state
     #[serde(default)]
     #[serde(skip_serializing_if = "EqDefault::eq_default")]
@@ -37,6 +33,10 @@ pub struct HybridElectricVehicle {
     #[serde(default)]
     #[serde(skip_serializing_if = "HEVStateHistoryVec::is_empty")]
     pub history: HEVStateHistoryVec,
+    /// vector of SOC balance iterations
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub soc_bal_iter_history: Vec<Self>,
 }
 
 impl SaveInterval for HybridElectricVehicle {
@@ -311,8 +311,11 @@ pub struct HEVState {
     /// Vector of posssible reasons the fc is forced on
     #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
-    // TODO: store the soc buffer here or somewhere
+    /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
+    /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
+    pub soc_bal_iters: u32,
 }
+
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
 
@@ -375,21 +378,21 @@ impl fmt::Display for FCOnCause {
 pub struct HEVSimulationParams {
     /// [ReversibleEnergyStorage] per [FuelConverter]
     pub res_per_fuel_lim: si::Ratio,
-    /// Threshold of SOC balancing iterations for triggering warning
-    pub soc_balance_iter_warn: u32,
     /// Threshold of SOC balancing iteration for triggering error
     pub soc_balance_iter_err: u32,
     /// Whether to allow iteration to achieve SOC balance
     pub balance_soc: bool,
+    /// Whether to save each SOC balance iteration    
+    pub save_soc_bal_iters: bool,
 }
 
 impl Default for HEVSimulationParams {
     fn default() -> Self {
         Self {
             res_per_fuel_lim: uc::R * 0.005,
-            soc_balance_iter_warn: 3,
             soc_balance_iter_err: 5,
             balance_soc: true,
+            save_soc_bal_iters: false,
         }
     }
 }

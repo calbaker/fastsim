@@ -102,10 +102,9 @@ pt_type:
     mass: ~
     sim_params:
       res_per_fuel_lim: 0.005
-      soc_balance_iter_warn: 3
       soc_balance_iter_err: 5
       balance_soc: true
-    soc_bal_iters: 0
+      save_soc_bal_iters: false
 chassis:
   drag_coef: 0.306
   frontal_area_square_meters: 2.22

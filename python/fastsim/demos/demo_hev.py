@@ -338,7 +338,7 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
         label="batt elec",
         linestyle=baselinestyles[0]
     )
-    ax[1].set_ylabel("FC Power\nDelta (f3-f2) [kW]")
+    ax[1].set_ylabel("RES Power\nDelta (f3-f2) [kW]")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
@@ -409,7 +409,7 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
         label="batt elec",
         linestyle=baselinestyles[0]
     )
-    ax[1].set_ylabel("FC Energy\nDelta [MJ]")
+    ax[1].set_ylabel("RES Energy\nDelta [MJ]")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
