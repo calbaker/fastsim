@@ -67,7 +67,7 @@ pub struct ElectricMachine {
     /// eff_interp_fwd and eff_interp_bwd have the same f_x but different x
     /// note that the Extrapolate field of this variable is changed in get_pwr_in_req()
     pub eff_interp_fwd: utils::interp::Interpolator,
-    #[serde(skip)]
+    #[serde(default)]
     #[api(skip_set, skip_get)]
     /// if it is not provided, will be set during init
     /// note that the Extrapolate field of this variable is changed in set_cur_pwr_prop_out_max()
