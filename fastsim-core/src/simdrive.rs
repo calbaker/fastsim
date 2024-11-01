@@ -138,7 +138,6 @@ impl SimDrive {
                         .unwrap()
                         .state
                         .soc;
-                    dbg!(soc_final);
                     let res_per_fuel = self.veh.res().unwrap().state.energy_out_chemical
                         / self.veh.fc().unwrap().state.energy_fuel;
                     if self.veh.hev().unwrap().state.soc_bal_iters
@@ -157,6 +156,7 @@ impl SimDrive {
                     {
                         break;
                     } else {
+                        // prep for another iteration
                         if let Some(&mut ref mut hev) = self.veh.hev_mut() {
                             if hev.sim_params.save_soc_bal_iters {
                                 hev.soc_bal_iter_history.push(hev.clone());

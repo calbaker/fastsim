@@ -54,6 +54,9 @@ t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0
 print(
     f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of 1:\n{t_fsim3_si1:.2e} s")
+
+# %%
+
 df = sd.to_dataframe()
 sd_dict = sd.to_pydict()
 
@@ -418,18 +421,26 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.min_soc_buffer"],
-        label='f3 min buffer',
-        linestyle='-',
-        color='red',
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+        label='f3 accel buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
+        np.array(sd2.accel_buff_soc.tolist()),
+        label='f2 accel buffer',
         alpha=0.5,
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.max_soc_buffer"],
-        label='f3 max buffer',
-        linestyle='-',
-        color='green',
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_regen_buffer"],
+        label='f3 regen buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
+        np.array(sd2.regen_buff_soc.tolist()),
+        label='f2 regen buffer',
         alpha=0.5,
     )
     ax[2].set_ylabel("RES (battery) SOC")
@@ -468,10 +479,12 @@ base_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
 baselinestyles = ["--", "-.",]
 
 if SHOW_PLOTS:
-    fig, ax = plot_road_loads()
+    # TODO: troubleshoot this first plot
+    # fig, ax = plot_road_loads()
     fig, ax = plot_fc_pwr()
     fig, ax = plot_fc_energy()
     fig, ax = plot_res_pwr()
     fig, ax = plot_res_energy()
+
 
 # %%

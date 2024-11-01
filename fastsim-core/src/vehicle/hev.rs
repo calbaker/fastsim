@@ -94,33 +94,27 @@ impl Powertrain for Box<HybridElectricVehicle> {
         let disch_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
                 0.5 * veh_state.mass
-                    * (rgwb
-                        .speed_min_soc_buffer_for_accel
-                        .with_context(|| format_dbg!())?
+                    * ((rgwb.speed_soc_accel_buffer.with_context(|| format_dbg!())?
                         - veh_state.speed_ach)
                         .max(si::Velocity::ZERO)
-                        .powi(typenum::P2::new())
+                        .powi(typenum::P2::new()))
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
             }
-        }
-        .max(si::Energy::ZERO);
+        };
         let chrg_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
                 0.5 * veh_state.mass
-                    * (veh_state.speed_ach
-                        - rgwb
-                            .speed_max_soc_buffer_for_decel
-                            .with_context(|| format_dbg!())?)
+                    * ((veh_state.speed_ach
+                        - rgwb.speed_soc_regen_buffer.with_context(|| format_dbg!())?)
                     .max(si::Velocity::ZERO)
-                    .powi(typenum::P2::new())
+                    .powi(typenum::P2::new()))
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
             }
-        }
-        .max(si::Energy::ZERO);
+        };
         self.res
             .set_curr_pwr_out_max(dt, disch_buffer, chrg_buffer)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -492,7 +486,7 @@ impl HEVPowertrainControls {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
 
-                    if res_state.soc < res_state.min_soc_buffer {
+                    if res_state.soc < res_state.soc_accel_buffer {
                         hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
                     }
                     if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
@@ -565,12 +559,12 @@ pub struct RESGreedyWithBuffers {
     /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
-    pub speed_min_soc_buffer_for_accel: Option<si::Velocity>,
+    pub speed_soc_accel_buffer: Option<si::Velocity>,
     /// Speed at which decel buffer maxes out.  Buffer linearly increases
     /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
-    pub speed_max_soc_buffer_for_decel: Option<si::Velocity>,
+    pub speed_soc_regen_buffer: Option<si::Velocity>,
     /// Minimum time engine must remain on if it was on during the previous
     /// simulation time step.  defaults to 30 s.
     pub fc_min_time_on: Option<si::Time>,
@@ -595,10 +589,8 @@ pub struct RESGreedyWithBuffers {
 impl Init for RESGreedyWithBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
-        self.speed_min_soc_buffer_for_accel =
-            self.speed_min_soc_buffer_for_accel.or(Some(60. * uc::MPH));
-        self.speed_max_soc_buffer_for_decel =
-            self.speed_max_soc_buffer_for_decel.or(Some(60. * uc::MPH));
+        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(70. * uc::MPH));
+        self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
