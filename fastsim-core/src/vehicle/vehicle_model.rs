@@ -401,7 +401,12 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         eff_interp_fwd: (Interpolator::Interp1D(
                             Interp1D::new(
                                 f2veh.mc_perc_out_array.to_vec(),
-                                f2veh.mc_full_eff_array.to_vec(),
+                                {
+                                    let mut mc_full_eff_vec = f2veh.mc_full_eff_array.to_vec();
+                                    ensure!(mc_full_eff_vec.len() > 1);
+                                    mc_full_eff_vec[0] = mc_full_eff_vec[1];
+                                    mc_full_eff_vec
+                                },
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )
