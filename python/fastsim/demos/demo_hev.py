@@ -1,5 +1,6 @@
 # %%
 
+from plot_utils import *
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -14,16 +15,15 @@ import fastsim as fsim
 
 sns.set_theme()
 
-from plot_utils import *
 
 # if enivronment var `DEBUG_LOG=true` is set, turns on debug logging
-DEBUG_LOG = os.environ.get("DEBUG_LOG", "false").lower() == "true"     
+DEBUG_LOG = os.environ.get("DEBUG_LOG", "false").lower() == "true"
 # if environment var `SHOW_PLOTS=false` is set, no plots are shown
-SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"     
+SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"
 # if environment var `SAVE_FIGS=true` is set, save plots
 SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 
-# `fastsim3` -- load vehicle and cycle, build simulation, and run 
+# `fastsim3` -- load vehicle and cycle, build simulation, and run
 # %%
 
 # load 2016 Toyota Prius Two from file
@@ -42,24 +42,24 @@ cyc = fsim.Cycle.from_resource("udds.csv")
 # instantiate `SimDrive` simulation object
 sd0 = fsim.SimDrive(veh, cyc)
 sd = sd0.copy()
-sd_dict = sd.to_pydict()
-sd_dict['sim_params']['trace_miss_opts'] = 'Error'
-sd = fsim.SimDrive.from_pydict(sd_dict)
+# sd_dict['sim_params']['trace_miss_opts'] = 'Error'
+# sd = fsim.SimDrive.from_pydict(sd_dict)
 
 # simulation start time
 t0 = time.perf_counter()
 # run simulation
-if DEBUG_LOG:
-    print("Running `sd.walk()` with logging enabled.")
-    fsim.pyo3_log_init()
-    with fsim.utils.with_logging():
-        sd.walk()
-else:
-    sd.walk()
+sd.walk()
 # simulation end time
 t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0
-print(f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of 1:\n{t_fsim3_si1:.2e} s")
+print(
+    f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of 1:\n{t_fsim3_si1:.2e} s")
+
+# %%
+
+df = sd.to_dataframe(allow_partial=True)
+sd_dict = sd.to_pydict()
+plt_slice = slice(0, len(df))
 
 # instantiate `SimDrive` simulation object
 sd_no_save = fsim.SimDrive(veh_no_save, cyc)
@@ -71,14 +71,15 @@ sd_no_save.walk()
 # simulation end time
 t1 = time.perf_counter()
 t_fsim3_si_none = t1 - t0
-print(f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of None:\n{t_fsim3_si_none:.2e} s")
+print(
+    f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of None:\n{t_fsim3_si_none:.2e} s")
 
 # `fastsim-2` benchmarking
 # %%
 
 sd2 = sd0.to_fastsim2()
 t0 = time.perf_counter()
-with fsim.utils.without_logging(): # suppresses known warning
+with fsim.utils.without_logging():  # suppresses known warning
     sd2.sim_drive()
 t1 = time.perf_counter()
 t_fsim2 = t1 - t0
@@ -90,7 +91,9 @@ print(f"{t_fsim2/t_fsim3_si_none:.3g}x")
 # Visualize results
 
 # %%
-def plot_road_loads() -> Tuple[Figure, Axes]: 
+
+
+def plot_road_loads() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Road Loads")
 
@@ -101,8 +104,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         label="f3 drag",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.drag_kw.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.drag_kw.tolist())[plt_slice],
         label="f2 drag",
     )
     ax[0].plot(
@@ -111,8 +114,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         label="f3 rr",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.rr_kw.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.rr_kw.tolist())[plt_slice],
         label="f2 rr",
     )
     ax[0].set_ylabel("Power [kW]")
@@ -121,19 +124,18 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df["cyc.time_seconds"],
-        df["veh.history.pwr_drag_watts"] / 1e3 - np.array(sd2.drag_kw.tolist())[:len(df)],
+        df["veh.history.pwr_drag_watts"] / 1e3 -
+        np.array(sd2.drag_kw.tolist())[plt_slice],
         label="drag",
         linestyle=baselinestyles[0],
     )
     ax[1].plot(
         df["cyc.time_seconds"],
         df["veh.history.pwr_rr_watts"] /
-        1e3 - np.array(sd2.rr_kw.tolist())[:len(df)],
+        1e3 - np.array(sd2.rr_kw.tolist())[plt_slice],
         label="rr",
         linestyle=baselinestyles[1],
     )
-    ax[1].text(
-        500, -0.125, "Drag error is due to more\naccurate air density model .")
     ax[1].set_ylabel("Power\nDelta (f3-f2) [kW]")
     ax[1].legend()
 
@@ -144,8 +146,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         label="f3",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[plt_slice],
+        np.array(sd2.mps_ach.tolist())[plt_slice],
         label="f2",
     )
     ax[-1].legend()
@@ -159,6 +161,7 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
 
     return fig, ax
 
+
 def plot_fc_pwr() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Fuel Converter Power")
@@ -171,8 +174,8 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
         label="f3 shaft",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fc_kw_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.fc_kw_out_ach.tolist())[plt_slice],
         label="f2 shaft",
     )
     ax[0].plot(
@@ -181,8 +184,8 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
         label="f3 fuel",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fs_kw_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.fs_kw_out_ach.tolist())[plt_slice],
         label="f2 fuel",
     )
     ax[0].set_ylabel("FC Power [kW]")
@@ -192,19 +195,20 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[1].plot(
         df["cyc.time_seconds"],
         (df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_propulsion_watts"] +
-            df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts"]) / 1e3 - np.array(sd2.fc_kw_out_ach.tolist())[:len(df)],
+            df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts"]) / 1e3 - np.array(sd2.fc_kw_out_ach.tolist())[plt_slice],
         label="shaft",
         linestyle=baselinestyles[0]
     )
     ax[1].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_fuel_watts"] / 1e3 - np.array(sd2.fs_kw_out_ach.tolist())[:len(df)],
+        df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_fuel_watts"] /
+        1e3 - np.array(sd2.fs_kw_out_ach.tolist())[plt_slice],
         label="fuel",
         linestyle=baselinestyles[1]
     )
     ax[1].set_ylabel("FC Power\nDelta (f3-f2) [kW]")
     ax[1].legend()
-    
+
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
         df["cyc.time_seconds"],
@@ -212,8 +216,8 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
         label="f3",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[plt_slice],
+        np.array(sd2.mps_ach.tolist())[plt_slice],
         label="f2",
     )
     ax[-1].legend()
@@ -227,6 +231,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
 
     return fig, ax
 
+
 def plot_fc_energy() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Fuel Converter Energy")
@@ -239,8 +244,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="f3 shaft",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fc_cumu_mj_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.fc_cumu_mj_out_ach.tolist())[plt_slice],
         label="f2 shaft",
     )
     ax[0].plot(
@@ -249,8 +254,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="f3 fuel",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.fs_cumu_mj_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.fs_cumu_mj_out_ach.tolist())[plt_slice],
         label="f2 fuel",
     )
     ax[0].set_ylabel("FC Energy [MJ]")
@@ -260,13 +265,14 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[1].plot(
         df["cyc.time_seconds"],
         (df["veh.pt_type.HybridElectricVehicle.fc.history.energy_propulsion_joules"] +
-            df["veh.pt_type.HybridElectricVehicle.fc.history.energy_aux_joules"]) / 1e6 - np.array(sd2.fc_cumu_mj_out_ach.tolist())[:len(df)],
+            df["veh.pt_type.HybridElectricVehicle.fc.history.energy_aux_joules"]) / 1e6 - np.array(sd2.fc_cumu_mj_out_ach.tolist())[plt_slice],
         label="shaft",
         linestyle=baselinestyles[0]
     )
     ax[1].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.fc.history.energy_fuel_joules"] / 1e6 - np.array(sd2.fs_cumu_mj_out_ach.tolist())[:len(df)],
+        df["veh.pt_type.HybridElectricVehicle.fc.history.energy_fuel_joules"] /
+        1e6 - np.array(sd2.fs_cumu_mj_out_ach.tolist())[plt_slice],
         label="fuel",
         linestyle=baselinestyles[1]
     )
@@ -280,8 +286,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="f3",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[plt_slice],
+        np.array(sd2.mps_ach.tolist())[plt_slice],
         label="f2",
     )
     ax[-1].legend()
@@ -295,7 +301,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
 
     return fig, ax
 
-def plot_res_pwr() -> Tuple[Figure, Axes]: 
+
+def plot_res_pwr() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Battery Power")
 
@@ -306,8 +313,8 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
         label="f3 batt elec",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.ess_kw_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.ess_kw_out_ach.tolist())[plt_slice],
         label="f2 batt elec",
     )
     ax[0].plot(
@@ -321,24 +328,24 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.pwr_out_electrical_watts"] / 1e3 
-            - np.array(sd2.ess_kw_out_ach.tolist())[:len(df)],
+        df["veh.pt_type.HybridElectricVehicle.res.history.pwr_out_electrical_watts"] / 1e3
+        - np.array(sd2.ess_kw_out_ach.tolist())[plt_slice],
         label="batt elec",
         linestyle=baselinestyles[0]
     )
-    ax[1].set_ylabel("FC Power\nDelta (f3-f2) [kW]")
+    ax[1].set_ylabel("RES Power\nDelta (f3-f2) [kW]")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
     ax[2].plot(
         df["cyc.time_seconds"],
         df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-        label="f3",
+        label="f3 soc",
     )
     ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.soc.tolist()),
-        label="f2",
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.soc.tolist())[plt_slice],
+        label="f2 soc",
     )
     ax[2].set_ylabel("RES (battery) SOC")
     ax[2].legend()
@@ -350,8 +357,8 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
         label="f3",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[plt_slice],
+        np.array(sd2.mps_ach.tolist())[plt_slice],
         label="f2",
     )
     ax[-1].legend()
@@ -365,18 +372,21 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
 
     return fig, ax
 
-def plot_res_energy() -> Tuple[Figure, Axes]: 
+
+def plot_res_energy() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Battery Energy")
 
+    ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df["cyc.time_seconds"],
         df["veh.pt_type.HybridElectricVehicle.res.history.energy_out_electrical_joules"] / 1e6,
         label="f3 batt elec",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.ess_kw_out_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        ((np.array(sd2.ess_kw_out_ach.tolist()) *
+            np.diff(np.array(sd2.cyc.time_s.tolist()), prepend=0.)).cumsum() / 1e3)[plt_slice],
         label="f2 batt elec",
     )
     ax[0].plot(
@@ -389,23 +399,48 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
 
     ax[1].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.energy_out_electrical_joules"] / 1e6 - np.array(sd2.ess_kw_out_ach.tolist()),
+        df["veh.pt_type.HybridElectricVehicle.res.history.energy_out_electrical_joules"] /
+        1e6 - np.array(sd2.ess_kw_out_ach.tolist())[plt_slice],
         label="batt elec",
         linestyle=baselinestyles[0]
     )
-    ax[1].set_ylabel("FC Energy\nDelta [MJ]")
+    ax[1].set_ylabel("RES Energy\nDelta [MJ]")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
     ax[2].plot(
         df["cyc.time_seconds"],
         df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-        label="f3",
+        label="f3 soc",
     )
     ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.soc.tolist()),
-        label="f2",
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.soc.tolist())[plt_slice],
+        label="f2 soc",
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+        label='f3 accel buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.accel_buff_soc.tolist())[plt_slice],
+        label='f2 accel buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_regen_buffer"],
+        label='f3 regen buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.regen_buff_soc.tolist())[plt_slice],
+        label='f2 regen buffer',
+        alpha=0.5,
     )
     ax[2].set_ylabel("RES (battery) SOC")
     ax[2].legend()
@@ -416,8 +451,8 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
         label="f3",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
+        np.array(sd2.cyc.time_s.tolist())[plt_slice],
+        np.array(sd2.mps_ach.tolist())[plt_slice],
         label="f2",
     )
     ax[-1].legend()
@@ -431,13 +466,15 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
 
     return fig, ax
 
+
 def plot_pwr_split() -> Tuple[Figure, Axes]: ...
+
 
 figsize_3_stacked = (10, 9)
 
 # set up cycling of colors and linestyles
 base_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
-          '#7f7f7f', '#bcbd22', '#17becf']
+               '#7f7f7f', '#bcbd22', '#17becf']
 baselinestyles = ["--", "-.",]
 
 if SHOW_PLOTS:
