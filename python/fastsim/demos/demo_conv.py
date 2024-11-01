@@ -190,7 +190,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     )
     ax[1].plot(
         np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.fc.history.pwr_fuel_watts) / 1e3 - np.array(sd2.fs_kw_out_ach.tolist()),
+        np.array(sd.veh.fc.history.energy_fuel_joules) / 1e6 - np.array(sd2.fs_cumu_mj_out_ach.tolist()),
         label="fuel",
     )
     ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]")
