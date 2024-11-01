@@ -98,6 +98,9 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         - veh_state.speed_ach)
                         .max(si::Velocity::ZERO)
                         .powi(typenum::P2::new()))
+                    * rgwb
+                        .speed_soc_accel_buffer_coeff
+                        .with_context(|| format_dbg!())?
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
@@ -110,6 +113,9 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         - rgwb.speed_soc_regen_buffer.with_context(|| format_dbg!())?)
                     .max(si::Velocity::ZERO)
                     .powi(typenum::P2::new()))
+                    * rgwb
+                        .speed_soc_regen_buffer_coeff
+                        .with_context(|| format_dbg!())?
             }
             HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
                 todo!()
@@ -438,6 +444,8 @@ impl HEVPowertrainControls {
         em_state: &ElectricMachineState,
         res_state: &ReversibleEnergyStorageState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
+        // TODO:
+        // - [ ] make buffers soft limits that aren't enforced, just suggested
         let fc_state = &fc.state;
         if pwr_out_req >= si::Power::ZERO {
             ensure!(
@@ -558,11 +566,15 @@ pub struct RESGreedyWithBuffers {
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
     pub speed_soc_accel_buffer: Option<si::Velocity>,
+    /// Coefficient for modifying amount of accel buffer
+    pub speed_soc_accel_buffer_coeff: Option<si::Ratio>,
     /// Speed at which decel buffer maxes out.  Buffer linearly increases
     /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
     // buffer is relative to this speed
     pub speed_soc_regen_buffer: Option<si::Velocity>,
+    /// Coefficient for modifying amount of regen buffer
+    pub speed_soc_regen_buffer_coeff: Option<si::Ratio>,
     /// Minimum time engine must remain on if it was on during the previous
     /// simulation time step.  defaults to 30 s.
     pub fc_min_time_on: Option<si::Time>,
@@ -588,7 +600,9 @@ impl Init for RESGreedyWithBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
         self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(70. * uc::MPH));
+        self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(0.5 * uc::R));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
+        self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1. * uc::R));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
