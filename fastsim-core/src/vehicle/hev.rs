@@ -93,11 +93,13 @@ impl Powertrain for Box<HybridElectricVehicle> {
             .with_context(|| anyhow!(format_dbg!()))?;
         let disch_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
-                0.5 * veh_state.mass
-                    * ((rgwb.speed_soc_accel_buffer.with_context(|| format_dbg!())?
-                        - veh_state.speed_ach)
-                        .max(si::Velocity::ZERO)
-                        .powi(typenum::P2::new()))
+                (0.5 * veh_state.mass
+                    * (rgwb
+                        .speed_soc_accel_buffer
+                        .with_context(|| format_dbg!())?
+                        .powi(typenum::P2::new())
+                        - veh_state.speed_ach.powi(typenum::P2::new())))
+                .max(si::Energy::ZERO)
                     * rgwb
                         .speed_soc_accel_buffer_coeff
                         .with_context(|| format_dbg!())?
@@ -108,11 +110,13 @@ impl Powertrain for Box<HybridElectricVehicle> {
         };
         let chrg_buffer: si::Energy = match &self.pt_cntrl {
             HEVPowertrainControls::Fastsim2(rgwb) => {
-                0.5 * veh_state.mass
-                    * ((veh_state.speed_ach
-                        - rgwb.speed_soc_regen_buffer.with_context(|| format_dbg!())?)
-                    .max(si::Velocity::ZERO)
-                    .powi(typenum::P2::new()))
+                (0.5 * veh_state.mass
+                    * (veh_state.speed_ach.powi(typenum::P2::new())
+                        - rgwb
+                            .speed_soc_regen_buffer
+                            .with_context(|| format_dbg!())?
+                            .powi(typenum::P2::new())))
+                .max(si::Energy::ZERO)
                     * rgwb
                         .speed_soc_regen_buffer_coeff
                         .with_context(|| format_dbg!())?
