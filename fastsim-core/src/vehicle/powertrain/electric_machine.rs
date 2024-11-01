@@ -319,7 +319,7 @@ impl Init for ElectricMachine {
                     .x()?
                     .iter()
                     .zip(self.eff_interp_fwd.f_x()?)
-                    .map(|(x, y)| if y == 0. { 0. } else { x / y })
+                    .map(|(x, y)| x / y)
                     .collect(),
                 self.eff_interp_fwd.f_x()?,
                 // TODO: should these be set to be the same as eff_interp_fwd,
