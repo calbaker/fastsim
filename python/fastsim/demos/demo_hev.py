@@ -42,20 +42,13 @@ cyc = fsim.Cycle.from_resource("udds.csv")
 # instantiate `SimDrive` simulation object
 sd0 = fsim.SimDrive(veh, cyc)
 sd = sd0.copy()
-sd_dict = sd.to_pydict()
 # sd_dict['sim_params']['trace_miss_opts'] = 'Error'
 # sd = fsim.SimDrive.from_pydict(sd_dict)
 
 # simulation start time
 t0 = time.perf_counter()
 # run simulation
-if DEBUG_LOG:
-    print("Running `sd.walk()` with logging enabled.")
-    fsim.pyo3_log_init()
-    with fsim.utils.with_logging():
-        sd.walk()
-else:
-    sd.walk()
+sd.walk()
 # simulation end time
 t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0
@@ -345,12 +338,12 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[2].plot(
         df["cyc.time_seconds"],
         df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-        label="f3",
+        label="f3 soc",
     )
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.array(sd2.soc.tolist()),
-        label="f2",
+        label="f2 soc",
     )
     ax[2].set_ylabel("RES (battery) SOC")
     ax[2].legend()
@@ -416,12 +409,28 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[2].plot(
         df["cyc.time_seconds"],
         df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-        label="f3",
+        label="f3 soc",
     )
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.array(sd2.soc.tolist()),
-        label="f2",
+        label="f2 soc",
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.min_soc_buffer"],
+        label='f3 min buffer',
+        linestyle='-',
+        color='red',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.max_soc_buffer"],
+        label='f3 max buffer',
+        linestyle='-',
+        color='green',
+        alpha=0.5,
     )
     ax[2].set_ylabel("RES (battery) SOC")
     ax[2].legend()
@@ -464,3 +473,5 @@ if SHOW_PLOTS:
     fig, ax = plot_fc_energy()
     fig, ax = plot_res_pwr()
     fig, ax = plot_res_energy()
+
+# %%
