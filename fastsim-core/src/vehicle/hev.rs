@@ -438,8 +438,6 @@ impl HEVPowertrainControls {
         em_state: &ElectricMachineState,
         res_state: &ReversibleEnergyStorageState,
     ) -> anyhow::Result<(si::Power, si::Power)> {
-        // TODO:
-        // - [ ] make buffers soft limits that aren't enforced, just suggested
         let fc_state = &fc.state;
         if pwr_out_req >= si::Power::ZERO {
             ensure!(
