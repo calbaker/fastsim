@@ -294,8 +294,8 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                             pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
                             pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
                             eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
-                                f2veh.fc_pwr_out_perc.to_vec(),
-                                f2veh.fc_eff_map.to_vec(),
+                                f2veh.fc_perc_out_array.to_vec(),
+                                f2veh.fc_eff_array.to_vec(),
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )?),
@@ -362,8 +362,8 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                             pwr_out_max_init: f2veh.fc_max_kw * uc::KW / f2veh.fc_sec_to_peak_pwr,
                             pwr_ramp_lag: f2veh.fc_sec_to_peak_pwr * uc::S,
                             eff_interp_from_pwr_out: Interpolator::Interp1D(Interp1D::new(
-                                f2veh.fc_pwr_out_perc.to_vec(),
-                                f2veh.fc_eff_map.to_vec(),
+                                f2veh.fc_perc_out_array.to_vec(),
+                                f2veh.fc_eff_array.to_vec(),
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )?),
@@ -400,30 +400,14 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         state: Default::default(),
                         eff_interp_fwd: (Interpolator::Interp1D(
                             Interp1D::new(
-                                f2veh.mc_pwr_out_perc.to_vec(),
-                                f2veh.mc_eff_array.to_vec(),
+                                f2veh.mc_perc_out_array.to_vec(),
+                                f2veh.mc_full_eff_array.to_vec(),
                                 Strategy::LeftNearest,
                                 Extrapolate::Error,
                             )
                             .unwrap(),
                         )),
-                        eff_interp_at_max_input: Some(Interpolator::Interp1D(
-                            Interp1D::new(
-                                // before adding the interpolator, pwr_in_frac_interp was set as Default::default(), can this
-                                // be transferred over as done here, or does a new defualt need to be defined?
-                                f2veh
-                                    .mc_pwr_out_perc
-                                    .to_vec()
-                                    .iter()
-                                    .zip(f2veh.mc_eff_array.to_vec().iter())
-                                    .map(|(x, y)| x / y)
-                                    .collect(),
-                                f2veh.mc_eff_array.to_vec(),
-                                Strategy::LeftNearest,
-                                Extrapolate::Error,
-                            )
-                            .unwrap(),
-                        )),
+                        eff_interp_at_max_input: None,
                         // pwr_in_frac_interp: Default::default(),
                         pwr_out_max: f2veh.mc_max_kw * uc::KW,
                         specific_pwr: None,
