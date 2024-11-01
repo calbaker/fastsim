@@ -612,7 +612,8 @@ impl Init for RESGreedyWithBuffers {
         self.frac_pwr_demand_fc_forced_on =
             self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
         // TODO: consider changing this default
-        self.frac_of_most_eff_pwr_to_run_fc = self.frac_of_most_eff_pwr_to_run_fc.or(Some(*uc::R));
+        self.frac_of_most_eff_pwr_to_run_fc =
+            self.frac_of_most_eff_pwr_to_run_fc.or(Some(1.0 * uc::R));
         Ok(())
     }
 }
