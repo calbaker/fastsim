@@ -654,11 +654,12 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       Fastsim2:
-        speed_soc_accel_buffer: 17.8816
-        speed_soc_accel_buffer_coeff: 0.5
+        speed_soc_fc_on_buffer: 29.0576
+        speed_soc_accel_buffer: 26.8224
+        speed_soc_accel_buffer_coeff: 1.0
         speed_soc_regen_buffer: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
-        fc_min_time_on: 10.0
+        fc_min_time_on: 5.0
         speed_fc_forced_on: 37.9984
         frac_pwr_demand_fc_forced_on: 0.5645161290322581
         frac_of_most_eff_pwr_to_run_fc: 1.0
