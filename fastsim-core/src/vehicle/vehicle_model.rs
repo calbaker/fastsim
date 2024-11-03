@@ -322,12 +322,13 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                 Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
             }
             HEV => {
-                let pt_cntrl = HEVPowertrainControls::Fastsim2(hev::RESGreedyWithBuffers {
+                let pt_cntrl = HEVPowertrainControls::Fastsim2(hev::RESGreedyWithDynamicBuffers {
                     speed_soc_accel_buffer: None,
                     speed_soc_accel_buffer_coeff: None,
                     speed_soc_regen_buffer: None,
                     speed_soc_regen_buffer_coeff: None,
-                    fc_min_time_on: Some(f2veh.min_fc_time_on * uc::S),
+                    // note that this exists in `fastsim-2` but has no apparent effect!
+                    fc_min_time_on: None,
                     speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
                     frac_pwr_demand_fc_forced_on: Some(
                         f2veh.kw_demand_fc_on

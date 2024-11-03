@@ -84,7 +84,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                     self.state.fc_on_causes.push(FCOnCause::OnTimeTooShort)
                 }
             },
-            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+            HEVPowertrainControls::Placeholder => {
                 todo!()
             }
         };
@@ -104,7 +104,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         .speed_soc_accel_buffer_coeff
                         .with_context(|| format_dbg!())?
             }
-            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+            HEVPowertrainControls::Placeholder => {
                 todo!()
             }
         };
@@ -121,7 +121,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                         .speed_soc_regen_buffer_coeff
                         .with_context(|| format_dbg!())?
             }
-            HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
+            HEVPowertrainControls::Placeholder => {
                 todo!()
             }
         };
@@ -415,9 +415,9 @@ pub enum HEVAuxControls {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum HEVPowertrainControls {
     /// Controls that attempt to match fastsim-2
-    Fastsim2(RESGreedyWithBuffers),
+    Fastsim2(RESGreedyWithDynamicBuffers),
     /// Controls that have a dynamically updated discharge buffer but are otherwise similar to [Self::Fastsim2]
-    RESGreedyWithDynamicBuffers,
+    Placeholder,
 }
 
 impl Default for HEVPowertrainControls {
@@ -430,7 +430,7 @@ impl Init for HEVPowertrainControls {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
             Self::Fastsim2(rgwb) => rgwb.init()?,
-            Self::RESGreedyWithDynamicBuffers => {
+            Self::Placeholder => {
                 todo!()
             }
         }
@@ -524,9 +524,7 @@ impl HEVPowertrainControls {
                     );
                     (fc_pwr, em_pwr)
                 }
-                HEVPowertrainControls::RESGreedyWithDynamicBuffers => {
-                    (uc::W * f64::NAN, uc::W * f64::NAN)
-                }
+                HEVPowertrainControls::Placeholder => todo!(),
             };
 
             Ok((fc_pwr, em_pwr))
@@ -564,7 +562,7 @@ impl HEVPowertrainControls {
 
 /// Container for static controls parameters
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
-pub struct RESGreedyWithBuffers {
+pub struct RESGreedyWithDynamicBuffers {
     /// Speed at which accel buffer becomes inactive.  Buffer linearly decreases
     /// up to this speed.  Defaults to ?? mph.
     // TODO: in future control strategy, have a coeff to control how big the
