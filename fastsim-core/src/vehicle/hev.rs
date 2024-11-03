@@ -598,14 +598,14 @@ pub struct RESGreedyWithDynamicBuffers {
     pub frac_res_dschrg_for_fc: si::Ratio,
 }
 
-impl Init for RESGreedyWithBuffers {
+impl Init for RESGreedyWithDynamicBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
         self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(40. * uc::MPH));
         self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(0.5 * uc::R));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1. * uc::R));
-        self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 30.));
+        self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 10.));
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
             self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));

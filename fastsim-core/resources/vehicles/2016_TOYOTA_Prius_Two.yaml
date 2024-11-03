@@ -658,7 +658,7 @@ pt_type:
         speed_soc_accel_buffer_coeff: 0.5
         speed_soc_regen_buffer: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
-        fc_min_time_on: 60.0
+        fc_min_time_on: 10.0
         speed_fc_forced_on: 37.9984
         frac_pwr_demand_fc_forced_on: 0.5645161290322581
         frac_of_most_eff_pwr_to_run_fc: 1.0
