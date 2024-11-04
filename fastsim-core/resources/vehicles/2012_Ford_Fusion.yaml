@@ -221,6 +221,11 @@ pt_type:
           extrapolate: Error
       pwr_idle_fuel_watts: 6999.999999999999
       save_interval: 1
+    transmission:
+      mass_kilograms: ~
+      eff_interp:
+        Interp0D: 0.875
+      save_interval: 1
     mass: ~
     alt_eff: 1.0
 chassis:

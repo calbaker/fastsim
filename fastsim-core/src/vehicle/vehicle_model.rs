@@ -316,6 +316,13 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                             .with_context(|| anyhow!(format_dbg!()))?;
                         fc
                     },
+                    transmission: Transmission {
+                        mass: None,
+                        eff_interp: Interpolator::Interp0D(f2veh.trans_eff),
+                        save_interval: Some(1),
+                        state: Default::default(),
+                        history: Default::default(),
+                    },
                     mass: None,
                     alt_eff: f2veh.alt_eff * uc::R,
                 };
@@ -432,6 +439,59 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                 };
                 hev.init()?;
                 Ok(PowertrainType::HybridElectricVehicle(Box::new(hev)))
+            }
+            BEV => {
+                let bev = BatteryElectricVehicle {
+                    res: ReversibleEnergyStorage {
+                        state: Default::default(),
+                        mass: None,
+                        specific_energy: None,
+                        pwr_out_max: f2veh.ess_max_kw * uc::KW,
+                        energy_capacity: f2veh.ess_max_kwh * uc::KWH,
+                        eff_interp: Interpolator::Interp0D(f2veh.ess_round_trip_eff.sqrt()),
+                        min_soc: f2veh.min_soc * uc::R,
+                        max_soc: f2veh.max_soc * uc::R,
+                        save_interval: Some(1),
+                        history: Default::default(),
+                    },
+                    em: ElectricMachine {
+                        state: Default::default(),
+                        eff_interp_fwd: (Interpolator::Interp1D(Interp1D::new(
+                            f2veh.mc_pwr_out_perc.to_vec(),
+                            f2veh.mc_eff_array.to_vec(),
+                            Strategy::LeftNearest,
+                            Extrapolate::Error,
+                        )?)),
+                        eff_interp_at_max_input: Some(Interpolator::Interp1D(Interp1D::new(
+                            // before adding the interpolator, pwr_in_frac_interp was set as Default::default(), can this
+                            // be transferred over as done here, or does a new defualt need to be defined?
+                            f2veh
+                                .mc_pwr_out_perc
+                                .to_vec()
+                                .iter()
+                                .zip(f2veh.mc_eff_array.to_vec().iter())
+                                .map(|(x, y)| x / y)
+                                .collect(),
+                            f2veh.mc_eff_array.to_vec(),
+                            Strategy::LeftNearest,
+                            Extrapolate::Error,
+                        )?)),
+                        pwr_out_max: f2veh.mc_max_kw * uc::KW,
+                        specific_pwr: None,
+                        mass: None,
+                        save_interval: Some(1),
+                        history: Default::default(),
+                    },
+                    transmission: Transmission {
+                        mass: None,
+                        eff_interp: Interpolator::Interp0D(f2veh.trans_eff),
+                        save_interval: Some(1),
+                        state: Default::default(),
+                        history: Default::default(),
+                    },
+                    mass: None,
+                };
+                Ok(PowertrainType::BatteryElectricVehicle(Box::new(bev)))
             }
             _ => {
                 bail!(
@@ -682,10 +742,17 @@ impl Vehicle {
                 .map(|res| res.energy_capacity.get::<si::kilowatt_hour>())
                 .unwrap_or_default(),
             ess_max_kwh_doc: None,
-            // TODO: make an enum for this in fastsim-3
-            // SOC is not time-varying in fastsim-2
-            // self.res().map(|res| res.eff.get::<si::ratio>().powi(2)).unwrap_or_default()
-            ess_round_trip_eff: 0.97,
+            ess_round_trip_eff: self
+                .res()
+                .map(|res| {
+                    if let Interpolator::Interp0D(eff) = res.eff_interp {
+                        Ok(eff.powi(2))
+                    } else {
+                        bail!("`to_fastsim2` is not implemented for non-0D `res.eff_interp`")
+                    }
+                })
+                .transpose()?
+                .unwrap_or(f64::NAN),
             ess_round_trip_eff_doc: None,
             ess_to_fuel_ok_error: 0.005, // TODO: update when hybrid logic is implemented
             ess_to_fuel_ok_error_doc: None,
@@ -704,7 +771,7 @@ impl Vehicle {
                     ),
                 })
                 .transpose()?
-                .unwrap_or_default(),
+                .unwrap_or_else(|| array![0., 0.]),
             fc_eff_map_doc: None,
             fc_eff_type: "SI".into(), // TODO: placeholder, revisit and update if needed
             fc_eff_type_doc: None,
@@ -734,7 +801,7 @@ impl Vehicle {
                     ),
                 })
                 .transpose()?
-                .unwrap_or_default(),
+                .unwrap_or_else(|| array![0., 1.]),
             fc_pwr_out_perc_doc: None,
             fc_sec_to_peak_pwr: self
                 .fc()
@@ -1063,6 +1130,22 @@ pub(crate) mod tests {
         veh
     }
 
+    #[cfg(feature = "yaml")]
+    pub(crate) fn mock_bev() -> Vehicle {
+        let file_contents = include_str!("fastsim-2_2022_Renault_Zoe_ZE50_R135.yaml");
+        use fastsim_2::traits::SerdeAPI;
+        let veh = {
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let veh = Vehicle::try_from(f2veh);
+            veh.unwrap()
+        };
+
+        // veh.to_file(vehicles_dir().join("2022_Renault_Zoe_ZE50_R135.yaml"))
+        //     .unwrap();
+        assert!(veh.pt_type.is_battery_electric_vehicle());
+        veh
+    }
+
     /// tests that vehicle can be initialized and that repeating has no net effect
     // TODO: fix this test from the python side.  Use `deepdiff` or some such
     // #[test]
@@ -1093,6 +1176,20 @@ pub(crate) mod tests {
     #[cfg(all(feature = "csv", feature = "resources"))]
     fn test_to_fastsim2_hev() {
         let veh = mock_hev();
+        let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
+        let sd = crate::simdrive::SimDrive {
+            veh,
+            cyc,
+            sim_params: Default::default(),
+        };
+        let mut sd2 = sd.to_fastsim2().unwrap();
+        sd2.sim_drive(None, None).unwrap();
+    }
+
+    #[test]
+    #[cfg(all(feature = "csv", feature = "resources"))]
+    fn test_to_fastsim2_bev() {
+        let veh = mock_bev();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
         let sd = crate::simdrive::SimDrive {
             veh,

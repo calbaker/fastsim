@@ -27,6 +27,7 @@ pub use powertrain::electric_machine::ElectricMachine;
 pub use powertrain::fuel_converter::FuelConverter;
 pub use powertrain::fuel_storage::FuelStorage;
 pub use powertrain::reversible_energy_storage::ReversibleEnergyStorage;
+pub use powertrain::transmission::Transmission;
 pub use powertrain::traits::Powertrain;
 pub use powertrain_type::PowertrainType;
 pub use traits::*;
