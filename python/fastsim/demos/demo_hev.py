@@ -60,8 +60,8 @@ print(
 # plt_slice = slice(200)
 # df = sd.to_dataframe(allow_partial=True)[plt_slice]
 df = sd.to_dataframe(allow_partial=True)
-sd_dict = sd.to_pydict()
 plt_slice = slice(0, len(df))
+sd_dict = sd.to_pydict()
 
 
 # instantiate `SimDrive` simulation object
@@ -157,7 +157,7 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
     x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
-    x_max = (x_max - x_min) * 1.1
+    x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
     plt.tight_layout()
@@ -216,28 +216,28 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
-    # ax[2].plot(
-    #     df["cyc.time_seconds"],
-    #     df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-    #     label="f3 soc",
-    # )
-    # ax[2].plot(
-    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-    #     np.array(sd2.soc.tolist())[plt_slice],
-    #     label="f2 soc",
-    # )
-    # ax[2].plot(
-    #     df["cyc.time_seconds"],
-    #     df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
-    #     label='f3 accel buffer',
-    #     alpha=0.5,
-    # )
-    # ax[2].plot(
-    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-    #     np.array(sd2.accel_buff_soc.tolist())[plt_slice],
-    #     label='f2 accel buffer',
-    #     alpha=0.5,
-    # )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
+        label="f3 soc",
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.soc.tolist())[plt_slice],
+        label="f2 soc",
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+        label='f3 accel buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.accel_buff_soc.tolist())[plt_slice],
+        label='f2 accel buffer',
+        alpha=0.5,
+    )
     # ax[2].plot(
     #     df["cyc.time_seconds"],
     #     df["veh.pt_type.HybridElectricVehicle.res.history.soc_regen_buffer"],
@@ -255,10 +255,11 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
         df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
         label='f3 FC eff',
     )
+    f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
+             np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-        (np.array(sd2.fc_kw_out_ach.tolist()) /
-         np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice],
+        f2_fc_eff,
         label='f2 FC eff',
     )
     ax[2].set_ylabel("[-]")
@@ -279,7 +280,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
     x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
-    x_max = (x_max - x_min) * 1.1
+    x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
     plt.tight_layout()
@@ -338,28 +339,28 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
-    # ax[2].plot(
-    #     df["cyc.time_seconds"],
-    #     df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
-    #     label="f3 soc",
-    # )
-    # ax[2].plot(
-    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-    #     np.array(sd2.soc.tolist())[plt_slice],
-    #     label="f2 soc",
-    # )
-    # ax[2].plot(
-    #     df["cyc.time_seconds"],
-    #     df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
-    #     label='f3 accel buffer',
-    #     alpha=0.5,
-    # )
-    # ax[2].plot(
-    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-    #     np.array(sd2.accel_buff_soc.tolist())[plt_slice],
-    #     label='f2 accel buffer',
-    #     alpha=0.5,
-    # )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc"],
+        label="f3 soc",
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.soc.tolist())[plt_slice],
+        label="f2 soc",
+    )
+    ax[2].plot(
+        df["cyc.time_seconds"],
+        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+        label='f3 accel buffer',
+        alpha=0.5,
+    )
+    ax[2].plot(
+        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+        np.array(sd2.accel_buff_soc.tolist())[plt_slice],
+        label='f2 accel buffer',
+        alpha=0.5,
+    )
     # ax[2].plot(
     #     df["cyc.time_seconds"],
     #     df["veh.pt_type.HybridElectricVehicle.res.history.soc_regen_buffer"],
@@ -377,10 +378,11 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
         label='f3 FC eff',
     )
+    f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
+             np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-        (np.array(sd2.fc_kw_out_ach.tolist()) /
-         np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice],
+        f2_fc_eff,
         label='f2 FC eff',
     )
     ax[2].set_ylabel("[-]")
@@ -401,7 +403,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
     x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
-    x_max = (x_max - x_min) * 1.1
+    x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
     plt.tight_layout()
@@ -499,7 +501,7 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
     x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
-    x_max = (x_max - x_min) * 1.1
+    x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
     plt.tight_layout()
@@ -596,7 +598,7 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
     x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
-    x_max = (x_max - x_min) * 1.1
+    x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
     plt.tight_layout()

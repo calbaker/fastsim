@@ -654,8 +654,8 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       Fastsim2:
-        speed_soc_fc_on_buffer: 29.0576
-        speed_soc_accel_buffer: 26.8224
+        speed_soc_fc_on_buffer: 23.4696
+        speed_soc_accel_buffer: 22.352
         speed_soc_accel_buffer_coeff: 1.0
         speed_soc_regen_buffer: 13.4112
         speed_soc_regen_buffer_coeff: 1.0

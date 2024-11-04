@@ -260,7 +260,7 @@ impl ReversibleEnergyStorage {
         self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
             self.pwr_out_max
         } else if self.state.soc < self.max_soc && soc_buffer > si::Ratio::ZERO {
-            self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
+            self.pwr_out_max * (self.max_soc - self.state.soc) / soc_buffer
         } else {
             // current SOC is less than both
             si::Power::ZERO

@@ -318,6 +318,8 @@ pub struct HEVState {
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
     pub soc_bal_iters: u32,
+    /// buffer at which FC is forced on
+    pub soc_fc_on_buffer: si::Ratio,
 }
 
 impl Init for HEVState {}
@@ -494,7 +496,7 @@ impl HEVPowertrainControls {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
 
-                    let soc_fc_on_buffer = {
+                    hev_state.soc_fc_on_buffer = {
                         (0.5 * veh_state.mass
                             * (rgwb
                                 .speed_soc_fc_on_buffer
@@ -505,9 +507,10 @@ impl HEVPowertrainControls {
                             * rgwb
                                 .speed_soc_accel_buffer_coeff
                                 .with_context(|| format_dbg!())?
-                    } / res.energy_capacity_usable();
+                    } / res.energy_capacity_usable()
+                        + res.min_soc;
 
-                    if res.state.soc < soc_fc_on_buffer {
+                    if res.state.soc < hev_state.soc_fc_on_buffer {
                         hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
                     }
                     if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
@@ -613,9 +616,11 @@ pub struct RESGreedyWithDynamicBuffers {
 impl Init for RESGreedyWithDynamicBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
-        self.speed_soc_fc_on_buffer = self.speed_soc_fc_on_buffer.or(Some(65. * uc::MPH));
-        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(60. * uc::MPH));
+        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(50. * uc::MPH));
         self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(1.0 * uc::R));
+        self.speed_soc_fc_on_buffer = self
+            .speed_soc_fc_on_buffer
+            .or(Some(self.speed_soc_accel_buffer.unwrap() * 1.05));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1.0 * uc::R));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 5.));
