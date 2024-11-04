@@ -284,13 +284,12 @@ impl FuelConverter {
                         )
                     })?
         } else {
-            uc::R * f64::NAN
+            si::Ratio::ZERO
         };
         ensure!(
-            (self.state.eff >= 0.0 * uc::R && self.state.eff <= 1.0 * uc::R)
-                || self.state.eff.is_nan(),
+            (self.state.eff >= 0.0 * uc::R && self.state.eff <= 1.0 * uc::R),
             format!(
-                "fc efficiency ({}) must be either between 0 and 1 or NAN",
+                "fc efficiency ({}) must be either between 0 and 1",
                 self.state.eff.get::<si::ratio>()
             )
         );
