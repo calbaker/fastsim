@@ -156,7 +156,7 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
-    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
+    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1]
     x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
@@ -256,7 +256,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
         label='f3 FC eff',
     )
     f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
-             np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
+                 np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
         f2_fc_eff,
@@ -279,7 +279,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
-    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
+    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1]
     x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
@@ -379,7 +379,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label='f3 FC eff',
     )
     f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
-             np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
+                 np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
     ax[2].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
         f2_fc_eff,
@@ -402,7 +402,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
-    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
+    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1]
     x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
@@ -500,7 +500,7 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
-    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
+    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1]
     x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 
@@ -597,7 +597,7 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
     ax[-1].set_ylabel("Ach Speed [m/s]")
-    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1] 
+    x_min, x_max = ax[-1].get_xlim()[0], ax[-1].get_xlim()[1]
     x_max = (x_max - x_min) * 1.15
     ax[-1].set_xlim([x_min, x_max])
 

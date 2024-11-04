@@ -178,8 +178,8 @@ impl ReversibleEnergyStorage {
                 )
             );
         }
-        state.eff = match self.eff_interp.to_owned() {
-            Interpolator::Interp0D(round_trip_eff) => round_trip_eff * uc::R,
+        state.eff = match &self.eff_interp {
+            Interpolator::Interp0D(round_trip_eff) => *round_trip_eff * uc::R,
             Interpolator::Interp1D(interp1d) => {
                 interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()])? * uc::R
             }
@@ -207,16 +207,15 @@ impl ReversibleEnergyStorage {
             )
         );
 
-        // TODO: figure out how to handle round trip efficiency calculation in fastsim-3 style
-        if state.pwr_out_electrical > si::Power::ZERO {
+        state.pwr_out_chemical = if state.pwr_out_electrical > si::Power::ZERO {
             // if positive, chemical power must be greater than electrical power
             // i.e. not all chemical power can be converted to electrical power
-            state.pwr_out_chemical = state.pwr_out_electrical / state.eff;
+            state.pwr_out_electrical / state.eff
         } else {
             // if negative, chemical power, must be less than electrical power
             // i.e. not all electrical power can be converted back to chemical power
-            state.pwr_out_chemical = state.pwr_out_electrical * state.eff;
-        }
+            state.pwr_out_electrical * state.eff
+        };
 
         state.pwr_loss = (state.pwr_out_chemical - state.pwr_out_electrical).abs();
 

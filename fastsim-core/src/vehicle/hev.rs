@@ -578,14 +578,13 @@ impl HEVPowertrainControls {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 pub struct RESGreedyWithDynamicBuffers {
     /// RES energy delta from minimum SOC corresponding to kinetic energy of
-    /// vehicle at this speed that triggers FC to be forced on. This should
-    /// usually be higher than [Self::speed_soc_accel_buffer]`
-    pub speed_soc_fc_on_buffer: Option<si::Velocity>,
-    /// RES energy delta from minimum SOC corresponding to kinetic energy of
     /// vehicle at this speed that triggers ramp down in RES discharge
     pub speed_soc_accel_buffer: Option<si::Velocity>,
     /// Coefficient for modifying amount of accel buffer
     pub speed_soc_accel_buffer_coeff: Option<si::Ratio>,
+    /// RES energy delta from minimum SOC corresponding to kinetic energy of
+    /// vehicle at this speed that triggers FC to be forced on.
+    pub speed_soc_fc_on_buffer: Option<si::Velocity>,
     /// RES energy delta from maximum SOC corresponding to kinetic energy of
     /// vehicle at current speed minus kinetic energy of vehicle at this speed
     /// triggers ramp down in RES discharge
@@ -616,17 +615,17 @@ pub struct RESGreedyWithDynamicBuffers {
 impl Init for RESGreedyWithDynamicBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
-        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(50. * uc::MPH));
+        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(40.0 * uc::MPH));
         self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(1.0 * uc::R));
         self.speed_soc_fc_on_buffer = self
             .speed_soc_fc_on_buffer
             .or(Some(self.speed_soc_accel_buffer.unwrap() * 1.05));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1.0 * uc::R));
-        self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 5.));
+        self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 5.0));
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
-            self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.25));
+            self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.75));
         // TODO: consider changing this default
         self.frac_of_most_eff_pwr_to_run_fc =
             self.frac_of_most_eff_pwr_to_run_fc.or(Some(1.0 * uc::R));
