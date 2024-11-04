@@ -541,7 +541,9 @@ mod tests {
 
         let dir = Path::new("../validation/f2-vehicles");
         let output_dir = Path::new("../validation/f3-vehicles");
-        std::fs::create_dir(output_dir).unwrap();
+        if !output_dir.exists() {
+            std::fs::create_dir(output_dir).unwrap();
+        }
         let skip_files = vec![
             "2016 CHEVROLET Volt.yaml",
             "2016 BMW i3 REx PHEV.yaml",
