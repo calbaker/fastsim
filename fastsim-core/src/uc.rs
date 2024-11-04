@@ -77,7 +77,8 @@ unit_const!(
     /// Calculated using the WGS-84 formula <https://en.wikipedia.org/wiki/Theoretical_gravity#Somigliana_equation>
     ACC_GRAV,
     Acceleration,
-    9.801_548_494_963_14
+    // 9.801_548_494_963_14 rounded to 3 sig figs
+    9.80
 );
 
 unit_const!(KELVIN, ThermodynamicTemperature, 1.0);

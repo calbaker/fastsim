@@ -92,13 +92,13 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_chemical_watts"] / 1e3,
-        label="f3 res kw out",
+        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_electrical_watts"] / 1e3,
+        label="f3 electrical out",
     )
     ax[0].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.array(sd2.ess_kw_out_ach.tolist()),
-        label="f2 res kw out",
+        label="f2 electrical out",
     )
     ax[0].set_ylabel("RES Power [kW]")
     ax[0].legend()
@@ -106,7 +106,8 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_chemical_watts"] / 1e3 - np.array(sd2.ess_kw_out_ach.tolist()),
+        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_electrical_watts"] /
+            1e3 - np.array(sd2.ess_kw_out_ach.tolist()),
         label="f3 res kw out",
     )
     ax[1].set_ylabel("RES Power\nDelta (f3-f2) [kW]")
@@ -156,12 +157,12 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[0].plot(
         df['cyc.time_seconds'],
         df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"] / 1e3,
-        label="f3 res kj out",
+        label="f3 electrical out",
     )
     ax[0].plot(
         np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
         np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) * np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
-        label="f2 res kj out",
+        label="f2 electrical out",
     )
     ax[0].set_ylabel("RES Energy [kW]")
     ax[0].legend()
@@ -169,10 +170,16 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"] / 1e3 - np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) * np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
-        label="res kj out",
+        df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"
+            ] / 1e3 - np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) *
+            np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
+        label="electrical out",
     )
-    ax[1].set_ylabel("RES Energy\nDelta (f3-f2) [kJ]")
+    ax[1].set_ylim(
+       -np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1,
+        np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1
+    )
+    ax[1].set_ylabel("RES Energy\nDelta (f3-f2) [kJ]\n+/- 10% Range")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
