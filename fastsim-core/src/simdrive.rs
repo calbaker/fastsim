@@ -550,6 +550,7 @@ mod tests {
             "2016 FORD C-MAX (PHEV).yaml",
             "2017 Prius Prime.yaml",
             "2016 HYUNDAI Sonata PHEV.yaml",
+            "2021 Fiat Panda Mild Hybrid.yaml",
         ];
         assert!(dir.exists());
         for filepath in std::fs::read_dir(dir).unwrap() {
