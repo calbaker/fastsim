@@ -1,4 +1,4 @@
-from pkg_resources import get_distribution
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any, List, Union, Dict, Optional
 from typing_extensions import Self
@@ -34,8 +34,7 @@ def resources_root() -> Path:
     path = package_root() / "resources"
     return path
 
-
-__version__ = get_distribution("fastsim").version
+__version__ = version("fastsim")
 
 
 def set_param_from_path(
