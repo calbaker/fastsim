@@ -13,6 +13,7 @@ pub struct HybridElectricVehicle {
     pub fc: FuelConverter,
     #[has_state]
     pub em: ElectricMachine,
+    // TODO: put a transmission here
     /// control strategy for distributing power demand between `fc` and `res`
     #[serde(default)]
     pub pt_cntrl: HEVPowertrainControls,
