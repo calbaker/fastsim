@@ -94,20 +94,8 @@ impl SimDrive {
     }
 
     // # TODO:
-    // - [x] remove separate `walk_hev`
-    // - [x] come up with a mechanism of enabling or disabling SOC balance iteration
-    // - [x] warn after ~2 (make configurable) iterations and error after ~10 iterations
-    // - [x] figure out speed trace miss -- resulted from not having enough SOC buffer
-    // - [ ] probably done already -- make sure that when doing lefthand interpolation we have same array length as f2
     // ## Features
-    // - [x] engine min time on per f2
-    // - [ ] accel buffer per f2
-    // - [ ] regen buffer per f2
     // - [ ] regen limiting curve during speeds approaching zero per f2 -- less urgent
-    // - [ ] controls to make the engine recharge the battery if below buffers
-    // - [ ] controls to make engine run efficiency when on. In f2, this just maxes out
-    //       the engine.  We should be able to actually get near peak efficiency in a
-    //       smarter way in f3 because the performance penalty is less problematic.
     // - [ ] ability to manipulate friction/regen brake split based on required braking
     //       power -- new feature -- move this to enum
     // - [x] make enum `EngineOnCause::{AlreadyOn, TooCold,
@@ -544,13 +532,12 @@ mod tests {
         if !output_dir.exists() {
             std::fs::create_dir(output_dir).unwrap();
         }
-        let skip_files = vec![
+        let skip_files = [
             "2016 CHEVROLET Volt.yaml",
             "2016 BMW i3 REx PHEV.yaml",
             "2016 FORD C-MAX (PHEV).yaml",
             "2017 Prius Prime.yaml",
             "2016 HYUNDAI Sonata PHEV.yaml",
-            "2021 Fiat Panda Mild Hybrid.yaml",
         ];
         assert!(dir.exists());
         for filepath in std::fs::read_dir(dir).unwrap() {

@@ -553,28 +553,6 @@ impl HEVPowertrainControls {
     }
 }
 
-// TODO: make sure this code has an equivalent in fastsim-3
-// if self.veh.no_elec_sys {
-//     self.regen_buff_soc[i] = 0.0;
-// } else if self.veh.charging_on {
-//     self.regen_buff_soc[i] = max(
-//         self.veh.max_soc - (self.veh.max_regen_kwh / self.veh.ess_max_kwh),
-//         (self.veh.max_soc + self.veh.min_soc) / 2.0,
-//     );
-// } else {
-//     self.regen_buff_soc[i] = max(
-//         (self.veh.ess_max_kwh * self.veh.max_soc
-//             - 0.5
-//                 * self.veh.veh_kg
-//                 * (self.cyc.mps[i].powi(2))
-//                 * (1.0 / 1_000.0)
-//                 * (1.0 / 3_600.0)
-//                 * self.veh.mc_peak_eff()
-//                 * self.veh.max_regen)
-//             / self.veh.ess_max_kwh,
-//         self.veh.min_soc,
-//     );
-
 /// Container for static controls parameters
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 pub struct RESGreedyWithDynamicBuffers {
