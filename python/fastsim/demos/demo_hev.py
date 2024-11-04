@@ -250,18 +250,18 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     #     label='f2 regen buffer',
     #     alpha=0.5,
     # )
-    ax[2].plot(
-        df["cyc.time_seconds"],
-        df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
-        label='f3 FC eff',
-    )
-    f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
-                 np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
-    ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-        f2_fc_eff,
-        label='f2 FC eff',
-    )
+    # ax[2].plot(
+    #     df["cyc.time_seconds"],
+    #     df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
+    #     label='f3 FC eff',
+    # )
+    # f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
+    #              np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
+    # ax[2].plot(
+    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+    #     f2_fc_eff,
+    #     label='f2 FC eff',
+    # )
     ax[2].set_ylabel("[-]")
     ax[2].legend(loc="center right")
 
@@ -335,7 +335,9 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="fuel",
         linestyle=baselinestyles[1]
     )
-    ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]")
+    ax[1].set_ylim((-sd.veh.fc.state.energy_fuel_joules * 1e-6 * 0.1,
+                    sd.veh.fc.state.energy_fuel_joules * 1e-6 * 0.1))
+    ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]\n+/- 10% Range")
     ax[1].legend()
 
     ax[2].set_prop_cycle(get_paired_cycler())
@@ -373,18 +375,18 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     #     label='f2 regen buffer',
     #     alpha=0.5,
     # )
-    ax[2].plot(
-        df["cyc.time_seconds"],
-        df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
-        label='f3 FC eff',
-    )
-    f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
-                 np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
-    ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
-        f2_fc_eff,
-        label='f2 FC eff',
-    )
+    # ax[2].plot(
+    #     df["cyc.time_seconds"],
+    #     df['veh.pt_type.HybridElectricVehicle.fc.history.eff'],
+    #     label='f3 FC eff',
+    # )
+    # f2_fc_eff = (np.array(sd2.fc_kw_out_ach.tolist()) /
+    #              np.array(sd2.fc_kw_in_ach.tolist()))[plt_slice]
+    # ax[2].plot(
+    #     np.array(sd2.cyc.time_s.tolist())[::veh.save_interval][plt_slice],
+    #     f2_fc_eff,
+    #     label='f2 FC eff',
+    # )
     ax[2].set_ylabel("[-]")
     ax[2].legend(loc="center right")
 
