@@ -300,13 +300,8 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                                 Extrapolate::Error,
                             )?),
                             pwr_for_peak_eff: uc::KW * f64::NAN, // this gets updated in `init`
-                            pwr_idle_fuel: f2veh.aux_kw
-                                / f2veh
-                                    .fc_eff_map
-                                    .to_vec()
-                                    .first()
-                                    .with_context(|| format_dbg!(f2veh.fc_eff_map))?
-                                * uc::KW,
+                            // this means that aux power must include idle fuel
+                            pwr_idle_fuel: si::Power::ZERO,
                             save_interval: Some(1),
                             history: Default::default(),
                             _phantom: PhantomData,
@@ -377,13 +372,8 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                                 Extrapolate::Error,
                             )?),
                             pwr_for_peak_eff: uc::KW * f64::NAN, // this gets updated in `init`
-                            pwr_idle_fuel: f2veh.aux_kw
-                                / f2veh
-                                    .fc_eff_map
-                                    .to_vec()
-                                    .first()
-                                    .with_context(|| format_dbg!(f2veh.fc_eff_map))?
-                                * uc::KW,
+                            // this means that aux power must include idle fuel
+                            pwr_idle_fuel: si::Power::ZERO,
                             save_interval: Some(1),
                             history: Default::default(),
                             _phantom: PhantomData,
