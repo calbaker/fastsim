@@ -228,8 +228,13 @@ def to_pydict(self, flatten: bool=True) -> Dict:
     # Arguments
     - `flatten`: if True, returns dict without any hierarchy
     """
-    import json
-    pydict = json.loads(self.to_json())
+    from yaml import load
+    try:
+        from yaml import CLoader as Loader
+    except ImportError:
+        from yaml import Loader
+
+    pydict = load(self.to_yaml(), Loader=Loader)
     if not flatten:
         return pydict
     else:
@@ -241,8 +246,8 @@ def from_pydict(cls, pydict: Dict) -> Self:
     """
     Instantiates Self from pure python dictionary 
     """
-    import json
-    return cls.from_json(json.dumps(pydict))
+    import yaml
+    return cls.from_yaml(yaml.dump(pydict), skip_init=False)
 
 
 def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Union[pd.DataFrame, pl.DataFrame]:
