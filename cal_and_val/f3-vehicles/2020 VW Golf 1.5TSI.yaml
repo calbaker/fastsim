@@ -6,7 +6,7 @@ pt_type:
     fs:
       pwr_out_max_watts: 2000000.0
       pwr_ramp_lag_seconds: 1.0
-      energy_capacity_joules: 1590104192.4
+      energy_capacity_joules: 1590104192.3999999
     fc:
       mass_kilograms: ~
       specific_pwr_watts_per_kilogram: ~
