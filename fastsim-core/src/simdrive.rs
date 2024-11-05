@@ -527,8 +527,8 @@ mod tests {
     fn delete_me() {
         use fastsim_2::traits::SerdeAPI;
 
-        let dir = Path::new("../validation/f2-vehicles");
-        let output_dir = Path::new("../validation/f3-vehicles");
+        let dir = Path::new("../cal_and_val/f2-vehicles");
+        let output_dir = Path::new("../cal_and_val/f3-vehicles");
         if !output_dir.exists() {
             std::fs::create_dir(output_dir).unwrap();
         }
