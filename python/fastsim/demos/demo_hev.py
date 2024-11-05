@@ -28,6 +28,14 @@ SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 
 # load 2016 Toyota Prius Two from file
 veh = fsim.Vehicle.from_resource("2016_TOYOTA_Prius_Two.yaml")
+# veh_dict = veh.to_pydict(flatten=False)
+# veh_dict['pt_type']['HybridElectricVehicle'][
+#     'pt_cntrl']['Fastsim2']['speed_soc_accel_buffer'] += 0.0
+# speed_accel_soc_buffer = veh_dict['pt_type']['HybridElectricVehicle'][
+#     'pt_cntrl']['Fastsim2']['speed_soc_accel_buffer']
+# veh_dict['pt_type']['HybridElectricVehicle'][
+#     'pt_cntrl']['Fastsim2']['speed_soc_fc_on_buffer'] = speed_accel_soc_buffer * 1.1
+# veh = veh.from_pydict(veh_dict)
 
 veh_no_save = veh.copy()
 fsim.set_param_from_path(veh_no_save, "save_interval", None)
@@ -410,7 +418,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
 
     plt.tight_layout()
     if SAVE_FIGS:
-        plt.savefig(Path("./plots/fc_energy.svg"))
+        plt.savefig(Path(f"./plots/fc_energy.svg"))
     plt.show()
 
     return fig, ax

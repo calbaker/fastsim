@@ -93,7 +93,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                 Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
             }
             HEV => {
-                let pt_cntrl = HEVPowertrainControls::Fastsim2(hev::RESGreedyWithDynamicBuffers {
+                let pt_cntrl = HEVPowertrainControls::RGWDB(hev::RESGreedyWithDynamicBuffers {
                     speed_soc_fc_on_buffer: None,
                     speed_soc_accel_buffer: None,
                     speed_soc_accel_buffer_coeff: None,
@@ -428,7 +428,7 @@ impl Vehicle {
             input_kw_out_array: Default::default(), // calculated in `set_derived()`
             kw_demand_fc_on: match &self.pt_type {
                 PowertrainType::HybridElectricVehicle(hev) => match &hev.pt_cntrl {
-                    HEVPowertrainControls::Fastsim2(rgwb) => (rgwb
+                    HEVPowertrainControls::RGWDB(rgwb) => (rgwb
                         .frac_pwr_demand_fc_forced_on
                         .with_context(|| format_dbg!("Expected `Some`."))?
                         * (hev.fc.pwr_out_max + hev.res.pwr_out_max.min(hev.em.pwr_out_max)))
@@ -502,7 +502,7 @@ impl Vehicle {
             modern_max: 0.95,
             mph_fc_on: match &self.pt_type {
                 PowertrainType::HybridElectricVehicle(hev) => match &hev.pt_cntrl {
-                    HEVPowertrainControls::Fastsim2(rgwb) => rgwb
+                    HEVPowertrainControls::RGWDB(rgwb) => rgwb
                         .speed_fc_forced_on
                         .with_context(|| format_dbg!("Expected Some"))?
                         .get::<si::mile_per_hour>(),

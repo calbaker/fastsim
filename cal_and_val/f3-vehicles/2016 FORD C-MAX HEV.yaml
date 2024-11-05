@@ -1,12 +1,12 @@
 ---
-name: 2016 KIA Optima Hybrid
+name: 2016 FORD C-MAX HEV
 year: 2016
 pt_type:
   HybridElectricVehicle:
     res:
       mass_kilograms: ~
       specific_energy_joules_per_kilogram: ~
-      pwr_out_max_watts: 47000.0
+      pwr_out_max_watts: 35000.0
       energy_capacity_joules: 3600000.0
       eff_interp:
         Interp0D: 0.9848857801796105
@@ -16,12 +16,12 @@ pt_type:
     fs:
       pwr_out_max_watts: 2000000.0
       pwr_ramp_lag_seconds: 1.0
-      energy_capacity_joules: 2066400000.0
+      energy_capacity_joules: 1623600000.0000002
     fc:
       mass_kilograms: ~
       specific_pwr_watts_per_kilogram: ~
-      pwr_out_max_watts: 119000.0
-      pwr_out_max_init_watts: 19833.333333333332
+      pwr_out_max_watts: 141000.0
+      pwr_out_max_init_watts: 23500.0
       pwr_ramp_lag_seconds: 6.0
       eff_interp_from_pwr_out:
         Interp1D:
@@ -653,15 +653,15 @@ pt_type:
       mass_kilograms: ~
       save_interval: 1
     pt_cntrl:
-      Fastsim2:
+      RGWDB:
         speed_soc_accel_buffer: 17.8816
         speed_soc_accel_buffer_coeff: 1.0
-        speed_soc_fc_on_buffer: 18.77568
+        speed_soc_fc_on_buffer: 19.66976
         speed_soc_regen_buffer: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
         fc_min_time_on: 5.0
-        speed_fc_forced_on: 0.44704
-        frac_pwr_demand_fc_forced_on: 0.6493506493506493
+        speed_fc_forced_on: 27.71648
+        frac_pwr_demand_fc_forced_on: 0.3409090909090909
         frac_of_most_eff_pwr_to_run_fc: 1.0
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 0.0
@@ -673,9 +673,9 @@ pt_type:
       balance_soc: true
       save_soc_bal_iters: false
 chassis:
-  drag_coef: 0.3
-  frontal_area_square_meters: 2.732
-  wheel_rr_coef: 0.008
+  drag_coef: 0.325
+  frontal_area_square_meters: 2.973
+  wheel_rr_coef: 0.007
   wheel_inertia_kilogram_square_meters: 0.815
   num_wheels: 4
   wheel_radius_meters: 0.336
@@ -684,7 +684,7 @@ chassis:
   drive_type: FWD
   drive_axle_weight_frac: 0.59
   wheel_base_meters: 2.6
-mass_kilograms: 1893.6707541501114
+mass_kilograms: 1950.3693212520827
 pwr_aux_watts: 500.0
 trans_eff: 0.95
 save_interval: 1

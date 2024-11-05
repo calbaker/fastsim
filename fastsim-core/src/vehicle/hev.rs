@@ -72,7 +72,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
         // TODO: account for transmission efficiency in here
         self.state.fc_on_causes.clear();
         match &self.pt_cntrl {
-            HEVPowertrainControls::Fastsim2(rgwb) => {
+            HEVPowertrainControls::RGWDB(rgwb) => {
                 if self.fc.state.fc_on && self.fc.state.time_on
                     < rgwb.fc_min_time_on.with_context(|| {
                     anyhow!(
@@ -91,7 +91,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
         let disch_buffer: si::Energy = match &self.pt_cntrl {
-            HEVPowertrainControls::Fastsim2(rgwb) => {
+            HEVPowertrainControls::RGWDB(rgwb) => {
                 (0.5 * veh_state.mass
                     * (rgwb
                         .speed_soc_accel_buffer
@@ -108,7 +108,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
             }
         };
         let chrg_buffer: si::Energy = match &self.pt_cntrl {
-            HEVPowertrainControls::Fastsim2(rgwb) => {
+            HEVPowertrainControls::RGWDB(rgwb) => {
                 (0.5 * veh_state.mass
                     * (veh_state.speed_ach.powi(typenum::P2::new())
                         - rgwb
@@ -416,21 +416,21 @@ pub enum HEVAuxControls {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum HEVPowertrainControls {
     /// Controls that attempt to match fastsim-2
-    Fastsim2(RESGreedyWithDynamicBuffers),
+    RGWDB(RESGreedyWithDynamicBuffers),
     /// Controls that have a dynamically updated discharge buffer but are otherwise similar to [Self::Fastsim2]
     Placeholder,
 }
 
 impl Default for HEVPowertrainControls {
     fn default() -> Self {
-        Self::Fastsim2(Default::default())
+        Self::RGWDB(Default::default())
     }
 }
 
 impl Init for HEVPowertrainControls {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
-            Self::Fastsim2(rgwb) => rgwb.init()?,
+            Self::RGWDB(rgwb) => rgwb.init()?,
             Self::Placeholder => {
                 todo!()
             }
@@ -470,7 +470,7 @@ impl HEVPowertrainControls {
             );
             // positive net power out of the powertrain
             let (fc_pwr, em_pwr) = match &self {
-                HEVPowertrainControls::Fastsim2(rgwb) => {
+                HEVPowertrainControls::RGWDB(rgwb) => {
                     // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
                     let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
                     let frac_pwr_demand_fc_forced_on: si::Ratio = rgwb
@@ -553,11 +553,12 @@ impl HEVPowertrainControls {
     }
 }
 
-/// Container for static controls parameters
+/// Container for static controls parameters.  See [Self::init] for default
+/// values.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 pub struct RESGreedyWithDynamicBuffers {
     /// RES energy delta from minimum SOC corresponding to kinetic energy of
-    /// vehicle at this speed that triggers ramp down in RES discharge
+    /// vehicle at this speed that triggers ramp down in RES discharge.
     pub speed_soc_accel_buffer: Option<si::Velocity>,
     /// Coefficient for modifying amount of accel buffer
     pub speed_soc_accel_buffer_coeff: Option<si::Ratio>,
@@ -571,23 +572,27 @@ pub struct RESGreedyWithDynamicBuffers {
     /// Coefficient for modifying amount of regen buffer
     pub speed_soc_regen_buffer_coeff: Option<si::Ratio>,
     /// Minimum time engine must remain on if it was on during the previous
-    /// simulation time step.  defaults to 30 s.
+    /// simulation time step.
     pub fc_min_time_on: Option<si::Time>,
-    /// Speed at which [fuelconverter] is forced on. Defaults to 75 mph.
+    /// Speed at which [fuelconverter] is forced on.
     pub speed_fc_forced_on: Option<si::Velocity>,
     /// Fraction of total aux and powertrain power demand at which
-    /// [FuelConverter] is forced on.  Defaults to ???.
+    /// [FuelConverter] is forced on.
     pub frac_pwr_demand_fc_forced_on: Option<si::Ratio>,
     /// Force engine, if on, to run at this fraction of power at which peak
     /// efficiency occurs or the required power, whichever is greater. If SOC
-    /// is below min buffer, engine will run at this level and charge.  Defaults
+    /// is below min buffer, engine will run at this level and charge.
     /// to 1.
     pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
-    /// Fraction of available charging capacity to use toward running the engine efficiently. Defaults to 0.
-    // TODO: make sure this is plumbed up
+    /// Fraction of available charging capacity to use toward running the engine
+    /// efficiently.
+    // NOTE: this is inherited from fastsim-2 and has no effect here.  After
+    // further thought, either remove it or use it.
     pub frac_res_chrg_for_fc: si::Ratio,
-    // TODO: make sure this is plumbed up
-    /// Fraction of available discharging capacity to use toward running the engine efficiently. Defaults to 0.
+    // NOTE: this is inherited from fastsim-2 and has no effect here.  After
+    // further thought, either remove it or use it.
+    /// Fraction of available discharging capacity to use toward running the
+    /// engine efficiently.
     pub frac_res_dschrg_for_fc: si::Ratio,
 }
 
@@ -598,7 +603,7 @@ impl Init for RESGreedyWithDynamicBuffers {
         self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(1.0 * uc::R));
         self.speed_soc_fc_on_buffer = self
             .speed_soc_fc_on_buffer
-            .or(Some(self.speed_soc_accel_buffer.unwrap() * 1.05));
+            .or(Some(self.speed_soc_accel_buffer.unwrap() * 1.1));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1.0 * uc::R));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 5.0));
