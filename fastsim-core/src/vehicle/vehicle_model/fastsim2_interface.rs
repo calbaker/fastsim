@@ -45,7 +45,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         let mut fs = FuelStorage {
                             pwr_out_max: f2veh.fs_max_kw * uc::KW,
                             pwr_ramp_lag: f2veh.fs_secs_to_peak_pwr * uc::S,
-                            energy_capacity: f2veh.fs_kwh * 3.6 * uc::MJ,
+                            energy_capacity: f2veh.fs_kwh * uc::KWH,
                             specific_energy: Some(FUEL_LHV_MJ_PER_KG * uc::MJ / uc::KG),
                             mass: None,
                         };
