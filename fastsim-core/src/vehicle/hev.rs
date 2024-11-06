@@ -1,6 +1,5 @@
-use crate::prelude::ElectricMachineState;
-
 use super::{vehicle_model::VehicleState, *};
+use crate::prelude::ElectricMachineState;
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, HistoryMethods)]
 /// Hybrid vehicle with both engine and reversible energy storage (aka battery)

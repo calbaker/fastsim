@@ -183,7 +183,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df["cyc.time_seconds"],
-        (df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_propulsion_watts"] +
+        (df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_prop_watts"] +
             df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts"]) / 1e3,
         label="f3 shaft",
     )
@@ -208,7 +208,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df["cyc.time_seconds"],
-        (df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_propulsion_watts"] +
+        (df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_prop_watts"] +
             df["veh.pt_type.HybridElectricVehicle.fc.history.pwr_aux_watts"]) / 1e3 - np.array(sd2.fc_kw_out_ach.tolist())[plt_slice],
         label="shaft",
         linestyle=baselinestyles[0]
@@ -306,7 +306,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df["cyc.time_seconds"],
-        (df["veh.pt_type.HybridElectricVehicle.fc.history.energy_propulsion_joules"] +
+        (df["veh.pt_type.HybridElectricVehicle.fc.history.energy_prop_joules"] +
             df["veh.pt_type.HybridElectricVehicle.fc.history.energy_aux_joules"]) / 1e6,
         label="f3 shaft",
     )
@@ -331,7 +331,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
         df["cyc.time_seconds"],
-        (df["veh.pt_type.HybridElectricVehicle.fc.history.energy_propulsion_joules"] +
+        (df["veh.pt_type.HybridElectricVehicle.fc.history.energy_prop_joules"] +
             df["veh.pt_type.HybridElectricVehicle.fc.history.energy_aux_joules"]) / 1e6 - np.array(sd2.fc_cumu_mj_out_ach.tolist())[plt_slice],
         label="shaft",
         linestyle=baselinestyles[0]
