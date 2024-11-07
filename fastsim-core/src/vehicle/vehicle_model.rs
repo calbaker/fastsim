@@ -480,6 +480,7 @@ pub struct VehicleState {
     /// current grade
     pub grade_curr: si::Ratio,
     /// current air density
+    #[serde(skip_serializing, default)]
     pub air_density: si::MassDensity,
     /// current mass
     // TODO: make sure this gets updated appropriately
