@@ -17,6 +17,8 @@ pub struct SimParams {
     pub trace_miss_tol: TraceMissTolerance,
     #[api(skip_get, skip_set)]
     pub trace_miss_opts: TraceMissOptions,
+    /// whether to use FASTSim-2 style air density
+    pub f2_air_density: bool,
 }
 
 impl SerdeAPI for SimParams {}
@@ -30,6 +32,7 @@ impl Default for SimParams {
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
+            f2_air_density: true,
         }
     }
 }
@@ -204,7 +207,7 @@ impl SimDrive {
     /// Sets power required for given prescribed speed
     /// # Arguments
     /// - `speed`: prescribed or achieved speed
-    /// - `speed_prev`: previously achieved speed
+    // - `speed_prev`: previously achieved speed
     /// - `dt`: time step size
     pub fn set_pwr_prop_for_speed(
         &mut self,
@@ -225,6 +228,27 @@ impl SimDrive {
                     .as_ref()
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
                     .interpolate(&[vs.dist.get::<si::meter>()])?
+        };
+        let elev_curr = if vs.cyc_met_overall {
+            *self.cyc.elev.get(i).with_context(|| format_dbg!())?
+        } else {
+            uc::M
+                * self
+                    .cyc
+                    .elev_interp
+                    .as_ref()
+                    .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
+                    .interpolate(&[vs.dist.get::<si::meter>()])?
+        };
+
+        vs.air_density = if self.sim_params.f2_air_density {
+            1.2 * uc::KGPM3
+        } else {
+            let te_amb_air = match &self.cyc.temp_amb_air {
+                Some(t) => Some(t.get(i).with_context(|| format_dbg!())?),
+                None => None,
+            };
+            get_density_air(te_amb_air.cloned(), Some(elev_curr))
         };
 
         let mass = self.veh.mass.with_context(|| {

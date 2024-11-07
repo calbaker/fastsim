@@ -2,11 +2,10 @@ use super::imports::*;
 use super::*;
 
 lazy_static! {
-    static ref TE_AIR_DEFAULT: si::ThermodynamicTemperature = (22. + 273.15) * uc::KELVIN;
-    static ref STD_PRESSURE_DEFAULT: si::Pressure = 99_346.3 * uc::PASCAL;
-    // 1.2 kg/m^3 matches fastsim-2
-    static ref STD_DENSITY: si::MassDensity = 1.2 * uc::KGPM3;
-    static ref GAS_CONSTANT: si::SpecificHeatCapacity  = 287.0 * uc::J_PER_KG_K;
+    pub static ref TE_AIR_DEFAULT: si::ThermodynamicTemperature = (22. + 273.15) * uc::KELVIN;
+    pub static ref STD_PRESSURE_DEFAULT: si::Pressure = 99_346.3 * uc::PASCAL;
+    pub static ref STD_DENSITY: si::MassDensity = 1.172 * uc::KGPM3;
+    pub static ref GAS_CONSTANT: si::SpecificHeatCapacity = 287.0 * uc::J_PER_KG_K;
 }
 
 /// Returns density of air
@@ -19,7 +18,7 @@ lazy_static! {
 ///
 /// # Arguments  
 /// * `te_air` - ambient temperature of air, defaults to 22 C
-/// * `h` - evelation above sea level, defaults to 180 m
+/// * `h` - elevation above sea level, defaults to 180 m
 pub fn get_density_air(
     te_air: Option<si::ThermodynamicTemperature>,
     h: Option<si::Length>,

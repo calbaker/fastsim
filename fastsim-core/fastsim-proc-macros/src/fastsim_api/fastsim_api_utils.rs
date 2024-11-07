@@ -341,6 +341,10 @@ pub(crate) fn impl_getters_and_setters(
             "Pressure" => extract_units!(uom::si::pressure::kilopascal, uom::si::pressure::bar),
             "Ratio" => extract_units!(uom::si::ratio::ratio),
             "Time" => extract_units!(uom::si::time::second, uom::si::time::hour),
+            "ThermodynamicTemperature" => extract_units!(
+                uom::si::thermodynamic_temperature::degree_celsius,
+                uom::si::thermodynamic_temperature::kelvin
+            ),
             "Velocity" => extract_units!(
                 uom::si::velocity::meter_per_second,
                 uom::si::velocity::mile_per_hour

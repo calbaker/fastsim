@@ -13,7 +13,7 @@ use fastsim_2::cycle::RustCycle as Cycle2;
 
     #[getter]
     fn get_grade_py(&self) -> Vec<f64> {
-        self.grade.iter().map(|x| x.get::<si::ratio>()).collect()
+        self.grade.iter().map(|x|x.get::<si::ratio>()).collect()
     }
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -40,6 +40,7 @@ pub struct Cycle {
     #[api(skip_get, skip_set)]
     pub grade: Vec<si::Ratio>,
     // TODO: consider trapezoidal integration scheme
+    // TODO: @mokeefe, please check out how elevation is handled
     /// calculated prescribed elevation based on RHS integral distance and grade
     pub elev: Vec<si::Length>,
     /// road charging/discharing capacity
@@ -48,17 +49,22 @@ pub struct Cycle {
     /// grade interpolator
     #[api(skip_get, skip_set)]
     pub grade_interp: Option<Interpolator>,
+    /// elevation interpolator
+    #[api(skip_get, skip_set)]
+    pub elev_interp: Option<Interpolator>,
+    /// ambient air temperature w.r.t. to time (rather than spatial position)
+    #[api(skip_get, skip_set)]
+    pub temp_amb_air: Option<Vec<si::ThermodynamicTemperature>>,
 }
 
 lazy_static! {
-    static ref ELEV_DEFAULT: si::Length = 400. * uc::FT;
+    pub static ref ELEV_DEFAULT: si::Length = 400. * uc::FT;
 }
 
 impl Init for Cycle {
     /// Sets `self.dist` and `self.elev`
-    ///
-    /// Assumptions
-    /// - if `init_elev.is_none()`, then defaults to
+    /// # Assumptions
+    /// - if `init_elev.is_none()`, then defaults to [ELEV_DEFAULT]
     fn init(&mut self) -> anyhow::Result<()> {
         ensure!(self.time.len() == self.speed.len());
         ensure!(self.grade.len() == self.len());
@@ -98,6 +104,13 @@ impl Init for Cycle {
         self.grade_interp = Some(Interpolator::Interp1D(Interp1D::new(
             self.dist.iter().map(|x| x.get::<si::meter>()).collect(),
             self.grade.iter().map(|y| y.get::<si::ratio>()).collect(),
+            Strategy::Linear,
+            Extrapolate::Error,
+        )?));
+
+        self.elev_interp = Some(Interpolator::Interp1D(Interp1D::new(
+            self.dist.iter().map(|x| x.get::<si::meter>()).collect(),
+            self.elev.iter().map(|y| y.get::<si::meter>()).collect(),
             Strategy::Linear,
             Extrapolate::Error,
         )?));
@@ -418,6 +431,8 @@ mod tests {
             elev: vec![],
             pwr_max_chrg: vec![],
             grade_interp: Default::default(),
+            elev_interp: Default::default(),
+            temp_amb_air: Default::default(),
         };
         cyc.init().unwrap();
         cyc
