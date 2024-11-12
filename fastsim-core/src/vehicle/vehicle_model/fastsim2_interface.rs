@@ -338,8 +338,8 @@ impl Vehicle {
             fc_eff_map: self
                 .fc()
                 .map(|fc| match &fc.eff_interp_from_pwr_out {
-                    utils::interp::Interpolator::Interp1D(_interp1d) => {
-                        Ok(fc.eff_interp_from_pwr_out.f_x()?.clone().into())
+                    Interpolator::Interp1D(_interp1d) => {
+                        Ok(fc.eff_interp_from_pwr_out.f_x()?.to_vec().into())
                     }
                     _ => bail!(
                         "{}\nOnly 1-D interpolators can be converted to FASTSim 2",
@@ -372,8 +372,8 @@ impl Vehicle {
             fc_pwr_out_perc: self
                 .fc()
                 .map(|fc| match &fc.eff_interp_from_pwr_out {
-                    utils::interp::Interpolator::Interp1D(_interp) => {
-                        Ok(fc.eff_interp_from_pwr_out.x()?.clone().into())
+                    Interpolator::Interp1D(_interp) => {
+                        Ok(fc.eff_interp_from_pwr_out.x()?.to_vec().into())
                     }
                     _ => bail!(
                         "{}\nOnly 1-D interpolators can be converted to FASTSim 2",
@@ -458,6 +458,7 @@ impl Vehicle {
                 .em()
                 .map(|em| em.eff_interp_fwd.f_x())
                 .transpose()?
+                .map(|f_x| f_x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])
                 .into(),
             mc_eff_map_doc: None,
@@ -485,6 +486,7 @@ impl Vehicle {
                 .em()
                 .map(|em| em.eff_interp_fwd.x())
                 .transpose()?
+                .map(|x| x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])
                 .into(),
             mc_pwr_out_perc_doc: None,

@@ -2,8 +2,6 @@ use crate::imports::*;
 use paste::paste;
 use regex::Regex;
 
-pub mod interp;
-
 /// Error message for when user attempts to set value in a nested struct.
 pub const DIRECT_SET_ERR: &str =
     "Setting field value directly not allowed. Please use fastsim.set_param_from_path() method.";

@@ -9,7 +9,6 @@ pub(crate) use crate::si;
 pub(crate) use crate::traits::*;
 pub(crate) use crate::uc;
 pub(crate) use crate::utils;
-pub(crate) use crate::utils::interp::*;
 pub(crate) use crate::utils::{
     abs_checked_x_val, almost_eq, almost_le_uom, check_interp_frac_data, check_monotonicity,
     is_sorted, InterpRange, DIRECT_SET_ERR,
@@ -27,7 +26,7 @@ pub(crate) use anyhow::{anyhow, bail, ensure, Context};
 pub(crate) use duplicate::duplicate_item;
 pub(crate) use easy_ext::ext;
 pub(crate) use ndarray::prelude::*;
-pub(crate) use ndarray::Slice;
+pub(crate) use ninterp::*;
 pub(crate) use serde::{Deserialize, Serialize};
 pub(crate) use std::cmp::{self, Ordering};
 pub(crate) use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};

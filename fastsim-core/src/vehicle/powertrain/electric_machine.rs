@@ -61,12 +61,12 @@ pub struct ElectricMachine {
     /// Efficiency array corresponding to [Self::pwr_out_frac_interp] and [Self::pwr_in_frac_interp]
     /// eff_interp_fwd and eff_interp_bwd have the same f_x but different x
     /// note that the Extrapolate field of this variable is changed in get_pwr_in_req()
-    pub eff_interp_fwd: utils::interp::Interpolator,
+    pub eff_interp_fwd: Interpolator,
     #[serde(default)]
     #[api(skip_set, skip_get)]
     /// if it is not provided, will be set during init
     /// note that the Extrapolate field of this variable is changed in set_cur_pwr_prop_out_max()
-    pub eff_interp_at_max_input: Option<utils::interp::Interpolator>,
+    pub eff_interp_at_max_input: Option<Interpolator>,
     /// Electrical input power fraction array at which efficiencies are evaluated.
     /// Calculated during runtime if not provided.
     // /// this will disappear and instead be in eff_interp_bwd
@@ -144,8 +144,8 @@ impl ElectricMachine {
                 .map(|interpolator| {
                     interpolator.interpolate(&[abs_checked_x_val(
                         (pwr_in_fwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        &interpolator.x()?,
-                    )?])
+                        interpolator.x().map_err(|e| anyhow!(e))?,
+                    )?]).map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -164,8 +164,8 @@ impl ElectricMachine {
                 .map(|interpolator| {
                     interpolator.interpolate(&[abs_checked_x_val(
                         (pwr_in_bwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        &interpolator.x()?,
-                    )?])
+                        interpolator.x().map_err(|e| anyhow!(e))?,
+                    )?]).map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -321,14 +321,14 @@ impl Init for ElectricMachine {
                     .zip(self.eff_interp_fwd.f_x()?)
                     .map(|(x, y)| x / y)
                     .collect(),
-                self.eff_interp_fwd.f_x()?,
+                self.eff_interp_fwd.f_x()?.to_owned(),
                 // TODO: should these be set to be the same as eff_interp_fwd,
                 // as currently is done, or should they be set to be specific
                 // Extrapolate and Strategy types?
-                self.eff_interp_fwd.strategy()?,
-                self.eff_interp_fwd.extrapolate()?,
+                self.eff_interp_fwd.strategy()?.to_owned(),
+                self.eff_interp_fwd.extrapolate()?.to_owned(),
             )?;
-            self.eff_interp_at_max_input = Some(utils::interp::Interpolator::Interp1D(
+            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(
                 eff_interp_at_max_input,
             ));
         }
@@ -433,7 +433,7 @@ impl ElectricMachine {
         if (0.0..=1.0).contains(&eff_max) {
             let old_max_fwd = self.get_eff_max_fwd()?;
             let old_max_bwd = self.get_eff_max_bwd()?;
-            let f_x_fwd = self.eff_interp_fwd.f_x()?;
+            let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
             match &mut self.eff_interp_fwd {
                 Interpolator::Interp1D(interp1d) => {
                     interp1d
@@ -447,7 +447,7 @@ impl ElectricMachine {
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
                 ))?
-                .f_x()?;
+                .f_x()?.to_owned();
             match &mut self.eff_interp_at_max_input {
                 Some(Interpolator::Interp1D(interp1d)) => {
                     // let old_interp = interp1d;
@@ -543,7 +543,7 @@ impl ElectricMachine {
                     "`eff_range` is already zero so it cannot be modified."
                 ));
             }
-            let f_x_fwd = self.eff_interp_fwd.f_x()?;
+            let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
             match &mut self.eff_interp_fwd {
                 Interpolator::Interp1D(interp1d) => {
                     interp1d.set_f_x(
@@ -557,7 +557,7 @@ impl ElectricMachine {
             }
             if self.get_eff_min_fwd()? < 0.0 {
                 let x_neg = self.get_eff_min_fwd()?;
-                let f_x_fwd = self.eff_interp_fwd.f_x()?;
+                let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
                 match &mut self.eff_interp_fwd {
                     Interpolator::Interp1D(interp1d) => {
                         interp1d.set_f_x(f_x_fwd.iter().map(|x| x - x_neg).collect())?;

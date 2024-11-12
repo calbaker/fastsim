@@ -66,7 +66,7 @@ pub struct FuelConverter {
     pub pwr_ramp_lag: si::Time,
     /// interpolator for calculating [Self] efficiency as a function of output power
     #[api(skip_get, skip_set)]
-    pub eff_interp_from_pwr_out: utils::interp::Interpolator,
+    pub eff_interp_from_pwr_out: Interpolator,
     /// power at which peak efficiency occurs
     #[serde(skip)]
     pub pwr_for_peak_eff: si::Power,
