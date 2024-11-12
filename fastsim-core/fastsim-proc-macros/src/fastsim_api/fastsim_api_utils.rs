@@ -345,6 +345,9 @@ pub(crate) fn impl_getters_and_setters(
                 uom::si::thermodynamic_temperature::degree_celsius,
                 uom::si::thermodynamic_temperature::kelvin
             ),
+            "ThermalConductance" => {
+                extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
+            }
             "Velocity" => extract_units!(
                 uom::si::velocity::meter_per_second,
                 uom::si::velocity::mile_per_hour

@@ -367,3 +367,37 @@ pub struct FuelConverterState {
 
 impl SerdeAPI for FuelConverterState {}
 impl Init for FuelConverterState {}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+pub enum FuelConverterThermalOptions {
+    /// Basic thermal plant for [FuelConverter]
+    FuelConverterThermal(Box<FuelConverterThermal>),
+    /// no thermal plant for [FuelConverter]
+    None,
+}
+
+#[fastsim_api]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+/// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
+pub struct FuelConverterThermal {
+    /// [FuelConverter] thermal capacitance
+    pub heat_capacitance: si::SpecificEnergy,
+    /// parameter for engine characteristic length for heat transfer calcs
+    pub length_for_convection: si::Length,
+    /// parameter for heat transfer coeff from [FuelConverter] to ambient during vehicle stop
+    pub htc_to_amb_stop: si::ThermalConductance,
+
+    /// coefficient for fraction of combustion heat that goes to [FuelConverter]
+    /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
+    pub coeff_from_comb: si::Ratio,
+    /// parameter for temperature at which thermostat starts to open
+    pub tstat_te_sto_deg_c: si::ThermodynamicTemperature,
+    /// temperature delta over which thermostat is partially open
+    pub tstat_te_delta_deg_c: si::ThermodynamicTemperature,
+    /// radiator effectiveness -- ratio of active heat rejection from
+    /// radiator to passive heat rejection
+    pub rad_eps: si::Ratio,
+}
+
+impl SerdeAPI for FuelConverterThermal {}
+impl Init for FuelConverterThermal {}
