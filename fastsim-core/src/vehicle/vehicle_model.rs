@@ -1,3 +1,5 @@
+use cabin::CabinOption;
+
 use super::{hev::HEVPowertrainControls, *};
 pub mod fastsim2_interface;
 
@@ -114,8 +116,12 @@ pub struct Vehicle {
     /// Chassis model with various chassis-related parameters
     pub chassis: Chassis,
 
+    /// Cabin thermal model
+    #[serde(default, skip_serializing_if = "CabinOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub cabin: CabinOption,
+
     /// Total vehicle mass
-    // TODO: make sure setter and getter get written
     #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
@@ -125,6 +131,7 @@ pub struct Vehicle {
     pub pwr_aux: si::Power,
 
     /// transmission efficiency
+    // TODO: check if `trans_eff` is redundant (most likely) and fix
     // TODO: make `transmission::{Transmission, TransmissionState}` and
     // `Transmission` should have field `efficency: Efficiency`.
     pub trans_eff: si::Ratio,

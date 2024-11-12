@@ -15,6 +15,7 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             year: f2veh.veh_year,
             pt_type,
             chassis: Chassis::try_from(&f2veh)?,
+            cabin: Default::default(),
             pwr_aux: f2veh.aux_kw * uc::KW,
             trans_eff: f2veh.trans_eff * uc::R,
             state: Default::default(),
@@ -56,6 +57,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
+                            thermal_plant: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,
@@ -128,6 +130,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
+                            thermal_plant: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,

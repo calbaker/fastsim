@@ -345,6 +345,10 @@ pub(crate) fn impl_getters_and_setters(
                 uom::si::thermodynamic_temperature::degree_celsius,
                 uom::si::thermodynamic_temperature::kelvin
             ),
+            "TemperatureInterval" => extract_units!(
+                uom::si::temperature_interval::degree_celsius,
+                uom::si::temperature_interval::kelvin
+            ),
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }

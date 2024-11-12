@@ -23,6 +23,7 @@ pub use si::power_rate::watt_per_second;
 pub use si::pressure::kilopascal;
 pub use si::ratio::ratio;
 pub use si::specific_power::{kilowatt_per_kilogram, watt_per_kilogram};
+pub use si::temperature_interval::{degree_celsius as degree_celsius_int, kelvin as kelvin_int};
 pub use si::thermal_conductance::watt_per_kelvin;
 pub use si::thermodynamic_temperature::{degree_celsius, kelvin};
 pub use si::time::{hour, second};

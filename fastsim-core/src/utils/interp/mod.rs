@@ -26,8 +26,8 @@ pub use two::*;
 use crate::imports::*;
 
 // This method contains code from RouteE Compass, another NREL-developed tool
-// https://www.nrel.gov/transportation/route-energy-prediction-model.html
-// https://github.com/NREL/routee-compass/
+// <https://www.nrel.gov/transportation/route-energy-prediction-model.html>
+// <https://github.com/NREL/routee-compass/>
 fn find_nearest_index(arr: &[f64], target: f64) -> anyhow::Result<usize> {
     if &target == arr.last().unwrap() {
         return Ok(arr.len() - 2);
@@ -535,7 +535,7 @@ impl Init for Interpolator {}
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(feature = "pyo3", pyclass)]
 pub enum Strategy {
-    /// Linear interpolation: https://en.wikipedia.org/wiki/Linear_interpolation
+    /// Linear interpolation: <https://en.wikipedia.org/wiki/Linear_interpolation>
     Linear,
     /// Left-nearest (previous value) interpolation: https://en.wikipedia.org/wiki/Nearest-neighbor_interpolation
     LeftNearest,
