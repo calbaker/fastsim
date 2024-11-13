@@ -6,6 +6,8 @@ pub enum CabinOption {
     /// Basic single thermal capacitance cabin thermal model, including HVAC
     /// system and controls
     SingleCapacitanceCabin(Box<SingleCapacitanceCabin>),
+    /// Cabin with interior and shell capacitances
+    SingleCapacitanceCabinWithShell,
     /// no cabin thermal model
     #[default]
     None,
@@ -14,6 +16,7 @@ impl Init for CabinOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
             Self::SingleCapacitanceCabin(scc) => scc.init()?,
+            Self::SingleCapacitanceCabinWithShell => {}
             Self::None => {}
         }
         Ok(())

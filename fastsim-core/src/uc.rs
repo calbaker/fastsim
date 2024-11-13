@@ -88,4 +88,7 @@ lazy_static::lazy_static! {
 unit_const!(KELVIN, ThermodynamicTemperature, 1.0);
 unit_const!(KELVIN_INT, TemperatureInterval, 1.0);
 unit_const!(J_PER_KG_K, SpecificHeatCapacity, 1.0);
+unit_const!(J_PER_K, SpecificEnergy, 1.0);
+unit_const!(PASCAL_SECOND, DynamicViscosity, 1.0);
 unit_const!(PASCAL, Pressure, 1.0);
+unit_const!(WATT_PER_METER_SQUARED_KELVIN, ThermalConductivity, 1.0);

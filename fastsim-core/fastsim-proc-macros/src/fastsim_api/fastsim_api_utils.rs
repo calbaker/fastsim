@@ -352,6 +352,15 @@ pub(crate) fn impl_getters_and_setters(
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }
+            "ThermalConductivity" => {
+                extract_units!(
+                    uom::si::thermal_conductivity::watt_per_meter_kelvin,
+                    uom::si::thermal_conductivity::watt_per_meter_degree_celsius
+                )
+            }
+            "DynamicViscosity" => {
+                extract_units!(uom::si::dynamic_viscosity::pascal_second)
+            }
             "Velocity" => extract_units!(
                 uom::si::velocity::meter_per_second,
                 uom::si::velocity::mile_per_hour
