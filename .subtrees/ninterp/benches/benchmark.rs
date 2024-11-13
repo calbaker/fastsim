@@ -3,7 +3,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use fastsim_core::utils::interp::*;
+use ninterp::*;
 use ndarray::prelude::*;
 use rand::{self, rngs::StdRng, Rng, SeedableRng};
 
@@ -217,5 +217,5 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("3-D multilinear", |b| b.iter(benchmark_3D_multi));
 }
 
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
+criterion_group!(benchmarks, criterion_benchmark);
+criterion_main!(benchmarks);

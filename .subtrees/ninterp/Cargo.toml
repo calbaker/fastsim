@@ -1,0 +1,24 @@
+[package]
+name = "ninterp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+itertools = "0.13.0"
+log = { version = "0.4.22", optional = true }
+ndarray = "0.16.1"
+serde = { version = "1.0.210", optional = true }
+thiserror = "1.0.64"
+
+[dev-dependencies]
+criterion = "0.3"
+rand = "0.8.5"
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+[features]
+default = ["logging"]
+logging = ["dep:log"]
+serde = ["dep:serde", "ndarray/serde"]
