@@ -1,4 +1,5 @@
 """Test getting resource lists via Rust API"""
+
 import fastsim as fsim
 
 
