@@ -32,6 +32,6 @@ jobs:
       - name: run cargo tests
         run: cargo test
       - name: install FASTSim python
-        run: pip install -e .
+        run: pip install -e .[dev]
       - name: run pytest
         run: pytest -v
