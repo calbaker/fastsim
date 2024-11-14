@@ -25,8 +25,7 @@ dependencies = [
     "seaborn>=0.10",
     "typing_extensions",
     "pypi-multi-versions",
-    "PyYAML==6.0.2",
-    "pyarrow>=10.0.1"
+    "PyYAML==6.0.2"
 ]
 
 [project.urls]
