@@ -1,4 +1,5 @@
 use super::{hev::HEVPowertrainControls, *};
+use crate::resources;
 pub mod fastsim2_interface;
 
 /// Possible aux load power sources
@@ -97,6 +98,12 @@ impl Init for AuxSource {}
     #[getter("pt_type_json")]
     fn get_pt_type_json_py(&self) -> anyhow::Result<String >{
         self.pt_type.to_str("json")
+    }
+
+    #[pyo3(name = "list_resources")]
+    /// list available vehicle resources
+    fn list_resources_py(&self) -> Vec<String> {
+        resources::list_resources(Self::RESOURCE_PREFIX)
     }
 )]
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, HistoryMethods)]
