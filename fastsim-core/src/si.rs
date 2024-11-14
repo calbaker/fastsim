@@ -10,9 +10,10 @@ pub use si::dynamic_viscosity::pascal_second;
 pub use si::energy::{joule, kilowatt_hour, watt_hour};
 pub use si::f64::{
     Acceleration, Angle, Area, AvailableEnergy as SpecificEnergy, Curvature, DynamicViscosity,
-    Energy, Force, Frequency, InverseVelocity, Length, Mass, MassDensity, MomentOfInertia, Power,
-    PowerRate, Pressure, Ratio, SpecificHeatCapacity, SpecificPower, TemperatureInterval,
-    ThermalConductance, ThermalConductivity, ThermodynamicTemperature, Time, Velocity, Volume,
+    Energy, Force, Frequency, HeatCapacity, InverseVelocity, Length, Mass, MassDensity,
+    MomentOfInertia, Power, PowerRate, Pressure, Ratio, SpecificHeatCapacity, SpecificPower,
+    TemperatureInterval, ThermalConductance, ThermalConductivity, ThermodynamicTemperature, Time,
+    Velocity, Volume,
 };
 pub use si::force::{newton, pound_force};
 pub use si::length::{foot, kilometer, meter};

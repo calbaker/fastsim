@@ -1,5 +1,7 @@
 use cabin::CabinOption;
 
+use crate::prelude::Air;
+
 use super::{hev::HEVPowertrainControls, *};
 pub mod fastsim2_interface;
 
@@ -524,7 +526,7 @@ impl Default for VehicleState {
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
             grade_curr: si::Ratio::ZERO,
-            air_density: crate::air_properties::get_density_air(None, None),
+            air_density: Air::get_density(None, None),
             mass: uc::KG * f64::NAN,
         }
     }

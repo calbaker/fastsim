@@ -2,7 +2,6 @@ use self::utils::almost_eq_uom;
 
 use super::drive_cycle::Cycle;
 use super::vehicle::Vehicle;
-use crate::air_properties as air;
 use crate::imports::*;
 use crate::prelude::*;
 
@@ -248,7 +247,7 @@ impl SimDrive {
                 Some(t) => Some(t.get(i).with_context(|| format_dbg!())?),
                 None => None,
             };
-            get_density_air(te_amb_air.cloned(), Some(elev_curr))
+            Air::get_density(te_amb_air.cloned(), Some(elev_curr))
         };
 
         let mass = self.veh.mass.with_context(|| {
@@ -262,7 +261,7 @@ impl SimDrive {
         vs.pwr_ascent = uc::ACC_GRAV * vs.grade_curr * mass * (speed_prev + speed) / 2.0;
         vs.pwr_drag = 0.5
             // TODO: feed in elevation
-            * air::get_density_air(None, None)
+            * Air::get_density(None, None)
             * self.veh.chassis.drag_coef
             * self.veh.chassis.frontal_area
             * ((speed + speed_prev) / 2.0).powi(typenum::P3::new());
