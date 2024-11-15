@@ -150,6 +150,10 @@ pub struct Vehicle {
     #[serde(default)]
     #[serde(skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
     pub history: VehicleStateHistoryVec,
+    // phantom private field to prevent direct instantiation in other modules
+    #[serde(skip)]
+    #[api(skip_get, skip_set)]
+    _phantom: PhantomData<()>,
 }
 
 impl Mass for Vehicle {
@@ -606,11 +610,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_conv() {
         let veh = mock_conv_veh();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }
@@ -620,11 +620,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_hev() {
         let veh = mock_hev();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }
@@ -634,11 +630,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_bev() {
         let veh = mock_bev();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }

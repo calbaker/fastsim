@@ -18,6 +18,10 @@ pub struct SimParams {
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
     pub f2_air_density: bool,
+    // phantom private field to prevent direct instantiation in other modules
+    #[serde(skip)]
+    #[api(skip_get, skip_set)]
+    pub _phantom: PhantomData<()>,
 }
 
 impl SerdeAPI for SimParams {}
@@ -32,6 +36,7 @@ impl Default for SimParams {
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
             f2_air_density: true,
+            _phantom: PhantomData,
         }
     }
 }
@@ -39,11 +44,11 @@ impl Default for SimParams {
 #[fastsim_api(
     #[new]
     fn __new__(veh: Vehicle, cyc: Cycle, sim_params: Option<SimParams>) -> anyhow::Result<Self> {
-        Ok(SimDrive{
+        Ok(SimDrive::new(
             veh,
             cyc,
-            sim_params: sim_params.unwrap_or_default(),
-        })
+            sim_params,
+        ))
     }
 
     /// Run vehicle simulation once
@@ -72,6 +77,10 @@ pub struct SimDrive {
     pub veh: Vehicle,
     pub cyc: Cycle,
     pub sim_params: SimParams,
+    // phantom private field to prevent direct instantiation in other modules
+    #[serde(skip)]
+    #[api(skip_get, skip_set)]
+    _phantom: PhantomData<()>,
 }
 
 impl SerdeAPI for SimDrive {}
@@ -92,6 +101,7 @@ impl SimDrive {
             veh,
             cyc,
             sim_params: sim_params.unwrap_or_default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -520,11 +530,7 @@ mod tests {
     fn test_sim_drive_conv() {
         let _veh = mock_conv_veh();
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
-        let mut sd = SimDrive {
-            veh: _veh,
-            cyc: _cyc,
-            sim_params: Default::default(),
-        };
+        let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
@@ -535,11 +541,7 @@ mod tests {
     fn test_sim_drive_hev() {
         let _veh = mock_hev();
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
-        let mut sd = SimDrive {
-            veh: _veh,
-            cyc: _cyc,
-            sim_params: Default::default(),
-        };
+        let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);

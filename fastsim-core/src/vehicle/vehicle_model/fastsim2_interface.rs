@@ -22,6 +22,7 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             save_interval,
             history: Default::default(),
             mass: Some(f2veh.veh_kg * uc::KG),
+            _phantom: PhantomData,
         };
         f3veh.expunge_mass_fields();
         f3veh.init().with_context(|| anyhow!(format_dbg!()))?;

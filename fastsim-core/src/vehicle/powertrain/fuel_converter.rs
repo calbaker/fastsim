@@ -87,8 +87,8 @@ pub struct FuelConverter {
     #[serde(default)]
     #[serde(skip_serializing_if = "FuelConverterStateHistoryVec::is_empty")]
     pub history: FuelConverterStateHistoryVec,
-    #[serde(skip)]
     // phantom private field to prevent direct instantiation in other modules
+    #[serde(skip)]
     #[api(skip_get, skip_set)]
     pub(in super::super) _phantom: PhantomData<()>,
 }
