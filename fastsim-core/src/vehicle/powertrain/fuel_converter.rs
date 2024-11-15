@@ -49,7 +49,11 @@ use super::*;
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
 pub struct FuelConverter {
-    /// FuelConverter mass
+    /// [Self] Thermal plant, including thermal management controls
+    #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub thermal_plant: FuelConverterThermalOption,
+    /// [Self] mass
     #[serde(default)]
     #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
@@ -99,6 +103,7 @@ impl SerdeAPI for FuelConverter {}
 impl Init for FuelConverter {
     fn init(&mut self) -> anyhow::Result<()> {
         let _ = self.mass().with_context(|| anyhow!(format_dbg!()))?;
+        self.thermal_plant.init()?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
         let eff_max = self.eff_max()?;
         self.pwr_for_peak_eff = *self
@@ -367,3 +372,59 @@ pub struct FuelConverterState {
 
 impl SerdeAPI for FuelConverterState {}
 impl Init for FuelConverterState {}
+
+/// Options for handling [FuelConverter] thermal model
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+pub enum FuelConverterThermalOption {
+    /// Basic thermal plant for [FuelConverter]
+    FuelConverterThermal(Box<FuelConverterThermal>),
+    /// no thermal plant for [FuelConverter]
+    #[default]
+    None,
+}
+impl Init for FuelConverterThermalOption {
+    fn init(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.init()?,
+            Self::None => {}
+        }
+        Ok(())
+    }
+}
+impl SerdeAPI for FuelConverterThermalOption {}
+
+#[fastsim_api]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+/// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
+pub struct FuelConverterThermal {
+    /// [FuelConverter] thermal capacitance
+    pub heat_capacitance: si::SpecificEnergy,
+    /// parameter for engine characteristic length for heat transfer calcs
+    pub length_for_convection: si::Length,
+    /// parameter for heat transfer coeff from [FuelConverter] to ambient during vehicle stop
+    pub htc_to_amb_stop: si::ThermalConductance,
+
+    /// coefficient for fraction of combustion heat that goes to [FuelConverter]
+    /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
+    pub coeff_from_comb: si::Ratio,
+    /// parameter for temperature at which thermostat starts to open
+    #[api(skip_get, skip_set)]
+    pub tstat_te_sto_deg_c: Option<si::ThermodynamicTemperature>,
+    /// temperature delta over which thermostat is partially open
+    #[api(skip_get, skip_set)]
+    pub tstat_te_delta_deg_c: Option<si::TemperatureInterval>,
+    /// radiator effectiveness -- ratio of active heat rejection from
+    /// radiator to passive heat rejection
+    pub rad_eps: si::Ratio,
+}
+
+impl SerdeAPI for FuelConverterThermal {}
+impl Init for FuelConverterThermal {
+    fn init(&mut self) -> anyhow::Result<()> {
+        self.tstat_te_sto_deg_c = self
+            .tstat_te_sto_deg_c
+            .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
+        self.tstat_te_delta_deg_c = self.tstat_te_delta_deg_c.or(Some(5. * uc::KELVIN_INT));
+        Ok(())
+    }
+}

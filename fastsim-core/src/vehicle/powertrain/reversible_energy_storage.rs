@@ -194,7 +194,7 @@ impl ReversibleEnergyStorage {
                 interp3d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>(),
                     state.soc.get::<si::ratio>(),
-                    state.temperature_celsius,
+                    state.temperature.get::<si::degree_celsius>(),
                 ])? * uc::R
             }
             _ => bail!("Invalid interpolator.  See docs for `ReversibleEnergyStorage::eff_interp`"),
@@ -557,8 +557,7 @@ pub struct ReversibleEnergyStorageState {
     pub energy_out_chemical: si::Energy,
 
     /// component temperature
-    // TODO: make this uom or figure out why it's not!
-    pub temperature_celsius: f64,
+    pub temperature: si::ThermodynamicTemperature,
 }
 
 impl Default for ReversibleEnergyStorageState {
@@ -584,7 +583,7 @@ impl Default for ReversibleEnergyStorageState {
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,
-            temperature_celsius: 22.,
+            temperature: *crate::air_properties::TE_STD_AIR,
         }
     }
 }
