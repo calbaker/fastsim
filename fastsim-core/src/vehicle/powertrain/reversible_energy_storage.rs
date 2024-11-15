@@ -1,4 +1,5 @@
 use super::*;
+use efficiency_values::{F_XYZ_EFF, F_XY_EFF, F_X_EFF, X_EFF, Y_EFF, Z_EFF};
 
 #[allow(unused_imports)]
 #[cfg(feature = "pyo3")]
@@ -56,6 +57,21 @@ const TOL: f64 = 1e-3;
     #[getter]
     fn get_energy_capacity_usable_joules(&self) -> f64 {
         self.energy_capacity_usable().get::<si::joule>()
+    }
+
+    #[pyo3(name = "set_default_1d_interp")]
+    fn set_default_1d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_1d_interp()
+    }
+
+    #[pyo3(name = "set_default_2d_interp")]
+    fn set_default_2d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_2d_interp()
+    }
+
+    #[pyo3(name = "set_default_3d_interp")]
+    fn set_default_3d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_3d_interp()
     }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
@@ -402,6 +418,109 @@ impl ReversibleEnergyStorage {
     /// Usable energy capacity, accounting for SOC limits
     pub fn energy_capacity_usable(&self) -> si::Energy {
         self.energy_capacity * (self.max_soc - self.min_soc)
+    }
+
+    /// If the ReversibleEnergyStorage eff_interp is 1D, sets the x and f_x fields
+    /// of the interpolator to be the default x and f_x arrays, stored in X_EFF and
+    /// F_X_EFF
+    pub fn set_default_1d_interp(&mut self) -> anyhow::Result<()> {
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp1D(_) => self
+                .eff_interp
+                .set_x(X_EFF.iter().map(|x| x.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 1D, and therefore cannot set default 1D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp1D(_) => self
+                .eff_interp
+                .set_f_x(F_X_EFF.iter().map(|f_x| f_x.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 1D, and therefore cannot set default 1D interpolator."
+            ))?,
+        }
+        Ok(())
+    }
+
+    /// If the ReversibleEnergyStorage eff_interp is 2D, sets the x, y and f_xy
+    /// fields of the interpolator to be the default x, y and f_xy arrays,
+    /// stored in X_EFF, Y_EFF, and F_XY_EFF
+    pub fn set_default_2d_interp(&mut self) -> anyhow::Result<()> {
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp2D(_) => self
+                .eff_interp
+                .set_x(X_EFF.iter().map(|x| x.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 2D, and therefore cannot set default 2D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp2D(_) => self
+                .eff_interp
+                .set_y(Y_EFF.iter().map(|y| y.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 2D, and therefore cannot set default 2D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp2D(_) => self.eff_interp.set_f_xy(
+                F_XY_EFF
+                    .iter()
+                    .map(|f_y| f_y.iter().map(|f_x| f_x.to_owned()).collect())
+                    .collect(),
+            )?,
+            _ => Err(anyhow!(
+                "Interpolator is not 2D, and therefore cannot set default 2D interpolator."
+            ))?,
+        }
+        Ok(())
+    }
+
+    /// If the ReversibleEnergyStorage eff_interp is 3D, sets the x, y, z and
+    /// f_xyz fields of the interpolator to be the default x, y, z and f_xyz
+    /// arrays, stored in X_EFF, Y_EFF, Z_EFF, and F_XYZ_EFF
+    pub fn set_default_3d_interp(&mut self) -> anyhow::Result<()> {
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp3D(_) => self
+                .eff_interp
+                .set_x(X_EFF.iter().map(|x| x.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 3D, and therefore cannot set default 3D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp3D(_) => self
+                .eff_interp
+                .set_y(Y_EFF.iter().map(|y| y.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 3D, and therefore cannot set default 3D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp3D(_) => self
+                .eff_interp
+                .set_z(Z_EFF.iter().map(|z| z.to_owned()).collect())?,
+            _ => Err(anyhow!(
+                "Interpolator is not 3D, and therefore cannot set default 3D interpolator."
+            ))?,
+        }
+        match self.eff_interp.to_owned() {
+            Interpolator::Interp3D(_) => self.eff_interp.set_f_xyz(
+                F_XYZ_EFF
+                    .iter()
+                    .map(|f_z| {
+                        f_z.iter()
+                            .map(|f_y| f_y.iter().map(|f_x| f_x.to_owned()).collect())
+                            .collect()
+                    })
+                    .collect(),
+            )?,
+            _ => Err(anyhow!(
+                "Interpolator is not 3D, and therefore cannot set default 3D interpolator."
+            ))?,
+        }
+        Ok(())
     }
 }
 
