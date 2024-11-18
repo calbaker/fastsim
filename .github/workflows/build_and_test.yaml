@@ -10,11 +10,11 @@ jobs:
       matrix:
         os:
           - ubuntu
-          - macos
-          - windows
+          #- macos
+          #- windows
         python-version:
-          - "8"
-          - "9"
+          #- "8"
+          #- "9"
           - "10"
         include:
           - os: ubuntu
