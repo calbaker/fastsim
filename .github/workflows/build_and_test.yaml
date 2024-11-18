@@ -9,31 +9,31 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - ubuntu
-          #- macos
+          #- ubuntu
+          - macos
           #- windows
         python-version:
           #- "8"
           #- "9"
           - "10"
         include:
-          - os: ubuntu
-            platform: linux
+          #- os: ubuntu
+          #  platform: linux
           #- os: windows
           #  ls: dir
     runs-on: ${{ format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v4
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.${{ matrix.python-version }}'
       - name: set up rust
         uses: dtolnay/rust-toolchain@stable
       - run: |
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
         if: matrix.os == 'macos'
         shell: bash
-      - name: set up python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.${{ matrix.python-version }}'
       - name: install python dependencies
         run: python -m pip install --upgrade pip setuptools wheel pytest twine cibuildwheel
       - name: install FASTSim python
@@ -76,6 +76,6 @@ jobs:
         run: ${{ matrix.ls || 'ls -lh' }} dist/
       - uses: actions/upload-artifact@v4
         with:
-          name: fastsim-${{ strategy.job-index }}
+          name: fastsim-${{ matrix.platform || matrix.os }}-py3.${{ matrix.python }}-${{ strategy.job-index }}
           path: ./dist/*
 
