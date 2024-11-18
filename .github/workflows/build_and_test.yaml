@@ -27,9 +27,13 @@ jobs:
       - name: set up rust
         uses: dtolnay/rust-toolchain@stable
       - run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
+          if [[ $(sysctl -n machdep.cpu.brand_string) =~ "Apple" ]]; then
+            rustup target add aarch64-apple-darwin;
+          else
+            rustup target add x86_64-apple-darwin;
+          fi
         if: matrix.os == 'macos'
+        shell: bash
       - name: set up python
         uses: actions/setup-python@v5
         with:
