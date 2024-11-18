@@ -16,11 +16,11 @@ jobs:
           #- "8"
           #- "9"
           - "10"
-        include:
-          #- os: ubuntu
-          #  platform: linux
-          #- os: windows
-          #  ls: dir
+        #include:
+        #  - os: ubuntu
+        #    platform: linux
+        #  - os: windows
+        #    ls: dir
     runs-on: ${{ format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v4
