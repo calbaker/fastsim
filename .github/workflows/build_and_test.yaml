@@ -27,8 +27,7 @@ jobs:
       - name: set up rust
         uses: dtolnay/rust-toolchain@stable
       - run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
         if: matrix.os == 'macos'
         shell: bash
       - name: set up python
@@ -77,5 +76,6 @@ jobs:
         run: ${{ matrix.ls || 'ls -lh' }} dist/
       - uses: actions/upload-artifact@v4
         with:
+          name: fastsim-${{ strategy.job-index }}
           path: ./dist/*
 
