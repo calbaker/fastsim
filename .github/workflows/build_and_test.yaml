@@ -24,7 +24,14 @@ jobs:
     runs-on: ${{ format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v4
-      - name: set up python
+      - name: set up python for MacOS
+        if: matrix.os == 'macos'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          architecture: arm64
+      - name: set up python for non-Mac OS
+        if: matrix.os != 'macos'
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
