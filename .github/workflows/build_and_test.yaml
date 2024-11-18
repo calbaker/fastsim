@@ -27,7 +27,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.${{ matrix.python-version }}'
+          python-version: "3.10"
       - name: set up rust
         uses: dtolnay/rust-toolchain@stable
       - run: |
@@ -51,14 +51,14 @@ jobs:
         run: cibuildwheel --output-dir dist
         env:
           CIBW_BUILD: "cp3${{ matrix.python-version }}-*"
-          CIBW_SKIP: "*-win32 *-musllinux* *i686 *ppc64le *s390x *aarch64"
+          CIBW_SKIP: "*-win32 *-musllinux* *i686 *ppc64le *s390x *aarch64 *macosx_arm64"
           CIBW_PLATFORM: ${{ matrix.platform || matrix.os }}
           # TODO: why doesn't pytest work with cibuildwheel?
           # CIBW_TEST_COMMAND: "pytest -v {project}/python/fastsim/tests"
           CIBW_TEST_COMMAND: "python -m unittest discover {project}/python/fastsim/tests"
-          CIBW_ARCHS_MACOS: "universal2"
+          CIBW_ARCHS_MACOS: "x86_64 universal2"
           # see https://cibuildwheel.readthedocs.io/en/stable/faq/#universal2
-          CIBW_TEST_SKIP: "*_universal2:arm64"
+          CIBW_TEST_SKIP: "*_arm64 *_universal2:arm64"
           CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_ENVIRONMENT_WINDOWS: 'PATH="$UserProfile\.cargo\bin;$PATH"'
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
