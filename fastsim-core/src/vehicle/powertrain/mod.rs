@@ -4,7 +4,6 @@ pub mod fuel_converter;
 pub mod fuel_storage;
 pub mod reversible_energy_storage;
 pub mod transmission;
-pub mod efficiency_values;
 
 pub mod traits;
 

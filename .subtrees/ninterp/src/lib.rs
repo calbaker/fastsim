@@ -176,6 +176,17 @@ pub enum Interpolator {
 }
 
 impl Interpolator {
+    const ACCEPTED_BYTE_FORMATS: &'static [&'static str] = &[
+        // #[cfg(feature = "yaml")]
+        "yaml",
+    ];
+    const ACCEPTED_STR_FORMATS: &'static [&'static str] = &[
+        // #[cfg(feature = "yaml")]
+        "yaml",
+    ];
+    // #[cfg(feature = "resources")]
+    const RESOURCE_PREFIX: &'static str = "cycles";
+
     /// Interpolate at supplied point, after checking point validity.
     /// Length of supplied point must match interpolator dimensionality.
     pub fn interpolate(&self, point: &[f64]) -> Result<f64, InterpolationError> {
@@ -535,6 +546,24 @@ impl Interpolator {
             _ => Err(Error::NoSuchField),
         }
     }
+
+    // Read (deserialize) an object from a resource file packaged with the `fastsim-core` crate
+    //
+    // # Arguments:
+    //
+    // * `filepath` - Filepath, relative to the top of the `resources` folder (excluding any relevant prefix), from which to read the object
+    // #[cfg(feature = "resources")]
+    // fn from_resource<P: AsRef<Path>>(filepath: P, skip_init: bool) -> anyhow::Result<Self> {
+    //     let filepath = Path::new(Self::RESOURCE_PREFIX).join(filepath);
+    //     let extension = filepath
+    //         .extension()
+    //         .and_then(OsStr::to_str)
+    //         .with_context(|| format!("File extension could not be parsed: {filepath:?}"))?;
+    //     let file = crate::resources::RESOURCES_DIR
+    //         .get_file(&filepath)
+    //         .with_context(|| format!("File not found in resources: {filepath:?}"))?;
+    //     Self::from_reader(&mut file.contents(), extension, skip_init)
+    // }
 }
 
 /// Interpolation strategy.

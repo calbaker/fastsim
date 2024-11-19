@@ -1,6 +1,13 @@
-#%%
+"""
+Python file demonstrating how to take altrios formatted efficiency arrays and
+turn them into arrays that can be accepted into FASTSim-3 Interpolator with x
+being power, y being SOC, and z being temperature.
+"""
+
 import numpy as np
 
+# efficiency array as a function of power and SOC at constant 23 degrees C,
+# corresponds to eta_interp_values[0] in Altrios
 arr_2d = np.array([
     [
         0.760718703139553,
@@ -147,9 +154,15 @@ arr_2d = np.array([
     ],
 ])
 
+# transposing the altrios array so that the outermost layer is now power, and
+# the innermost layer SOC (in altrios, the outermost layer is SOC and innermost
+# is power), as required in order to use this array in a FASTSim-3 interpolator,
+# with x being power. arr_2d_transposed can now be used in FASTSim-3.
 arr_2d_transposed = np.transpose(arr_2d, (1,0))
 # %%
 
+# efficiency array as a function of power SOC, and temperature, corresponds to
+# eta_interp_values in Altrios
 arr_3d = [
     [
         [
@@ -436,4 +449,9 @@ arr_3d = [
     ],
 ]
 
+# transposing the altrios array so that the outermost layer is now power, and
+# the innermost layer temperature (in altrios, the outermost layer is
+# temperature and innermost is power), as required in order to use this array in
+# a FASTSim-3 interpolator, with x being power. arr_2d_transposed can now be
+# used in FASTSim-3.
 arr_3d_transposed = np.transpose(arr_3d, (2,1,0))
