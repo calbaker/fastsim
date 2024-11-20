@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build-and-test:
-    name: build ${{ matrix.python-version }} on ${{ matrix.platform || matrix.os.base }}
+    name: build py3.${{ matrix.python-version }} on ${{ matrix.platform || matrix.os.base }}
     strategy:
       fail-fast: true
       matrix:
@@ -25,22 +25,20 @@ jobs:
           - "9"
           - "10"
         include:
-          - os: ubuntu
+          - os:
+              base: ubuntu
+              version: latest
             platform: linux
-          - os: windows
+          - os:
+              base: windows
+              version: latest
             ls: dir
     runs-on: ${{ format('{0}-{1}', matrix.os.base, matrix.os.version) }}
     steps:
       - uses: actions/checkout@v4
 
       - name: set up rust
-        if: matrix.os != 'ubuntu'
-        uses: action-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-        # uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - run: rustup target add aarch64-apple-darwin
         if: matrix.os.base == 'macos' && matrix.os.version == '14'
