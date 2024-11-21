@@ -70,12 +70,12 @@ jobs:
       - name: run pytest
         run: pytest -v
 
-      - name: build ${{ matrix.platform || matrix.os }} binaries
+      - name: build ${{ matrix.platform || matrix.os.base }} binaries
         run: cibuildwheel --output-dir dist
         env:
           CIBW_BUILD: "cp3${{ matrix.python-version }}-*"
           CIBW_SKIP: "*-win32 *-musllinux* *i686 *ppc64le *s390x *aarch64"
-          CIBW_PLATFORM: ${{ matrix.platform || matrix.os }}
+          CIBW_PLATFORM: ${{ matrix.platform || matrix.os.base }}
           # TODO: why doesn't pytest work with cibuildwheel?
           # CIBW_TEST_COMMAND: "pytest -v {project}/python/fastsim/tests"
           CIBW_TEST_COMMAND: "python -m unittest discover {project}/python/fastsim/tests"
