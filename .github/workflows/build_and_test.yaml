@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build-and-test:
-    name: build py3.${{ matrix.python-version }} on ${{ matrix.platform || matrix.os.base }}
+    name: build py3.${{ matrix.python-version }} on ${{ matrix.platform || matrix.os.base }}-${{ matrix.os.version }}
     strategy:
       fail-fast: true
       matrix:
