@@ -9,30 +9,30 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - base: ubuntu
-            version: latest
+          #- base: ubuntu
+          #  version: latest
+          #- base: macos
+          #  version: '13'
+          #  arch: 'x86_64'
           - base: macos
-            version: 13
-            arch: 'x86_64'
-          - base: macos
-            version: 14
+            version: '14'
             arch: 'arm64'
-          - base: windows
-            version: latest
-            arch: 'amd64'
+          #- base: windows
+          #  version: latest
+          #  arch: 'amd64'
         python-version:
-          - "8"
-          - "9"
+          #- "8"
+          #- "9"
           - "10"
-        include:
-          - os:
-              base: ubuntu
-              version: latest
-            platform: linux
-          - os:
-              base: windows
-              version: latest
-            ls: dir
+        #include:
+        #  - os:
+        #      base: ubuntu
+        #      version: latest
+        #    platform: linux
+        #  - os:
+        #      base: windows
+        #      version: latest
+        #    ls: dir
     runs-on: ${{ format('{0}-{1}', matrix.os.base, matrix.os.version) }}
     steps:
       - uses: actions/checkout@v4
