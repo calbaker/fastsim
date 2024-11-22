@@ -11,9 +11,9 @@ jobs:
         os:
           #- base: ubuntu
           #  version: latest
-          #- base: macos
-          #  version: '13'
-          #  arch: 'x86_64'
+          - base: macos
+            version: '13'
+            arch: 'x86_64'
           - base: macos
             version: '14'
             arch: 'arm64'
