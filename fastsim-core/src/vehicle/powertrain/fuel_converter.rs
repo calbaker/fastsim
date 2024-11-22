@@ -1,3 +1,5 @@
+use crate::prelude::{Air, Octane, TE_STD_AIR};
+
 use super::*;
 
 // TODO: think about how to incorporate life modeling for Fuel Cells and other tech
@@ -52,7 +54,7 @@ pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
     #[api(skip_get, skip_set)]
-    pub thermal_plant: FuelConverterThermalOption,
+    pub thrml: FuelConverterThermalOption,
     /// [Self] mass
     #[serde(default)]
     #[api(skip_get, skip_set)]
@@ -103,7 +105,7 @@ impl SerdeAPI for FuelConverter {}
 impl Init for FuelConverter {
     fn init(&mut self) -> anyhow::Result<()> {
         let _ = self.mass().with_context(|| anyhow!(format_dbg!()))?;
-        self.thermal_plant.init()?;
+        self.thrml.init()?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
         let eff_max = self.eff_max()?;
         self.pwr_for_peak_eff = *self
@@ -245,6 +247,7 @@ impl FuelConverter {
         fc_on: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
+        self.thrml.solve().with_context(|| format_dbg!())?;
         self.state.fc_on = fc_on;
         if fc_on {
             self.state.time_on += dt;
@@ -392,39 +395,139 @@ impl Init for FuelConverterThermalOption {
     }
 }
 impl SerdeAPI for FuelConverterThermalOption {}
+impl FuelConverterThermalOption {
+    fn solve(
+        &mut self,
+        te_amb: si::ThermodynamicTemperature,
+        heat_demand: si::Power,
+        heat_gen: si::Power,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::FuelConverterThermal(fct) => fct
+                .solve(te_amb, heat_demand, heat_gen, dt)
+                .with_context(|| format_dbg!())?,
+            Self::None => {}
+        }
+        Ok(())
+    }
+}
 
 #[fastsim_api]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
 pub struct FuelConverterThermal {
     /// [FuelConverter] thermal capacitance
-    pub heat_capacitance: si::SpecificEnergy,
+    pub heat_capacitance: si::HeatCapacity,
     /// parameter for engine characteristic length for heat transfer calcs
     pub length_for_convection: si::Length,
     /// parameter for heat transfer coeff from [FuelConverter] to ambient during vehicle stop
     pub htc_to_amb_stop: si::ThermalConductance,
-
-    /// coefficient for fraction of combustion heat that goes to [FuelConverter]
+    /// Coefficient for max fraction of combustion heat minus shaft power
+    /// that goes to [FuelConverter] (engine) thermal mass. Remainder goes to
+    /// environment via tailpipe.
+    pub max_coeff_from_comb: si::Ratio,
+    /// heat transfer coefficient for combustion heat that goes to [FuelConverter]
     /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
-    pub coeff_from_comb: si::Ratio,
+    pub htc_from_comb: si::ThermalConductance,
     /// parameter for temperature at which thermostat starts to open
     #[api(skip_get, skip_set)]
-    pub tstat_te_sto_deg_c: Option<si::ThermodynamicTemperature>,
+    pub tstat_te_sto: Option<si::ThermodynamicTemperature>,
     /// temperature delta over which thermostat is partially open
     #[api(skip_get, skip_set)]
-    pub tstat_te_delta_deg_c: Option<si::TemperatureInterval>,
+    pub tstat_te_delta: Option<si::TemperatureInterval>,
     /// radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection
-    pub rad_eps: si::Ratio,
+    pub radiator_effectiveness: si::Ratio,
+    /// struct for tracking current state
+    #[serde(default)]
+    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    pub state: FuelConverterThermalState,
+    /// Custom vector of [Self::state]
+    #[serde(default)]
+    #[serde(skip_serializing_if = "FuelConverterThermalStateHistoryVec::is_empty")]
+    pub history: FuelConverterThermalStateHistoryVec,
 }
 
+lazy_static! {
+    /// gasoline stoichiometric air-fuel ratio https://en.wikipedia.org/wiki/Air%E2%80%93fuel_ratio
+    pub static ref AFR_STOICH_GASOLINE: si::Ratio = uc::R * 14.7;
+    /// gasoline density in https://inchem.org/documents/icsc/icsc/eics1400.htm
+    /// This is reasonably constant with respect to temperature and pressure
+    pub static ref GASOLINE_DENSITY: si::MassDensity = 0.75 * uc::KG / uc::L;
+    /// TODO: find a source for this value
+    pub static ref GASOLINE_LHV: si::SpecificEnergy = 33.7 * uc::KWH / uc::GALLON / *GASOLINE_DENSITY;
+    pub static ref TE_ADIABATIC_STD: si::ThermodynamicTemperature = Air::get_te_from_u(
+            Air::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
+                + (Octane::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
+                    + *GASOLINE_LHV)
+                    / *AFR_STOICH_GASOLINE,
+        )
+        .with_context(|| format_dbg!()).unwrap();
+}
+
+impl FuelConverterThermal {
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `te_amb`: ambient temperature
+    /// - `heat_demand`: heat demand from HVAC system
+    /// - `heat_gen`: total combustion heat minus shaft power
+    fn solve(
+        &mut self,
+        te_amb: si::ThermodynamicTemperature,
+        heat_demand: si::Power,
+        heat_gen: si::Power,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        // assumes fuel/air mixture is entering combustion chamber at block temperature
+        // assumes stoichiometric combustion
+        self.state.te_adiabatic = Air::get_te_from_u(
+            Air::get_specific_energy(self.state.temp).with_context(|| format_dbg!())?
+                + (Octane::get_specific_energy(self.state.temp).with_context(|| format_dbg!())?
+                    + *GASOLINE_LHV)
+                    / *AFR_STOICH_GASOLINE,
+        )
+        .with_context(|| format_dbg!())?;
+        self.state.temp = self.state.temp
+            + (((self.htc_from_comb * (self.state.te_adiabatic - self.state.temp))
+                .min(self.max_coeff_from_comb * heat_gen)
+                - heat_demand)
+                * dt)
+                / self.heat_capacitance;
+        Ok(())
+    }
+}
 impl SerdeAPI for FuelConverterThermal {}
 impl Init for FuelConverterThermal {
     fn init(&mut self) -> anyhow::Result<()> {
-        self.tstat_te_sto_deg_c = self
-            .tstat_te_sto_deg_c
+        self.tstat_te_sto = self
+            .tstat_te_sto
             .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
-        self.tstat_te_delta_deg_c = self.tstat_te_delta_deg_c.or(Some(5. * uc::KELVIN_INT));
+        self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN_INT));
         Ok(())
+    }
+}
+
+#[fastsim_api]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+pub struct FuelConverterThermalState {
+    /// time step index
+    pub i: usize,
+    /// Adiabatic flame temperature assuming complete (i.e. all fuel is consumed
+    /// if fuel lean or stoich or all air is consumed if fuel rich) combustion
+    pub te_adiabatic: si::ThermodynamicTemperature,
+    /// Current engine thermal mass temperature (lumped engine block and coolant)
+    pub temp: si::ThermodynamicTemperature,
+}
+
+impl Init for FuelConverterThermalState {}
+impl SerdeAPI for FuelConverterThermalState {}
+impl Default for FuelConverterThermalState {
+    fn default() -> Self {
+        Self {
+            i: Default::default(),
+            te_adiabatic: *TE_ADIABATIC_STD,
+            temp: *TE_STD_AIR,
+        }
     }
 }

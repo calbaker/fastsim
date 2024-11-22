@@ -43,6 +43,8 @@ unit_const!(MI, Length, 1.609_344_E3);
 unit_const!(M2, Area, 1.0);
 unit_const!(FT2, Area, 9.290_304_E-2);
 unit_const!(M3, Volume, 1.0);
+unit_const!(L, Volume, 1.0E-3);
+unit_const!(GALLON, Volume, 0.003785);
 
 unit_const!(S, Time, 1.0);
 unit_const!(MIN, Time, 60.0);

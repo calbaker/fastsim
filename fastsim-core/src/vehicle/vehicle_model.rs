@@ -426,6 +426,12 @@ impl Vehicle {
 
         Ok(())
     }
+
+    pub fn solve_thermal(&mut self) -> anyhow::Result<()> {
+        self.pt_type.solve_thermal();
+        todo!();
+        Ok(())
+    }
 }
 
 /// Vehicle state for current time step

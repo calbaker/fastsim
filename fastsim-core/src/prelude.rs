@@ -1,8 +1,8 @@
 //! Convenience module for exposing commonly used structs
 // NOTE: consider exposing more structs and other stuff here
 
-pub use crate::air_properties::Air;
 pub use crate::drive_cycle::{Cycle, CycleElement};
+pub use crate::gas_properties::{Air, Octane, TE_STD_AIR};
 pub use crate::simdrive::{SimDrive, SimParams};
 pub use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecBoolWrapper, Pyo3VecWrapper};
 pub use crate::vehicle::cabin::{CabinOption, SingleCapacitanceCabin};

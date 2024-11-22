@@ -57,7 +57,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
-                            thermal_plant: Default::default(),
+                            thrml: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,
@@ -130,7 +130,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
-                            thermal_plant: Default::default(),
+                            thrml: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,

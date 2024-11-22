@@ -17,7 +17,7 @@ pub struct SimParams {
     #[api(skip_get, skip_set)]
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
-    pub f2_air_density: bool,
+    pub f2_const_air_density: bool,
 }
 
 impl SerdeAPI for SimParams {}
@@ -31,7 +31,7 @@ impl Default for SimParams {
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
-            f2_air_density: true,
+            f2_const_air_density: true,
         }
     }
 }
@@ -240,7 +240,7 @@ impl SimDrive {
                     .interpolate(&[vs.dist.get::<si::meter>()])?
         };
 
-        vs.air_density = if self.sim_params.f2_air_density {
+        vs.air_density = if self.sim_params.f2_const_air_density {
             1.2 * uc::KGPM3
         } else {
             let te_amb_air = match &self.cyc.temp_amb_air {

@@ -16,6 +16,7 @@ pub use si::f64::{
     Velocity, Volume,
 };
 pub use si::force::{newton, pound_force};
+pub use si::heat_capacity::{joule_per_degree_celsius, joule_per_kelvin};
 pub use si::length::{foot, kilometer, meter};
 pub use si::mass::{kilogram, megagram};
 pub use si::mass_density::kilogram_per_cubic_meter;

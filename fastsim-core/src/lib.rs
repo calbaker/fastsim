@@ -11,8 +11,8 @@
 #[macro_use]
 pub mod macros;
 
-pub mod air_properties;
 pub mod drive_cycle;
+pub mod gas_properties;
 pub mod imports;
 pub mod prelude;
 // #[cfg(feature = "pyo3")] -- feature gate provided inside module

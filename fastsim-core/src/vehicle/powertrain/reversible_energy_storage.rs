@@ -583,7 +583,7 @@ impl Default for ReversibleEnergyStorageState {
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,
-            temperature: *crate::air_properties::TE_STD_AIR,
+            temperature: *crate::gas_properties::TE_STD_AIR,
         }
     }
 }
