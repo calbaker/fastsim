@@ -81,7 +81,7 @@ jobs:
           # TODO: why doesn't pytest work with cibuildwheel?
           # CIBW_TEST_COMMAND: "pytest -v {project}/python/fastsim/tests"
           CIBW_TEST_COMMAND: "python -m unittest discover {project}/python/fastsim/tests"
-          CIBW_ARCHS_MACOS: "universal2"
+          CIBW_ARCHS_MACOS: "${{ matrix.os.arch }}"
           # see https://cibuildwheel.readthedocs.io/en/stable/faq/#universal2
           CIBW_TEST_SKIP: "*_universal2:arm64"
           CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
