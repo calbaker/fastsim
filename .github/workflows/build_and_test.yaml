@@ -40,10 +40,12 @@ jobs:
       - name: set up rust
         uses: dtolnay/rust-toolchain@stable
 
-      - run: rustup target add aarch64-apple-darwin
+      - name: install rust target for MacOS 14 (Apple Silicon)
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
         if: matrix.os.base == 'macos' && matrix.os.version == '14'
 
-      - run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: install rust target for MacOS 13 (Intel Mac)
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
         if: matrix.os.base == 'macos' && matrix.os.version == '13'
 
       - name: run cargo tests
