@@ -54,7 +54,7 @@ pub struct Cycle {
     pub elev_interp: Option<Interpolator>,
     /// ambient air temperature w.r.t. to time (rather than spatial position)
     #[api(skip_get, skip_set)]
-    pub temp_amb_air: Option<Vec<si::ThermodynamicTemperature>>,
+    pub temp_amb_air: Option<Vec<si::TemperatureInterval>>,
 }
 
 lazy_static! {
@@ -68,6 +68,9 @@ impl Init for Cycle {
     fn init(&mut self) -> anyhow::Result<()> {
         ensure!(self.time.len() == self.speed.len());
         ensure!(self.grade.len() == self.len());
+        if let Some(te_amb_air) = &self.temp_amb_air {
+            ensure!(te_amb_air.len() == self.time.len());
+        }
         // TODO: figure out if this should be uncommented -- probably need to use a `match`
         // somewhere to fix this ensure!(self.pwr_max_chrg.len() == self.len());
 

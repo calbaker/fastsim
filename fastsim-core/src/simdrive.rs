@@ -199,6 +199,20 @@ impl SimDrive {
         self.veh
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
+        self.veh
+            .solve_thermal(
+                self.cyc.temp_amb_air.with_context(|| {
+                    format!(
+                        "{}\n{}",
+                        format_dbg!(),
+                        "Expected to have `te_amb_air` provided in `Cycle`"
+                    )
+                })?[i]
+                    .clone(),
+                self.veh.state.speed_ach,
+                dt,
+            )
+            .with_context(|| format_dbg!())?;
         self.veh.set_cumulative(dt);
         Ok(())
     }

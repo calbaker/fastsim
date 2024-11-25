@@ -341,16 +341,16 @@ pub(crate) fn impl_getters_and_setters(
             "Pressure" => extract_units!(uom::si::pressure::kilopascal, uom::si::pressure::bar),
             "Ratio" => extract_units!(uom::si::ratio::ratio),
             "Time" => extract_units!(uom::si::time::second, uom::si::time::hour),
+            "HeatTransferCoeff" => extract_units!(
+                uom::si::heat_transfer::watt_per_square_meter_degree_celsius,
+                uom::si::heat_transfer::watt_per_square_meter_kelvin
+            ),
             "HeatCapacity" => {
                 extract_units!(
                     uom::si::heat_capacity::joule_per_kelvin,
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "ThermodynamicTemperature" => extract_units!(
-                uom::si::thermodynamic_temperature::degree_celsius,
-                uom::si::thermodynamic_temperature::kelvin
-            ),
             "TemperatureInterval" => extract_units!(
                 uom::si::temperature_interval::degree_celsius,
                 uom::si::temperature_interval::kelvin

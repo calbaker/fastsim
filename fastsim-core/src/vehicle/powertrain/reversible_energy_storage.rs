@@ -117,8 +117,8 @@ impl ReversibleEnergyStorage {
             state.soc.get::<si::ratio>()
         );
 
-        state.pwr_out_propulsion = pwr_out_req;
-        state.pwr_out_electrical = state.pwr_out_propulsion + state.pwr_aux;
+        state.pwr_out_prop = pwr_out_req;
+        state.pwr_out_electrical = state.pwr_out_prop + state.pwr_aux;
 
         if pwr_out_req + state.pwr_aux >= si::Power::ZERO {
             // discharging
@@ -536,7 +536,7 @@ pub struct ReversibleEnergyStorageState {
     /// total electrical power; positive is discharging
     pub pwr_out_electrical: si::Power,
     /// electrical power going to propulsion
-    pub pwr_out_propulsion: si::Power,
+    pub pwr_out_prop: si::Power,
     /// electrical power going to aux loads
     pub pwr_aux: si::Power,
     /// power dissipated as loss
@@ -548,7 +548,7 @@ pub struct ReversibleEnergyStorageState {
     /// cumulative total electrical energy; positive is discharging
     pub energy_out_electrical: si::Energy,
     /// cumulative electrical energy going to propulsion
-    pub energy_out_propulsion: si::Energy,
+    pub energy_out_prop: si::Energy,
     /// cumulative electrical energy going to aux loads
     pub energy_aux: si::Energy,
     /// cumulative energy dissipated as loss
@@ -557,7 +557,7 @@ pub struct ReversibleEnergyStorageState {
     pub energy_out_chemical: si::Energy,
 
     /// component temperature
-    pub temperature: si::ThermodynamicTemperature,
+    pub temperature: si::TemperatureInterval,
 }
 
 impl Default for ReversibleEnergyStorageState {
@@ -574,12 +574,12 @@ impl Default for ReversibleEnergyStorageState {
             eff: si::Ratio::ZERO,
             soh: 0.,
             pwr_out_electrical: si::Power::ZERO,
-            pwr_out_propulsion: si::Power::ZERO,
+            pwr_out_prop: si::Power::ZERO,
             pwr_aux: si::Power::ZERO,
             pwr_loss: si::Power::ZERO,
             pwr_out_chemical: si::Power::ZERO,
             energy_out_electrical: si::Energy::ZERO,
-            energy_out_propulsion: si::Energy::ZERO,
+            energy_out_prop: si::Energy::ZERO,
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,

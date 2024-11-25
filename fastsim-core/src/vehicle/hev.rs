@@ -199,6 +199,20 @@ impl Powertrain for Box<HybridElectricVehicle> {
         Ok(())
     }
 
+    fn solve_thermal(
+        &mut self,
+        te_amb: si::TemperatureInterval,
+        heat_demand: si::Power,
+        veh_speed: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.fc
+            .solve_thermal(te_amb, heat_demand, veh_speed, dt)
+            .with_context(|| format_dbg!())?;
+        todo!();
+        self.res.solve_thermal()
+    }
+
     fn pwr_regen(&self) -> si::Power {
         // When `pwr_mech_prop_out` is negative, regen is happening.  First, clip it at 0, and then negate it.
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d

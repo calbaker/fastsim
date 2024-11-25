@@ -53,6 +53,15 @@ impl Powertrain for Box<ConventionalVehicle> {
         Ok(())
     }
 
+    fn solve_thermal(
+        &mut self,
+        te_amb: si::TemperatureInterval,
+        heat_demand: si::Power,
+        veh_speed: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.fc.solve_thermal(te_amb, heat_demand, veh_speed, dt)
+    }
 
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         Ok((self.fc.state.pwr_prop_max, si::Power::ZERO))

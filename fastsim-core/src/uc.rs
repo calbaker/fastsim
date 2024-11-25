@@ -86,10 +86,9 @@ unit_const!(
 );
 
 lazy_static::lazy_static! {
-    pub static ref CELSIUS_TO_KELVIN: crate::si::TemperatureInterval = 273.15 * KELVIN_INT;
+    pub static ref CELSIUS_TO_KELVIN: crate::si::TemperatureInterval = 273.15 * KELVIN;
 }
-unit_const!(KELVIN, ThermodynamicTemperature, 1.0);
-unit_const!(KELVIN_INT, TemperatureInterval, 1.0);
+unit_const!(KELVIN, TemperatureInterval, 1.0);
 unit_const!(J_PER_KG_K, SpecificHeatCapacity, 1.0);
 unit_const!(J_PER_K, HeatCapacity, 1.0);
 unit_const!(J_PER_KG, SpecificEnergy, 1.0);

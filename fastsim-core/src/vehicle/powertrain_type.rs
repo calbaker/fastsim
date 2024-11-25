@@ -47,6 +47,20 @@ impl Powertrain for PowertrainType {
         }
     }
 
+    fn solve_thermal(
+        &mut self,
+        te_amb: si::TemperatureInterval,
+        heat_demand: si::Power,
+        veh_speed: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::ConventionalVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_speed, dt),
+            Self::HybridElectricVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_speed, dt),
+            Self::BatteryElectricVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_speed, dt),
+        }
+    }
+
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         match self {
             Self::ConventionalVehicle(v) => v.get_curr_pwr_prop_out_max(),

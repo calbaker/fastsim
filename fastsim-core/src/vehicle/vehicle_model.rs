@@ -427,9 +427,15 @@ impl Vehicle {
         Ok(())
     }
 
-    pub fn solve_thermal(&mut self) -> anyhow::Result<()> {
-        self.pt_type.solve_thermal();
-        todo!();
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::TemperatureInterval,
+        veh_speed: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        let heat_demand = si::Power::ZERO;
+        self.pt_type
+            .solve_thermal(te_amb, heat_demand, veh_speed, dt);
         Ok(())
     }
 }

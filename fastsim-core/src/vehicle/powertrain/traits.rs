@@ -35,6 +35,14 @@ pub trait Powertrain {
         dt: si::Time,
     ) -> anyhow::Result<()>;
 
+    fn solve_thermal(
+        &mut self,
+        te_amb: si::TemperatureInterval,
+        heat_demand: si::Power,
+        veh_speed: si::Velocity,
+        dt: si::Time,
+    ) -> anyhow::Result<()>;
+
     /// Returns regen power after `Powertrain::solve` has been called
     fn pwr_regen(&self) -> si::Power;
 }
