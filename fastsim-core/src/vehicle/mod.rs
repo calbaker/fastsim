@@ -4,6 +4,7 @@
 //! Module containing submodules for vehicle and powertrain models
 
 pub(crate) use crate::imports::*;
+pub use crate::prelude::*;
 
 // powertrain types
 pub mod bev;

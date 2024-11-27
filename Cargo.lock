@@ -608,7 +608,6 @@ name = "fastsim-core"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "bincode",
  "csv",
  "derive_more",
  "document-features",

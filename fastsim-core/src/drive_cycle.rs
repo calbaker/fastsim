@@ -1,4 +1,5 @@
 use crate::imports::*;
+use crate::prelude::*;
 use fastsim_2::cycle::RustCycle as Cycle2;
 
 #[fastsim_api(
@@ -53,8 +54,9 @@ pub struct Cycle {
     #[api(skip_get, skip_set)]
     pub elev_interp: Option<Interpolator>,
     /// ambient air temperature w.r.t. to time (rather than spatial position)
+    #[serde(default)]
     #[api(skip_get, skip_set)]
-    pub temp_amb_air: Option<Vec<si::TemperatureInterval>>,
+    pub temp_amb_air: Vec<si::Temperature>,
 }
 
 lazy_static! {
@@ -68,8 +70,10 @@ impl Init for Cycle {
     fn init(&mut self) -> anyhow::Result<()> {
         ensure!(self.time.len() == self.speed.len());
         ensure!(self.grade.len() == self.len());
-        if let Some(te_amb_air) = &self.temp_amb_air {
-            ensure!(te_amb_air.len() == self.time.len());
+        if !self.temp_amb_air.is_empty() {
+            ensure!(self.temp_amb_air.len() == self.time.len());
+        } else {
+            self.temp_amb_air = vec![*TE_STD_AIR; self.time.len()];
         }
         // TODO: figure out if this should be uncommented -- probably need to use a `match`
         // somewhere to fix this ensure!(self.pwr_max_chrg.len() == self.len());
@@ -124,8 +128,6 @@ impl Init for Cycle {
 
 impl SerdeAPI for Cycle {
     const ACCEPTED_BYTE_FORMATS: &'static [&'static str] = &[
-        #[cfg(feature = "bincode")]
-        "bin",
         #[cfg(feature = "csv")]
         "csv",
         #[cfg(feature = "json")]
@@ -157,8 +159,6 @@ impl SerdeAPI for Cycle {
     ///
     fn to_writer<W: std::io::Write>(&self, mut wtr: W, format: &str) -> anyhow::Result<()> {
         match format.trim_start_matches('.').to_lowercase().as_str() {
-            #[cfg(feature = "bincode")]
-            "bin" | "bincode" => bincode::serialize_into(wtr, self)?,
             #[cfg(feature = "csv")]
             "csv" => {
                 let mut wtr = csv::Writer::from_writer(wtr);
@@ -202,8 +202,6 @@ impl SerdeAPI for Cycle {
         skip_init: bool,
     ) -> anyhow::Result<Self> {
         let mut deserialized: Self = match format.trim_start_matches('.').to_lowercase().as_str() {
-            #[cfg(feature = "bincode")]
-            "bin" | "bincode" => bincode::deserialize_from(rdr)?,
             #[cfg(feature = "csv")]
             "csv" => {
                 // Create empty cycle to be populated

@@ -225,6 +225,10 @@ impl ReversibleEnergyStorage {
         Ok(())
     }
 
+    pub fn solve_thermal(&mut self) -> anyhow::Result<()> {
+        todo!()
+    }
+
     /// Sets and returns max output and max regen power based on current state
     /// # Arguments
     /// - `dt`: time step size
@@ -557,7 +561,7 @@ pub struct ReversibleEnergyStorageState {
     pub energy_out_chemical: si::Energy,
 
     /// component temperature
-    pub temperature: si::TemperatureInterval,
+    pub temperature: si::Temperature,
 }
 
 impl Default for ReversibleEnergyStorageState {

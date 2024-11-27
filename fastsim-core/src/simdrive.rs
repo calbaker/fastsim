@@ -200,18 +200,7 @@ impl SimDrive {
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
         self.veh
-            .solve_thermal(
-                self.cyc.temp_amb_air.with_context(|| {
-                    format!(
-                        "{}\n{}",
-                        format_dbg!(),
-                        "Expected to have `te_amb_air` provided in `Cycle`"
-                    )
-                })?[i]
-                    .clone(),
-                self.veh.state.speed_ach,
-                dt,
-            )
+            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state.speed_ach, dt)
             .with_context(|| format_dbg!())?;
         self.veh.set_cumulative(dt);
         Ok(())
@@ -257,11 +246,19 @@ impl SimDrive {
         vs.air_density = if self.sim_params.f2_const_air_density {
             1.2 * uc::KGPM3
         } else {
-            let te_amb_air = match &self.cyc.temp_amb_air {
-                Some(t) => Some(t.get(i).with_context(|| format_dbg!())?),
-                None => None,
+            let te_amb_air = {
+                let te_amb_air = self
+                    .cyc
+                    .temp_amb_air
+                    .get(i)
+                    .with_context(|| format_dbg!())?;
+                if *te_amb_air == *TE_STD_AIR {
+                    None
+                } else {
+                    Some(te_amb_air)
+                }
             };
-            Air::get_density(te_amb_air.cloned(), Some(elev_curr))
+            Air::get_density(te_amb_air.copied(), Some(elev_curr))
         };
 
         let mass = self.veh.mass.with_context(|| {
@@ -510,7 +507,7 @@ impl Default for TraceMissTolerance {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,

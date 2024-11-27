@@ -1,6 +1,7 @@
 use super::*;
 use crate::prelude::*;
 use serde::Deserializer;
+use std::f64::consts::PI;
 
 // TODO: think about how to incorporate life modeling for Fuel Cells and other tech
 
@@ -322,7 +323,7 @@ impl FuelConverter {
 
     pub fn solve_thermal(
         &mut self,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         heat_demand: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
@@ -364,7 +365,7 @@ pub struct FuelConverterState {
     pub eff: si::Ratio,
     /// instantaneous power going to drivetrain, not including aux
     pub pwr_prop: si::Power,
-    /// integral of [Self::pwr_propulsion]
+    /// integral of [Self::pwr_prop]
     pub energy_prop: si::Energy,
     /// power going to auxiliaries
     pub pwr_aux: si::Power,
@@ -416,7 +417,7 @@ impl FuelConverterThermalOption {
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         heat_demand: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
@@ -437,25 +438,22 @@ impl FuelConverterThermalOption {
 pub struct FuelConverterThermal {
     /// [FuelConverter] thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
-    /// Parameter for engine characteristic length for heat transfer calcs.  For
-    /// these calculations, the engine is treated as a sphere to enable speed-dependent
-    /// calculations that don't require a large number of parameters.
+    /// parameter for engine characteristic length for heat transfer calcs
     pub length_for_convection: si::Length,
     /// parameter for heat transfer coeff from [FuelConverter] to ambient during vehicle stop
     pub htc_to_amb_stop: si::HeatTransferCoeff,
-    /// Coefficient for max fraction of combustion heat minus shaft power
-    /// that goes to [FuelConverter] (engine) thermal mass. Remainder goes to
-    /// environment via tailpipe.
-    pub max_frac_from_comb: si::Ratio,
-    /// heat transfer coefficient for combustion heat that goes to [FuelConverter]
-    /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
+
+    /// Heat transfer coefficient between adiabatic flame temperature and [FuelConverterThermal] temperature
     pub htc_from_comb: si::ThermalConductance,
+    /// Max coefficient for fraction of combustion heat that goes to [FuelConverter]
+    /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
+    pub max_frac_from_comb: si::Ratio,
     /// parameter for temperature at which thermostat starts to open
     #[api(skip_get, skip_set)]
-    pub tstat_te_sto: Option<si::TemperatureInterval>,
+    pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
     #[api(skip_get, skip_set)]
-    pub tstat_te_delta: Option<si::TemperatureInterval>,
+    pub tstat_te_delta: Option<si::Temperature>,
     #[serde(skip_serializing, deserialize_with = "tstat_interp_default")]
     #[api(skip_get, skip_set)]
     pub tstat_interp: Interp1D,
@@ -495,7 +493,7 @@ lazy_static! {
     pub static ref GASOLINE_DENSITY: si::MassDensity = 0.75 * uc::KG / uc::L;
     /// TODO: find a source for this value
     pub static ref GASOLINE_LHV: si::SpecificEnergy = 33.7 * uc::KWH / uc::GALLON / *GASOLINE_DENSITY;
-    pub static ref TE_ADIABATIC_STD: si::TemperatureInterval= Air::get_te_from_u(
+    pub static ref TE_ADIABATIC_STD: si::Temperature= Air::get_te_from_u(
             Air::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                 + (Octane::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                     + *GASOLINE_LHV)
@@ -515,7 +513,7 @@ impl FuelConverterThermal {
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         heat_demand: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
@@ -573,13 +571,14 @@ impl FuelConverterThermal {
         .with_context(|| format_dbg!())?;
         // heat that will go both to the block and out the exhaust port
         let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
-        self.state.temp = self.state.temp
-            + (((self.htc_from_comb * (self.state.te_adiabatic - self.state.temp))
-                .min(self.max_frac_from_comb * heat_gen)
-                - heat_demand
-                - self.state.heat_to_amb)
-                * dt)
-                / self.heat_capacitance;
+        let delta_temp: si::Temperature = (((self.htc_from_comb
+            * (self.state.te_adiabatic - self.state.temp))
+            .min(self.max_frac_from_comb * heat_gen)
+            - heat_demand
+            - self.state.heat_to_amb)
+            * dt)
+            / self.heat_capacitance;
+        self.state.temp = self.state.temp + delta_temp;
         Ok(())
     }
 }
@@ -612,9 +611,9 @@ pub struct FuelConverterThermalState {
     pub i: usize,
     /// Adiabatic flame temperature assuming complete (i.e. all fuel is consumed
     /// if fuel lean or stoich or all air is consumed if fuel rich) combustion
-    pub te_adiabatic: si::TemperatureInterval,
+    pub te_adiabatic: si::Temperature,
     /// Current engine thermal mass temperature (lumped engine block and coolant)
-    pub temp: si::TemperatureInterval,
+    pub temp: si::Temperature,
     /// Current heat transfer coefficient from [FuelConverter] to ambient
     pub htc_to_amb: si::HeatTransferCoeff,
     /// Current heat transfer to ambient

@@ -12,11 +12,10 @@ pub use si::f64::{
     Acceleration, Angle, Area, AvailableEnergy as SpecificEnergy, Curvature, DynamicViscosity,
     Energy, Force, Frequency, HeatCapacity, HeatTransfer as HeatTransferCoeff, InverseVelocity,
     Length, Mass, MassDensity, MomentOfInertia, Power, PowerRate, Pressure, Ratio,
-    SpecificHeatCapacity, SpecificPower, TemperatureInterval, ThermalConductance,
+    SpecificHeatCapacity, SpecificPower, TemperatureInterval as Temperature, ThermalConductance,
     ThermalConductivity, Time, Velocity, Volume,
 };
 pub use si::force::{newton, pound_force};
-pub use si::heat_capacity::{joule_per_degree_celsius, joule_per_kelvin};
 pub use si::heat_transfer::{watt_per_square_meter_degree_celsius, watt_per_square_meter_kelvin};
 pub use si::length::{foot, kilometer, meter};
 pub use si::mass::{kilogram, megagram};

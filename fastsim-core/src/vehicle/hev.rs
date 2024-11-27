@@ -201,7 +201,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
 
     fn solve_thermal(
         &mut self,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         heat_demand: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
@@ -209,8 +209,8 @@ impl Powertrain for Box<HybridElectricVehicle> {
         self.fc
             .solve_thermal(te_amb, heat_demand, veh_speed, dt)
             .with_context(|| format_dbg!())?;
-        todo!();
-        self.res.solve_thermal()
+        self.res.solve_thermal().with_context(|| format_dbg!())?;
+        Ok(())
     }
 
     fn pwr_regen(&self) -> si::Power {
@@ -365,7 +365,7 @@ impl std::fmt::Display for FCOnCauses {
 }
 
 #[fastsim_enum_api]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
 pub enum FCOnCause {
     /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,
@@ -417,7 +417,7 @@ impl Default for HEVSimulationParams {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default, IsVariant)]
 pub enum HEVAuxControls {
     /// If feasible, use [ReversibleEnergyStorage] to handle aux power demand
     #[default]

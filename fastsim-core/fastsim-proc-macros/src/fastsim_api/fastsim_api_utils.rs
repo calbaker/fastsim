@@ -351,7 +351,7 @@ pub(crate) fn impl_getters_and_setters(
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "TemperatureInterval" => extract_units!(
+            "Temperature" => extract_units!(
                 uom::si::temperature_interval::degree_celsius,
                 uom::si::temperature_interval::kelvin
             ),

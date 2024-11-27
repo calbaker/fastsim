@@ -222,6 +222,7 @@ impl From<Vec<Vec<Vec<f64>>>> for Pyo3Vec3Wrapper {
 impl SerdeAPI for Pyo3Vec3Wrapper {}
 impl Init for Pyo3Vec3Wrapper {}
 
+#[derive(IsVariant)]
 pub(crate) enum InterpRange {
     ZeroThroughOne,
     NegativeOneThroughOne,

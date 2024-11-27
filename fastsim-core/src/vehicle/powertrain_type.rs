@@ -49,7 +49,7 @@ impl Powertrain for PowertrainType {
 
     fn solve_thermal(
         &mut self,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         heat_demand: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,

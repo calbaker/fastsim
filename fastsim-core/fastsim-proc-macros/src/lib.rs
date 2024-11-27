@@ -39,7 +39,8 @@ pub fn history_vec_derive(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(SetCumulative)]
-/// generate method to implement `SetCumulative` trait
+/// generate method to implement `SetCumulative` trait for all `pwr_*` and
+/// corresponding `energy_*` fields
 pub fn cumu_method_derive(input: TokenStream) -> TokenStream {
     cumu_method_derive::cumu_method_derive(input)
 }

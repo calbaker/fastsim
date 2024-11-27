@@ -2,7 +2,7 @@ use crate::imports::*;
 
 lazy_static! {
     /// room temperature
-    pub static ref TE_STD_AIR: si::TemperatureInterval= (22. + 273.15) * uc::KELVIN;
+    pub static ref TE_STD_AIR: si::Temperature = (22. + 273.15) * uc::KELVIN;
     /// pressure of air at 180 m and 22 C
     pub static ref STD_PRESSURE_AIR: si::Pressure = 99_346.3 * uc::PASCAL;
     /// density of air at 180 m ASL and 22 C
@@ -124,10 +124,7 @@ impl Air {
     /// # Arguments  
     /// * `te_air` - ambient temperature of air, defaults to 22 C
     /// * `h` - elevation above sea level, defaults to 180 m
-    pub fn get_density(
-        te_air: Option<si::TemperatureInterval>,
-        h: Option<si::Length>,
-    ) -> si::MassDensity {
+    pub fn get_density(te_air: Option<si::Temperature>, h: Option<si::Length>) -> si::MassDensity {
         let std_pressure_at_elev = |h: si::Length| -> si::Pressure {
             let std_temp_at_elev = (15.04 - 0.00649 * h.get::<si::meter>() + 273.15) * uc::KELVIN;
             (101.29e3 * uc::PASCAL)
@@ -146,9 +143,7 @@ impl Air {
     /// Returns thermal conductivity of air
     /// # Arguments
     /// - `te_air`: temperature of air
-    pub fn get_therm_cond(
-        te_air: si::TemperatureInterval,
-    ) -> anyhow::Result<si::ThermalConductivity> {
+    pub fn get_therm_cond(te_air: si::Temperature) -> anyhow::Result<si::ThermalConductivity> {
         Ok(
             asp::THERMAL_CONDUCTIVITY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])?
                 * uc::WATT_PER_METER_KELVIN,
@@ -159,7 +154,7 @@ impl Air {
     /// # Arguments
     /// - `te_air`: temperature of air
     pub fn get_specific_heat_cp(
-        te_air: si::TemperatureInterval,
+        te_air: si::Temperature,
     ) -> anyhow::Result<si::SpecificHeatCapacity> {
         Ok(asp::C_P_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG_K)
     }
@@ -167,46 +162,42 @@ impl Air {
     /// Returns specific enthalpy of air  
     /// # Arguments  
     /// - `te_air`: temperature of air
-    pub fn get_specific_enthalpy(
-        te_air: si::TemperatureInterval,
-    ) -> anyhow::Result<si::SpecificEnergy> {
+    pub fn get_specific_enthalpy(te_air: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
         Ok(asp::ENTHALPY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG)
     }
 
     /// Returns specific energy of air  
     /// # Arguments  
     /// - `te_air`: temperature of air
-    pub fn get_specific_energy(
-        te_air: si::TemperatureInterval,
-    ) -> anyhow::Result<si::SpecificEnergy> {
+    pub fn get_specific_energy(te_air: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
         Ok(asp::ENERGY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG)
     }
 
     /// Returns thermal Prandtl number of air
     /// # Arguments
     /// - `te_air`: temperature of air     
-    pub fn get_pr(te_air: si::TemperatureInterval) -> anyhow::Result<si::Ratio> {
+    pub fn get_pr(te_air: si::Temperature) -> anyhow::Result<si::Ratio> {
         Ok(asp::PRANDTL_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::R)
     }
 
     /// Returns dynamic viscosity \[Pa*s\] of air
     /// # Arguments
     /// te_air: temperature of air
-    pub fn get_dyn_visc(te_air: si::TemperatureInterval) -> anyhow::Result<si::DynamicViscosity> {
+    pub fn get_dyn_visc(te_air: si::Temperature) -> anyhow::Result<si::DynamicViscosity> {
         Ok(asp::DYN_VISC_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::PASCAL_SECOND)
     }
 
     /// Returns temperature of air
     /// # Arguments
     /// `h`: specific enthalpy of air \[J/kg\]
-    pub fn get_te_from_h(h: si::SpecificEnergy) -> anyhow::Result<si::TemperatureInterval> {
+    pub fn get_te_from_h(h: si::SpecificEnergy) -> anyhow::Result<si::Temperature> {
         Ok(asp::TEMP_FROM_ENTHALPY.interpolate(&[h.get::<si::joule_per_kilogram>()])? * uc::KELVIN)
     }
 
     /// Returns temperature of air
     /// # Arguments
     /// `u`: specific energy of air \[J/kg\]
-    pub fn get_te_from_u(u: si::SpecificEnergy) -> anyhow::Result<si::TemperatureInterval> {
+    pub fn get_te_from_u(u: si::SpecificEnergy) -> anyhow::Result<si::Temperature> {
         Ok(asp::TEMP_FROM_ENERGY.interpolate(&[u.get::<si::joule_per_kilogram>()])? * uc::KELVIN)
     }
 }
@@ -250,9 +241,9 @@ mod air_static_props {
     use super::*;
     lazy_static! {
         /// Array of temperatures at which properties are evaluated
-        static ref TEMPERATURE_VALUES: Vec<si::TemperatureInterval> = [
+        static ref TEMPERATURE_VALUES: Vec<si::Temperature> = [
             -60.,
-            -57.03690616,
+             -57.03690616,
             -53.1958198,
             -48.21658352,
             -41.7619528,
@@ -528,9 +519,9 @@ mod octane_static_props {
     use super::*;
     lazy_static! {
         /// Array of temperatures at which properties are evaluated
-        static ref TEMPERATURE_VALUES: Vec<si::TemperatureInterval> = [
+        static ref TEMPERATURE_VALUES: Vec<si::Temperature> = [
             -4.00000000e+01,
-            -3.70369062e+01,
+             -3.70369062e+01,
             -3.31958198e+01,
             -2.82165835e+01,
             -2.17619528e+01,
@@ -631,16 +622,14 @@ impl Octane {
     /// Returns specific energy of octane  
     /// # Arguments  
     /// - `te_octane`: temperature of octane
-    pub fn get_specific_energy(
-        te_octane: si::TemperatureInterval,
-    ) -> anyhow::Result<si::SpecificEnergy> {
+    pub fn get_specific_energy(te_octane: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
         Ok(osp::ENERGY_INTERP.interpolate(&[te_octane.get::<si::kelvin>()])? * uc::J_PER_KG)
     }
 
     /// Returns temperature of octane
     /// # Arguments
     /// `u`: specific energy of octane \[J/kg\]
-    pub fn get_te_from_u(u: si::SpecificEnergy) -> anyhow::Result<si::TemperatureInterval> {
+    pub fn get_te_from_u(u: si::SpecificEnergy) -> anyhow::Result<si::Temperature> {
         Ok(osp::TEMP_FROM_ENERGY.interpolate(&[u.get::<si::joule_per_kilogram>()])? * uc::KELVIN)
     }
 }

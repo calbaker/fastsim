@@ -282,6 +282,11 @@ impl SetCumulative for Vehicle {
         if let Some(em) = self.em_mut() {
             em.set_cumulative(dt);
         }
+        match &mut self.cabin {
+            CabinOption::LumpedCabin(lumped_cabin) => lumped_cabin.set_cumulative(dt),
+            CabinOption::LumpedCabinWithShell => todo!(),
+            CabinOption::None => {}
+        }
         self.state.dist += self.state.speed_ach * dt;
     }
 }
@@ -429,7 +434,7 @@ impl Vehicle {
 
     pub fn solve_thermal(
         &mut self,
-        te_amb: si::TemperatureInterval,
+        te_amb: si::Temperature,
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {

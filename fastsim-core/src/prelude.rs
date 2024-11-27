@@ -5,7 +5,7 @@ pub use crate::drive_cycle::{Cycle, CycleElement};
 pub use crate::gas_properties::{get_sphere_conv_params, Air, Octane, TE_STD_AIR};
 pub use crate::simdrive::{SimDrive, SimParams};
 pub use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecBoolWrapper, Pyo3VecWrapper};
-pub use crate::vehicle::cabin::{CabinOption, SingleCapacitanceCabin};
+pub use crate::vehicle::cabin::{CabinOption, LumpedCabin};
 pub use crate::vehicle::powertrain::electric_machine::{
     ElectricMachine, ElectricMachineState, ElectricMachineStateHistoryVec,
 };

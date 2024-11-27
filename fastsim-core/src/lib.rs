@@ -37,8 +37,6 @@ pub fn enabled_features() -> Vec<String> {
         "web".into(),
         #[cfg(feature = "serde-default")]
         "serde-default".into(),
-        #[cfg(feature = "bincode")]
-        "bincode".into(),
         #[cfg(feature = "csv")]
         "csv".into(),
         #[cfg(feature = "json")]
