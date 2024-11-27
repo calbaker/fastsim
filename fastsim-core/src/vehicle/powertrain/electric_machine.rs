@@ -142,10 +142,12 @@ impl ElectricMachine {
                 .eff_interp_at_max_input
                 .as_ref()
                 .map(|interpolator| {
-                    interpolator.interpolate(&[abs_checked_x_val(
-                        (pwr_in_fwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        interpolator.x().map_err(|e| anyhow!(e))?,
-                    )?]).map_err(|e| anyhow!(e))
+                    interpolator
+                        .interpolate(&[abs_checked_x_val(
+                            (pwr_in_fwd_lim / self.pwr_out_max).get::<si::ratio>(),
+                            interpolator.x().map_err(|e| anyhow!(e))?,
+                        )?])
+                        .map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -162,10 +164,12 @@ impl ElectricMachine {
                 .eff_interp_at_max_input
                 .as_ref()
                 .map(|interpolator| {
-                    interpolator.interpolate(&[abs_checked_x_val(
-                        (pwr_in_bwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        interpolator.x().map_err(|e| anyhow!(e))?,
-                    )?]).map_err(|e| anyhow!(e))
+                    interpolator
+                        .interpolate(&[abs_checked_x_val(
+                            (pwr_in_bwd_lim / self.pwr_out_max).get::<si::ratio>(),
+                            interpolator.x().map_err(|e| anyhow!(e))?,
+                        )?])
+                        .map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -301,7 +305,7 @@ impl SerdeAPI for ElectricMachine {}
 impl Init for ElectricMachine {
     fn init(&mut self) -> anyhow::Result<()> {
         let _ = self.mass().with_context(|| anyhow!(format_dbg!()))?;
-        let _ = check_interp_frac_data(&self.eff_interp_fwd.x()?, InterpRange::Either)
+        let _ = check_interp_frac_data(self.eff_interp_fwd.x()?, InterpRange::Either)
             .with_context(||
                 "Invalid values for `ElectricMachine::pwr_out_frac_interp`; must range from [-1..1] or [0..1].")?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
@@ -328,9 +332,7 @@ impl Init for ElectricMachine {
                 self.eff_interp_fwd.strategy()?.to_owned(),
                 self.eff_interp_fwd.extrapolate()?.to_owned(),
             )?;
-            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(
-                eff_interp_at_max_input,
-            ));
+            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(eff_interp_at_max_input));
         }
         Ok(())
     }
@@ -447,7 +449,8 @@ impl ElectricMachine {
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
                 ))?
-                .f_x()?.to_owned();
+                .f_x()?
+                .to_owned();
             match &mut self.eff_interp_at_max_input {
                 Some(Interpolator::Interp1D(interp1d)) => {
                     // let old_interp = interp1d;

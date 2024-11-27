@@ -578,7 +578,7 @@ impl FuelConverterThermal {
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
-        self.state.temp = self.state.temp + delta_temp;
+        self.state.temp += delta_temp;
         Ok(())
     }
 }

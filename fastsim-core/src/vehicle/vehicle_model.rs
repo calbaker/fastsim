@@ -440,7 +440,8 @@ impl Vehicle {
     ) -> anyhow::Result<()> {
         let heat_demand = si::Power::ZERO;
         self.pt_type
-            .solve_thermal(te_amb, heat_demand, veh_speed, dt);
+            .solve_thermal(te_amb, heat_demand, veh_speed, dt)
+            .with_context(|| format_dbg!())?;
         Ok(())
     }
 }
