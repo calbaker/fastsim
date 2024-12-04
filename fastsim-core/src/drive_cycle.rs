@@ -413,6 +413,7 @@ pub struct CycleElement {
     #[api(skip_get, skip_set)]
     /// road charging/discharing capacity
     pub pwr_max_charge: Option<si::Power>,
+    // TODO: make sure all fields in cycle are represented here, as appropriate
 }
 
 impl SerdeAPI for CycleElement {}

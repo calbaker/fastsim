@@ -1,4 +1,5 @@
 use super::*;
+// TODO: add parameters and/or cabin model variant for solar heat load
 
 /// Options for handling cabin thermal model
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]

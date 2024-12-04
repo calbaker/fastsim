@@ -435,7 +435,9 @@ impl FuelConverterThermalOption {
             Self::FuelConverterThermal(fct) => fct
                 .solve(fc_state, te_amb, heat_demand, veh_speed, dt)
                 .with_context(|| format_dbg!())?,
-            Self::None => {}
+            Self::None => {
+                // TODO: make sure this triggers error if appropriate
+            }
         }
         Ok(())
     }
@@ -575,6 +577,7 @@ impl FuelConverterThermal {
             Air::get_specific_energy(self.state.temperature).with_context(|| format_dbg!())?
                 + (Octane::get_specific_energy(self.state.temperature)
                     .with_context(|| format_dbg!())?
+                    // TODO: make config. for other fuels -- e.g. with enum for specific fuels and/or fuel properties
                     + *GASOLINE_LHV)
                     / *AFR_STOICH_GASOLINE,
         )
