@@ -61,6 +61,10 @@ const TOL: f64 = 1e-3;
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// Struct for modeling technology-naive Reversible Energy Storage (e.g. battery, flywheel).
 pub struct ReversibleEnergyStorage {
+    /// [Self] Thermal plant, including thermal management controls
+    #[serde(default, skip_serializing_if = "RESThermalOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub thrml: RESThermalOption,
     /// ReversibleEnergyStorage mass
     #[serde(default)]
     #[api(skip_get, skip_set)]
@@ -102,6 +106,7 @@ pub struct ReversibleEnergyStorage {
 
 impl ReversibleEnergyStorage {
     pub fn solve(&mut self, pwr_out_req: si::Power, dt: si::Time) -> anyhow::Result<()> {
+        let te_res = self.temperature();
         let state = &mut self.state;
 
         ensure!(
@@ -194,7 +199,9 @@ impl ReversibleEnergyStorage {
                 interp3d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>(),
                     state.soc.get::<si::ratio>(),
-                    state.temperature.get::<si::degree_celsius>(),
+                    te_res
+                        .with_context(|| format_dbg!("Expected thermal model to be configured"))?
+                        .get::<si::degree_celsius>(),
                 ])? * uc::R
             }
             _ => bail!("Invalid interpolator.  See docs for `ReversibleEnergyStorage::eff_interp`"),
@@ -225,8 +232,16 @@ impl ReversibleEnergyStorage {
         Ok(())
     }
 
-    pub fn solve_thermal(&mut self) -> anyhow::Result<()> {
-        todo!()
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `fc_state`: [ReversibleEnergyStorage] state
+    /// - `te_amb`: ambient temperature
+    /// - `heat_demand`: heat demand from HVAC system
+    /// - `veh_speed`: current achieved speed
+    pub fn solve_thermal(&mut self, te_amb: si::Temperature, dt: si::Time) -> anyhow::Result<()> {
+        self.thrml
+            .solve(self.state, te_amb, dt)
+            .with_context(|| format_dbg!())
     }
 
     /// Sets and returns max output and max regen power based on current state
@@ -407,6 +422,14 @@ impl ReversibleEnergyStorage {
     pub fn energy_capacity_usable(&self) -> si::Energy {
         self.energy_capacity * (self.max_soc - self.min_soc)
     }
+
+    /// If thermal model is appropriately configured, returns current lumped [Self] temperature
+    pub fn temperature(&self) -> Option<si::Temperature> {
+        match &self.thrml {
+            RESThermalOption::RESThermal(rest) => Some(rest.state.temperature),
+            RESThermalOption::None => None,
+        }
+    }
 }
 
 impl SetCumulative for ReversibleEnergyStorage {
@@ -559,9 +582,6 @@ pub struct ReversibleEnergyStorageState {
     pub energy_loss: si::Energy,
     /// cumulative chemical energy; positive is discharging
     pub energy_out_chemical: si::Energy,
-
-    /// component temperature
-    pub temperature: si::Temperature,
 }
 
 impl Default for ReversibleEnergyStorageState {
@@ -587,10 +607,277 @@ impl Default for ReversibleEnergyStorageState {
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,
-            temperature: *crate::gas_properties::TE_STD_AIR,
         }
     }
 }
 
 impl Init for ReversibleEnergyStorageState {}
 impl SerdeAPI for ReversibleEnergyStorageState {}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+pub enum RESThermalOption {
+    /// Basic thermal plant for [ReversibleEnergyStorage]
+    RESThermal(Box<RESThermal>),
+    /// no thermal plant for [ReversibleEnergyStorage]
+    #[default]
+    None,
+}
+impl Init for RESThermalOption {
+    fn init(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::RESThermal(rest) => rest.init()?,
+            Self::None => {}
+        }
+        Ok(())
+    }
+}
+impl SerdeAPI for RESThermalOption {}
+impl RESThermalOption {
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `fc_state`: [ReversibleEnergyStorage] state
+    /// - `te_amb`: ambient temperature
+    /// - `heat_demand`: heat demand from HVAC system
+    /// - `veh_speed`: current achieved speed
+    fn solve(
+        &mut self,
+        res_state: ReversibleEnergyStorageState,
+        te_amb: si::Temperature,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::RESThermal(rest) => rest
+                .solve(res_state, te_amb, dt)
+                .with_context(|| format_dbg!())?,
+            Self::None => {
+                // TODO: make sure this triggers error if appropriate
+            }
+        }
+        Ok(())
+    }
+}
+
+#[fastsim_api]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+/// Struct for modeling [ReversibleEnergyStorage] (e.g. battery) thermal plant
+pub struct RESThermal {
+    /// [ReversibleEnergyStorage] thermal capacitance
+    pub heat_capacitance: si::HeatCapacity,
+    /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml]to ambient
+    pub htc_to_amb: si::HeatTransferCoeff,
+    /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml]to cabin
+    pub htc_to_cab: si::HeatTransferCoeff,
+    /// Thermal management system
+    pub cntrl_sys: RESThermalControlSystem,
+    /// current state
+    pub state: RESThermalState,
+    /// history of state
+    pub history: RESThermalStateHistoryVec,
+    // TODO: add `save_interval` and associated methods
+}
+
+impl SerdeAPI for RESThermal {}
+impl Init for RESThermal {}
+impl RESThermal {
+    fn solve(
+        &mut self,
+        res_state: ReversibleEnergyStorageState,
+        te_amb: si::Temperature,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        todo!();
+        Ok(())
+    }
+}
+
+#[fastsim_api]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+pub struct RESThermalState {
+    /// time step index
+    pub i: usize,
+    /// Current thermal mass temperature
+    pub temperature: si::Temperature,
+    /// Thermal mass temperature at previous time step
+    pub temp_prev: si::Temperature,
+}
+
+impl Init for RESThermalState {}
+impl SerdeAPI for RESThermalState {}
+impl Default for RESThermalState {
+    fn default() -> Self {
+        Self {
+            i: Default::default(),
+            temperature: *TE_STD_AIR,
+            temp_prev: *TE_STD_AIR,
+        }
+    }
+}
+
+#[fastsim_api]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+/// HVAC system for [LumpedCabin]
+pub struct RESThermalControlSystem {
+    /// set point temperature
+    pub te_set: si::Temperature,
+    /// deadband range.  any cabin temperature within this range of
+    /// `te_set` results in no HVAC power draw
+    pub te_deadband: si::Temperature,
+    /// HVAC proportional gain
+    pub p: si::ThermalConductance,
+    /// HVAC integral gain [W / K / s], resets at zero crossing events
+    /// NOTE: `uom` crate does not have this unit, but it may be possible to make a custom unit for this
+    pub i: f64,
+    /// value at which [Self::i] stops accumulating
+    pub pwr_i_max: si::Power,
+    /// HVAC derivative gain [W / K * s]  
+    /// NOTE: `uom` crate does not have this unit, but it may be possible to make a custom unit for this
+    pub d: f64,
+    /// max HVAC thermal power
+    pub pwr_thermal_max: si::Power,
+    /// coefficient between 0 and 1 to calculate HVAC efficiency by multiplying by
+    /// coefficient of performance (COP)
+    pub frac_of_ideal_cop: f64,
+    /// heat source
+    #[api(skip_get, skip_set)]
+    pub heat_source: RESHeatSource,
+    /// max allowed aux load
+    pub pwr_aux_max: si::Power,
+    /// coefficient of performance of vapor compression cycle
+    pub state: RESThermalControlSystemState,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "RESThermalControlSystemStateHistoryVec::is_empty")]
+    pub history: RESThermalControlSystemStateHistoryVec,
+    // TODO: add `save_interval` and associated methods
+}
+impl Init for RESThermalControlSystem {}
+impl SerdeAPI for RESThermalControlSystem {}
+impl RESThermalControlSystem {
+    pub fn get_pwr_thermal(
+        &mut self,
+        te_amb_air: si::Temperature,
+        res_thrml_state: RESThermalState,
+        dt: si::Time,
+    ) -> anyhow::Result<si::Power> {
+        let pwr_from_hvac = if res_thrml_state.temperature <= self.te_set + self.te_deadband
+            && res_thrml_state.temperature >= self.te_set - self.te_deadband
+        {
+            // inside deadband; no hvac power is needed
+
+            self.state.pwr_i = si::Power::ZERO; // reset to 0.0
+            self.state.pwr_p = si::Power::ZERO;
+            self.state.pwr_d = si::Power::ZERO;
+            si::Power::ZERO
+        } else {
+            let te_delta_vs_set = res_thrml_state.temperature - self.te_set;
+            let te_delta_vs_amb: si::Temperature = res_thrml_state.temperature - te_amb_air;
+
+            self.state.pwr_p = -self.p * te_delta_vs_set;
+            self.state.pwr_i -= self.i * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
+            self.state.pwr_i = self.state.pwr_i.max(-self.pwr_i_max).min(self.pwr_i_max);
+            self.state.pwr_d = -self.d * uc::J / uc::KELVIN
+                * ((res_thrml_state.temperature - res_thrml_state.temp_prev) / dt);
+
+            // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
+            // cop_ideal is t_h / (t_h - t_c) for heating
+            // cop_ideal is t_c / (t_h - t_c) for cooling
+
+            // divide-by-zero protection and realistic limit on COP
+            let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                // cabin is cooler than ambient + threshold
+                // TODO: make this `5.0` not hardcoded
+                res_thrml_state.temperature / (5.0 * uc::KELVIN)
+            } else {
+                res_thrml_state.temperature / te_delta_vs_amb.abs()
+            };
+            self.state.cop = cop_ideal * self.frac_of_ideal_cop;
+            assert!(self.state.cop > 0.0 * uc::R);
+
+            if res_thrml_state.temperature > self.te_set + self.te_deadband {
+                // COOLING MODE; cabin is hotter than set point
+
+                if self.state.pwr_i > si::Power::ZERO {
+                    // If `pwr_i` is greater than zero, reset to switch from heating to cooling
+                    self.state.pwr_i = si::Power::ZERO;
+                }
+                let mut pwr_thermal_from_hvac =
+                    (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
+                        .max(-self.pwr_thermal_max);
+
+                if (-pwr_thermal_from_hvac / self.state.cop) > self.pwr_aux_max {
+                    self.state.pwr_aux = self.pwr_aux_max;
+                    // correct if limit is exceeded
+                    pwr_thermal_from_hvac = -self.state.pwr_aux * self.state.cop;
+                } else {
+                    self.state.pwr_aux = pwr_thermal_from_hvac / self.state.cop;
+                }
+                pwr_thermal_from_hvac
+            } else {
+                // HEATING MODE; cabin is colder than set point
+
+                if self.state.pwr_i < si::Power::ZERO {
+                    // If `pwr_i` is less than zero reset to switch from cooling to heating
+                    self.state.pwr_i = si::Power::ZERO;
+                }
+                let mut pwr_thermal_from_hvac =
+                    (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
+                        .min(self.pwr_thermal_max);
+
+                // Assumes blower has negligible impact on aux load, may want to revise later
+                match &self.heat_source {
+                    RESHeatSource::SelfHeating => {
+                        todo!()
+                    }
+                    RESHeatSource::HeatPump => {
+                        todo!()
+                    }
+                    RESHeatSource::None => {}
+                }
+                pwr_thermal_from_hvac
+            }
+        };
+        Ok(pwr_from_hvac)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+pub enum RESHeatSource {
+    /// Self heating
+    SelfHeating,
+    /// Heat pump provides heat for HVAC system
+    HeatPump,
+    /// No active heat source for [RESThermal]
+    None,
+}
+impl Init for RESHeatSource {}
+impl SerdeAPI for RESHeatSource {}
+
+#[fastsim_api]
+#[derive(
+    Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
+)]
+pub struct RESThermalControlSystemState {
+    /// time step counter
+    pub i: u32,
+    /// portion of total HVAC cooling/heating (negative/positive) power due to proportional gain
+    pub pwr_p: si::Power,
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to proportional gain
+    pub energy_p: si::Energy,
+    /// portion of total HVAC cooling/heating (negative/positive) power due to integral gain
+    pub pwr_i: si::Power,
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to integral gain
+    pub energy_i: si::Energy,
+    /// portion of total HVAC cooling/heating (negative/positive) power due to derivative gain
+    pub pwr_d: si::Power,
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to derivative gain
+    pub energy_d: si::Energy,
+    /// coefficient of performance (i.e. efficiency) of vapor compression cycle
+    pub cop: si::Ratio,
+    /// Aux power demand from HVAC system
+    pub pwr_aux: si::Power,
+    /// Cumulative aux energy for HVAC system
+    pub energy_aux: si::Energy,
+    /// Cumulative energy demand by HVAC system from thermal component (e.g. [FuelConverter])
+    pub energy_thermal_req: si::Energy,
+}
+impl Init for RESThermalControlSystemState {}
+impl SerdeAPI for RESThermalControlSystemState {}

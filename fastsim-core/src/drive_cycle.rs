@@ -409,7 +409,6 @@ pub struct CycleElement {
     /// road grade
     #[serde(skip_serializing_if = "Option::is_none", alias = "cycGrade")]
     pub grade: Option<si::Ratio>,
-    // TODO: make `fastsim_api` handle Option or write custom getter/setter
     #[api(skip_get, skip_set)]
     /// road charging/discharing capacity
     pub pwr_max_charge: Option<si::Power>,

@@ -50,7 +50,7 @@ use std::f64::consts::PI;
     }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
-/// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
+/// Struct for modeling [FuelConverter] (e.g. engine, fuel cell.) thermal plant
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
@@ -331,8 +331,7 @@ impl FuelConverter {
         let veh_speed = veh_state.speed_ach;
         self.thrml
             .solve(&self.state, te_amb, heat_demand, veh_speed, dt)
-            .with_context(|| format_dbg!())?;
-        Ok(())
+            .with_context(|| format_dbg!())
     }
 
     pub fn eff_max(&self) -> anyhow::Result<si::Ratio> {
@@ -345,7 +344,7 @@ impl FuelConverter {
             * uc::R)
     }
 
-    /// If thermal model is appropriately configured, returns current lumped engine temperature
+    /// If thermal model is appropriately configured, returns current lumped [Self] temperature
     pub fn temperature(&self) -> Option<si::Temperature> {
         match &self.thrml {
             FuelConverterThermalOption::FuelConverterThermal(fct) => Some(fct.state.temperature),
@@ -479,6 +478,7 @@ pub struct FuelConverterThermal {
     #[serde(default)]
     #[serde(skip_serializing_if = "FuelConverterThermalStateHistoryVec::is_empty")]
     pub history: FuelConverterThermalStateHistoryVec,
+    // TODO: add `save_interval` and associated methods
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]

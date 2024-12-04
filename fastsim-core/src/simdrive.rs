@@ -539,6 +539,7 @@ mod tests {
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
+        assert!(sd.veh.res().is_none());
     }
 
     #[test]
@@ -569,7 +570,7 @@ mod tests {
         };
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
-        assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
+        assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
 

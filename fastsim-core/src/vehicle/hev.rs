@@ -209,7 +209,9 @@ impl Powertrain for Box<HybridElectricVehicle> {
         self.fc
             .solve_thermal(te_amb, heat_demand, veh_state, dt)
             .with_context(|| format_dbg!())?;
-        self.res.solve_thermal().with_context(|| format_dbg!())?;
+        self.res
+            .solve_thermal(te_amb, dt)
+            .with_context(|| format_dbg!())?;
         Ok(())
     }
 

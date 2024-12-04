@@ -156,6 +156,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         fc
                     },
                     res: ReversibleEnergyStorage {
+                        thrml: Default::default(),
                         state: Default::default(),
                         mass: None,
                         specific_energy: None,
@@ -205,6 +206,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
             BEV => {
                 let bev = BatteryElectricVehicle {
                     res: ReversibleEnergyStorage {
+                        thrml: Default::default(),
                         state: Default::default(),
                         mass: None,
                         specific_energy: None,

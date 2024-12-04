@@ -47,6 +47,7 @@ pub struct LumpedCabin {
     #[serde(default)]
     #[serde(skip_serializing_if = "LumpedCabinStateHistoryVec::is_empty")]
     pub history: LumpedCabinStateHistoryVec,
+    // TODO: add `save_interval` and associated method
 }
 
 impl SerdeAPI for LumpedCabin {}
@@ -184,7 +185,7 @@ pub struct HVACSystemForSCC {
     pub frac_of_ideal_cop: f64,
     /// heat source
     #[api(skip_get, skip_set)]
-    pub heat_source: HeatSource,
+    pub heat_source: CabinHeatSource,
     /// max allowed aux load
     pub pwr_aux_max: si::Power,
     /// coefficient of performance of vapor compression cycle
@@ -271,7 +272,7 @@ impl HVACSystemForSCC {
 
                 // Assumes blower has negligible impact on aux load, may want to revise later
                 match self.heat_source {
-                    HeatSource::FuelConverter => {
+                    CabinHeatSource::FuelConverter => {
                         ensure!(
                             te_fc.is_some(),
                             "{}\nExpected vehicle with [FuelConverter] with thermal plant model.",
@@ -297,12 +298,12 @@ impl HVACSystemForSCC {
                         // HEV probably also needs careful consideration
                         // There needs to be an engine temperature (e.g. 60°C) below which the engine is forced on
                     }
-                    HeatSource::ResistanceHeater => {
+                    CabinHeatSource::ResistanceHeater => {
                         self.state.cop = uc::R;
                         self.state.pwr_thermal_req = si::Power::ZERO;
                         self.state.pwr_aux = pwr_thermal_from_hvac;
                     }
-                    HeatSource::HeatPump => {
+                    CabinHeatSource::HeatPump => {
                         self.state.pwr_thermal_req = si::Power::ZERO;
                         // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
                         // cop_ideal is t_h / (t_h - t_c) for heating
@@ -337,7 +338,7 @@ impl HVACSystemForSCC {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
-pub enum HeatSource {
+pub enum CabinHeatSource {
     /// [FuelConverter], if applicable, provides heat for HVAC system
     FuelConverter,
     /// Resistance heater provides heat for HVAC system
@@ -345,8 +346,8 @@ pub enum HeatSource {
     /// Heat pump provides heat for HVAC system
     HeatPump,
 }
-impl Init for HeatSource {}
-impl SerdeAPI for HeatSource {}
+impl Init for CabinHeatSource {}
+impl SerdeAPI for CabinHeatSource {}
 
 #[fastsim_api]
 #[derive(
