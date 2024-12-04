@@ -16,6 +16,7 @@ pub use si::f64::{
     ThermalConductivity, Time, Velocity, Volume,
 };
 pub use si::force::{newton, pound_force};
+pub use si::heat_capacity::{joule_per_degree_celsius, joule_per_kelvin};
 pub use si::heat_transfer::{watt_per_square_meter_degree_celsius, watt_per_square_meter_kelvin};
 pub use si::length::{foot, kilometer, meter};
 pub use si::mass::{kilogram, megagram};

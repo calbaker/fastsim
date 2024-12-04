@@ -66,7 +66,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
         self.state.fc_on_causes.clear();
@@ -169,7 +169,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
@@ -203,11 +203,11 @@ impl Powertrain for Box<HybridElectricVehicle> {
         &mut self,
         te_amb: si::Temperature,
         heat_demand: si::Power,
-        veh_speed: si::Velocity,
+        veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.fc
-            .solve_thermal(te_amb, heat_demand, veh_speed, dt)
+            .solve_thermal(te_amb, heat_demand, veh_state, dt)
             .with_context(|| format_dbg!())?;
         self.res.solve_thermal().with_context(|| format_dbg!())?;
         Ok(())
@@ -456,7 +456,7 @@ impl HEVPowertrainControls {
     fn get_pwr_fc_and_em(
         &self,
         pwr_out_req: si::Power,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
         hev_state: &mut HEVState,
         fc: &FuelConverter,
         em_state: &ElectricMachineState,

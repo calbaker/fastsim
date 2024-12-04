@@ -1,6 +1,4 @@
-use cabin::CabinOption;
-
-use crate::prelude::Air;
+use crate::prelude::*;
 
 use super::{hev::HEVPowertrainControls, *};
 pub mod fastsim2_interface;
@@ -405,7 +403,7 @@ impl Vehicle {
         self.pt_type
             .solve(
                 self.state.pwr_tractive,
-                &self.state,
+                self.state,
                 true, // `enabled` should always be true at the powertrain level
                 dt,
             )
@@ -421,7 +419,7 @@ impl Vehicle {
         // TODO: account for traction limits here
 
         self.pt_type
-            .set_curr_pwr_prop_out_max(self.pwr_aux, dt, &self.state)
+            .set_curr_pwr_prop_out_max(self.pwr_aux, dt, self.state)
             .with_context(|| anyhow!(format_dbg!()))?;
 
         (self.state.pwr_prop_fwd_max, self.state.pwr_prop_bwd_max) = self
@@ -435,12 +433,23 @@ impl Vehicle {
     pub fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        veh_speed: si::Velocity,
+        veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
-        let heat_demand = si::Power::ZERO;
+        let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
+        let heat_demand = match &mut self.cabin {
+            CabinOption::LumpedCabin(lc) => {
+                lc.solve(te_amb, te_fc, veh_state, dt)
+                    .with_context(|| format_dbg!())?;
+                lc.hvac.state.pwr_thermal_req
+            }
+            CabinOption::LumpedCabinWithShell => {
+                bail!("{}\nNot yet implemented.", format_dbg!())
+            }
+            CabinOption::None => si::Power::ZERO,
+        };
         self.pt_type
-            .solve_thermal(te_amb, heat_demand, veh_speed, dt)
+            .solve_thermal(te_amb, heat_demand, veh_state, dt)
             .with_context(|| format_dbg!())?;
         Ok(())
     }
@@ -506,6 +515,9 @@ pub struct VehicleState {
     pub dist: si::Length,
     /// current grade
     pub grade_curr: si::Ratio,
+    /// current grade
+    #[serde(skip_deserializing, default)]
+    pub elev_curr: si::Length,
     /// current air density
     #[serde(skip_serializing, default)]
     pub air_density: si::MassDensity,
@@ -544,6 +556,8 @@ impl Default for VehicleState {
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
             grade_curr: si::Ratio::ZERO,
+            // note that this value will be overwritten
+            elev_curr: f64::NAN * uc::M,
             air_density: Air::get_density(None, None),
             mass: uc::KG * f64::NAN,
         }
@@ -601,8 +615,8 @@ pub(crate) mod tests {
             veh.unwrap()
         };
 
-        // veh.to_file(vehicles_dir().join("2022_Renault_Zoe_ZE50_R135.yaml"))
-        //     .unwrap();
+        veh.to_file(vehicles_dir().join("2022_Renault_Zoe_ZE50_R135.yaml"))
+            .unwrap();
         assert!(veh.pt_type.is_battery_electric_vehicle());
         veh
     }

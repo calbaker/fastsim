@@ -29,11 +29,11 @@ impl SerdeAPI for CabinOption {}
 /// Basic single thermal capacitance cabin thermal model, including HVAC
 /// system and controls
 pub struct LumpedCabin {
-    /// cabin shell thermal resistance \[m **2 * K / W\]
-    pub cab_r_to_amb: f64,
-    /// parameter for heat transfer coeff \[W / (m ** 2 * K)\] from cabin to ambient during
+    /// Inverse of cabin shell thermal resistance
+    pub cab_htc_to_amb: si::HeatTransferCoeff,
+    /// parameter for heat transfer coeff from cabin to ambient during
     /// vehicle stop
-    pub cab_htc_to_amb_stop: f64,
+    pub cab_htc_to_amb_stop: si::HeatTransferCoeff,
     /// cabin thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
     /// cabin length, modeled as a flat plate
@@ -57,112 +57,70 @@ impl SetCumulative for LumpedCabin {
 }
 
 impl LumpedCabin {
-    /// Solve temperatures, powers, and cumulative energies of cabin and HVAC system
+    /// Solve temperatures, HVAC powers, and cumulative energies of cabin and HVAC system
     /// Arguments:
     /// - `te_amb_air`: ambient air temperature
     /// - `te_fc`: [FuelConverter] temperature, as appropriate for [PowertrainType]
     /// - `dt`: simulation time step size
-    fn solve(
+    pub fn solve(
         &mut self,
         te_amb_air: si::Temperature,
         te_fc: Option<si::Temperature>,
+        veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
-        if self.state.temp <= self.hvac.te_set + self.hvac.te_deadband
-            && self.state.temp >= self.hvac.te_set - self.hvac.te_deadband
-        {
-            // inside deadband; no hvac power is needed
+        self.state.pwr_thermal_from_hvac = self.hvac.get_pwr_thermal_from_hvac(
+            te_amb_air,
+            te_fc,
+            self.state,
+            self.heat_capacitance,
+            dt,
+        )?;
 
-            self.state.pwr_thermal_from_hvac = si::Power::ZERO;
-            self.hvac.state.pwr_i = si::Power::ZERO; // reset to 0.0
-            self.hvac.state.pwr_p = si::Power::ZERO;
-            self.hvac.state.pwr_d = si::Power::ZERO;
+        // flat plate model for isothermal, mixed-flow from Incropera and deWitt, Fundamentals of Heat and Mass
+        // Transfer, 7th Edition
+        let cab_te_film_ext = 0.5 * (self.state.temp + te_amb_air);
+        self.state.reynolds_for_plate =
+            Air::get_density(Some(cab_te_film_ext), Some(veh_state.elev_curr))
+                * veh_state.speed_ach
+                * self.length
+                / Air::get_dyn_visc(cab_te_film_ext).with_context(|| format_dbg!())?;
+        let re_l_crit = 5.0e5 * uc::R; // critical Re for transition to turbulence
+
+        let nu_l_bar: si::Ratio = if self.state.reynolds_for_plate < re_l_crit {
+            // equation 7.30
+            0.664
+                * self.state.reynolds_for_plate.get::<si::ratio>().powf(0.5)
+                * Air::get_pr(cab_te_film_ext)
+                    .with_context(|| format_dbg!())?
+                    .get::<si::ratio>()
+                    .powf(1.0 / 3.0)
+                * uc::R
         } else {
-            let te_delta_vs_set = self.state.temp - self.hvac.te_set;
-            let te_delta_vs_amb: si::Temperature = self.state.temp - te_amb_air;
+            // equation 7.38
+            let a = 871.0; // equation 7.39
+            (0.037 * self.state.reynolds_for_plate.get::<si::ratio>().powf(0.8) - a)
+                * Air::get_pr(cab_te_film_ext).with_context(|| format_dbg!())?
+        };
 
-            self.hvac.state.pwr_p = self.hvac.p * te_delta_vs_set;
-            self.hvac.state.pwr_i +=
-                (self.hvac.i * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt)
-                    .max(self.hvac.pwr_i_max);
-            self.hvac.state.pwr_d =
-                self.hvac.d * uc::J / uc::KELVIN * ((self.state.temp - self.state.temp_prev) / dt);
+        self.state.pwr_thermal_from_amb = if veh_state.speed_ach > 2.0 * uc::MPH {
+            let htc_overall_moving: si::HeatTransferCoeff = 1.0
+                / (1.0
+                    / (nu_l_bar
+                        * Air::get_therm_cond(cab_te_film_ext).with_context(|| format_dbg!())?
+                        / self.length)
+                    + 1.0 / self.cab_htc_to_amb);
+            (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temp)
+        } else {
+            (self.length * self.width)
+                / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_htc_to_amb)
+                * (te_amb_air - self.state.temp)
+        };
 
-            // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
-            // cop_ideal is t_h / (t_h - t_c) for heating
-            // cop_ideal is t_c / (t_h - t_c) for cooling
-
-            // divide-by-zero protection and realistic limit on COP
-            let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
-                // cabin is cooler than ambient + threshold
-                // TODO: make this `5.0` not hardcoded
-                self.state.temp / (5.0 * uc::KELVIN)
-            } else {
-                self.state.temp / te_delta_vs_amb.abs()
-            };
-            self.hvac.state.cop = cop_ideal * self.hvac.frac_of_ideal_cop;
-            assert!(self.hvac.state.cop > 0.0 * uc::R);
-
-            if self.state.temp > self.hvac.te_set + self.hvac.te_deadband {
-                // COOLING MODE; cabin is hotter than set point
-
-                if self.hvac.state.pwr_i < si::Power::ZERO {
-                    // reset to switch from heating to cooling
-                    self.hvac.state.pwr_i = si::Power::ZERO;
-                }
-                self.state.pwr_thermal_from_hvac =
-                    (-self.hvac.state.pwr_p - self.hvac.state.pwr_i - self.hvac.state.pwr_d)
-                        .max(-self.hvac.pwr_thermal_max);
-
-                if (-self.state.pwr_thermal_from_hvac / self.hvac.state.cop) > self.hvac.pwr_aux_max
-                {
-                    self.hvac.state.pwr_aux = self.hvac.pwr_aux_max;
-                    // correct if limit is exceeded
-                    self.state.pwr_thermal_from_hvac =
-                        -self.hvac.state.pwr_aux * self.hvac.state.cop;
-                }
-            } else {
-                // HEATING MODE; cabin is colder than set point
-
-                if self.hvac.state.pwr_i > si::Power::ZERO {
-                    // reset to switch from cooling to heating
-                    self.hvac.state.pwr_i = si::Power::ZERO;
-                }
-                self.hvac.state.pwr_i = self.hvac.state.pwr_i.max(-self.hvac.pwr_i_max);
-
-                self.state.pwr_thermal_from_hvac =
-                    (-self.hvac.state.pwr_p - self.hvac.state.pwr_i - self.hvac.state.pwr_d)
-                        .min(self.hvac.pwr_thermal_max);
-
-                // Assumes blower has negligible impact on aux load, may want to revise later
-                match self.hvac.heat_source {
-                    HeatSource::FuelConverter => {
-                        ensure!(
-                            te_fc.is_some(),
-                            "{}\nExpected vehicle with [FuelConverter] with thermal plant model.",
-                            format_dbg!()
-                        );
-                        // limit heat transfer to be substantially less than what is physically possible
-                        // i.e. the engine can't drop below cabin temperature to heat the cabin
-                        self.state.pwr_thermal_from_hvac = self
-                            .state
-                            .pwr_thermal_from_hvac
-                            .min(
-                                self.heat_capacitance *
-                                (te_fc.unwrap() - self.state.temp)
-                                    * 0.1 // so that it's substantially less
-                                    / dt,
-                            )
-                            .max(si::Power::ZERO);
-                        // TODO: think about what to do for PHEV, which needs careful consideration here
-                        // HEV probably also needs careful consideration
-                        // There needs to be an engine temperature (e.g. 60°C) below which the engine is forced on
-                    }
-                    HeatSource::ResistanceHeater => {}
-                    HeatSource::HeatPump => {}
-                }
-            }
-        }
+        self.state.temp_prev = self.state.temp;
+        self.state.temp += (self.state.pwr_thermal_from_hvac + self.state.pwr_thermal_from_amb)
+            / self.heat_capacitance
+            * dt;
         Ok(())
     }
 }
@@ -176,22 +134,24 @@ pub struct LumpedCabinState {
     pub i: u32,
     /// lumped cabin temperature
     // TODO: make sure this gets updated
-    temp: si::Temperature,
+    pub temp: si::Temperature,
     /// lumped cabin temperature at previous simulation time step
     // TODO: make sure this gets updated
-    temp_prev: si::Temperature,
+    pub temp_prev: si::Temperature,
     /// Thermal power coming to cabin from HVAC system.  Positive indicates
     /// heating, and negative indicates cooling.
-    pwr_thermal_from_hvac: si::Power,
+    pub pwr_thermal_from_hvac: si::Power,
     /// Cumulative thermal energy coming to cabin from HVAC system.  Positive indicates
     /// heating, and negative indicates cooling.
-    energy_thermal_from_hvac: si::Energy,
+    pub energy_thermal_from_hvac: si::Energy,
     /// Thermal power coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
-    pwr_thermal_from_amb: si::Power,
+    pub pwr_thermal_from_amb: si::Power,
     /// Cumulative thermal energy coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
-    energy_thermal_from_amb: si::Energy,
+    pub energy_thermal_from_amb: si::Energy,
+    /// Reynolds number for flow over cabin, treating cabin as a flat plate
+    pub reynolds_for_plate: si::Ratio,
 }
 
 impl Init for LumpedCabinState {}
@@ -221,7 +181,6 @@ pub struct HVACSystemForSCC {
     /// coefficient between 0 and 1 to calculate HVAC efficiency by multiplying by
     /// coefficient of performance (COP)
     pub frac_of_ideal_cop: f64,
-    // TODO: make sure this is plumbed up
     /// heat source
     #[api(skip_get, skip_set)]
     pub heat_source: HeatSource,
@@ -235,6 +194,146 @@ pub struct HVACSystemForSCC {
 }
 impl Init for HVACSystemForSCC {}
 impl SerdeAPI for HVACSystemForSCC {}
+impl HVACSystemForSCC {
+    pub fn get_pwr_thermal_from_hvac(
+        &mut self,
+        te_amb_air: si::Temperature,
+        te_fc: Option<si::Temperature>,
+        cab_state: LumpedCabinState,
+        cab_heat_cap: si::HeatCapacity,
+        dt: si::Time,
+    ) -> anyhow::Result<si::Power> {
+        let pwr_from_hvac = if cab_state.temp <= self.te_set + self.te_deadband
+            && cab_state.temp >= self.te_set - self.te_deadband
+        {
+            // inside deadband; no hvac power is needed
+
+            self.state.pwr_i = si::Power::ZERO; // reset to 0.0
+            self.state.pwr_p = si::Power::ZERO;
+            self.state.pwr_d = si::Power::ZERO;
+            si::Power::ZERO
+        } else {
+            let te_delta_vs_set = cab_state.temp - self.te_set;
+            let te_delta_vs_amb: si::Temperature = cab_state.temp - te_amb_air;
+
+            self.state.pwr_p = -self.p * te_delta_vs_set;
+            self.state.pwr_i -= self.i * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
+            self.state.pwr_i = self.state.pwr_i.max(-self.pwr_i_max).min(self.pwr_i_max);
+            self.state.pwr_d =
+                -self.d * uc::J / uc::KELVIN * ((cab_state.temp - cab_state.temp_prev) / dt);
+
+            // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
+            // cop_ideal is t_h / (t_h - t_c) for heating
+            // cop_ideal is t_c / (t_h - t_c) for cooling
+
+            // divide-by-zero protection and realistic limit on COP
+            let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                // cabin is cooler than ambient + threshold
+                // TODO: make this `5.0` not hardcoded
+                cab_state.temp / (5.0 * uc::KELVIN)
+            } else {
+                cab_state.temp / te_delta_vs_amb.abs()
+            };
+            self.state.cop = cop_ideal * self.frac_of_ideal_cop;
+            assert!(self.state.cop > 0.0 * uc::R);
+
+            if cab_state.temp > self.te_set + self.te_deadband {
+                // COOLING MODE; cabin is hotter than set point
+
+                if self.state.pwr_i > si::Power::ZERO {
+                    // If `pwr_i` is greater than zero, reset to switch from heating to cooling
+                    self.state.pwr_i = si::Power::ZERO;
+                }
+                let mut pwr_thermal_from_hvac =
+                    (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
+                        .max(-self.pwr_thermal_max);
+
+                if (-pwr_thermal_from_hvac / self.state.cop) > self.pwr_aux_max {
+                    self.state.pwr_aux = self.pwr_aux_max;
+                    // correct if limit is exceeded
+                    pwr_thermal_from_hvac = -self.state.pwr_aux * self.state.cop;
+                } else {
+                    self.state.pwr_aux = pwr_thermal_from_hvac / self.state.cop;
+                }
+                self.state.pwr_thermal_req = si::Power::ZERO;
+                pwr_thermal_from_hvac
+            } else {
+                // HEATING MODE; cabin is colder than set point
+
+                if self.state.pwr_i < si::Power::ZERO {
+                    // If `pwr_i` is less than zero reset to switch from cooling to heating
+                    self.state.pwr_i = si::Power::ZERO;
+                }
+                let mut pwr_thermal_from_hvac =
+                    (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
+                        .min(self.pwr_thermal_max);
+
+                // Assumes blower has negligible impact on aux load, may want to revise later
+                match self.heat_source {
+                    HeatSource::FuelConverter => {
+                        ensure!(
+                            te_fc.is_some(),
+                            "{}\nExpected vehicle with [FuelConverter] with thermal plant model.",
+                            format_dbg!()
+                        );
+                        // limit heat transfer to be substantially less than what is physically possible
+                        // i.e. the engine can't drop below cabin temperature to heat the cabin
+                        pwr_thermal_from_hvac = pwr_thermal_from_hvac
+                            .min(
+                                cab_heat_cap *
+                                (te_fc.unwrap() - cab_state.temp)
+                                    * 0.1 // so that it's substantially less
+                                    / dt,
+                            )
+                            .max(si::Power::ZERO);
+                        self.state.cop = f64::NAN * uc::R;
+                        self.state.pwr_thermal_req = pwr_thermal_from_hvac;
+                        // Assumes aux power needed for heating is incorporated into based aux load.
+                        // TODO: refine this, perhaps by making aux power
+                        // proportional to heating power, to account for blower power
+                        self.state.pwr_aux = si::Power::ZERO;
+                        // TODO: think about what to do for PHEV, which needs careful consideration here
+                        // HEV probably also needs careful consideration
+                        // There needs to be an engine temperature (e.g. 60°C) below which the engine is forced on
+                    }
+                    HeatSource::ResistanceHeater => {
+                        self.state.cop = uc::R;
+                        self.state.pwr_thermal_req = si::Power::ZERO;
+                        self.state.pwr_aux = pwr_thermal_from_hvac;
+                    }
+                    HeatSource::HeatPump => {
+                        self.state.pwr_thermal_req = si::Power::ZERO;
+                        // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
+                        // cop_ideal is t_h / (t_h - t_c) for heating
+                        // cop_ideal is t_c / (t_h - t_c) for cooling
+
+                        // divide-by-zero protection and realistic limit on COP
+                        // TODO: make sure this is right for heating!
+                        let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                            // cabin is cooler than ambient + threshold
+                            // TODO: make this `5.0` not hardcoded
+                            cab_state.temp / (5.0 * uc::KELVIN)
+                        } else {
+                            cab_state.temp / te_delta_vs_amb.abs()
+                        };
+                        self.state.cop = cop_ideal * self.frac_of_ideal_cop;
+                        assert!(self.state.cop > 0.0 * uc::R);
+                        self.state.pwr_thermal_req = si::Power::ZERO;
+                        if (pwr_thermal_from_hvac / self.state.cop) > self.pwr_aux_max {
+                            self.state.pwr_aux = self.pwr_aux_max;
+                            // correct if limit is exceeded
+                            pwr_thermal_from_hvac = -self.state.pwr_aux * self.state.cop;
+                        } else {
+                            self.state.pwr_aux = pwr_thermal_from_hvac / self.state.cop;
+                        }
+                    }
+                }
+                pwr_thermal_from_hvac
+            }
+        };
+        Ok(pwr_from_hvac)
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub enum HeatSource {
@@ -256,27 +355,27 @@ pub struct HVACSystemForSCCState {
     /// time step counter
     pub i: u32,
     /// portion of total HVAC cooling/heating (negative/positive) power due to proportional gain
-    pwr_p: si::Power,
+    pub pwr_p: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to proportional gain
-    energy_p: si::Energy,
+    pub energy_p: si::Energy,
     /// portion of total HVAC cooling/heating (negative/positive) power due to integral gain
-    pwr_i: si::Power,
+    pub pwr_i: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to integral gain
-    energy_i: si::Energy,
+    pub energy_i: si::Energy,
     /// portion of total HVAC cooling/heating (negative/positive) power due to derivative gain
-    pwr_d: si::Power,
+    pub pwr_d: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to derivative gain
-    energy_d: si::Energy,
-    /// input power required
-    pwr_in: si::Power,
-    /// input cumulative energy required
-    energy_in: si::Energy,
+    pub energy_d: si::Energy,
     /// coefficient of performance (i.e. efficiency) of vapor compression cycle
-    cop: si::Ratio,
+    pub cop: si::Ratio,
     /// Aux power demand from HVAC system
-    pwr_aux: si::Power,
+    pub pwr_aux: si::Power,
     /// Cumulative aux energy for HVAC system
-    energy_aux: si::Energy,
+    pub energy_aux: si::Energy,
+    /// Thermal power demand by HVAC system from thermal component (e.g. [FuelConverter])
+    pub pwr_thermal_req: si::Power,
+    /// Cumulative energy demand by HVAC system from thermal component (e.g. [FuelConverter])
+    pub energy_thermal_req: si::Energy,
 }
 impl Init for HVACSystemForSCCState {}
 impl SerdeAPI for HVACSystemForSCCState {}

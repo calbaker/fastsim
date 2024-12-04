@@ -122,4 +122,5 @@ state:
   speed_ach_meters_per_second: 0.0
   dist_meters: 0.0
   grade_curr: 0.0
+  elev_curr_meters: .nan
   mass_kilograms: .nan

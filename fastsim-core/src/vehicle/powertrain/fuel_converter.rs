@@ -325,9 +325,10 @@ impl FuelConverter {
         &mut self,
         te_amb: si::Temperature,
         heat_demand: si::Power,
-        veh_speed: si::Velocity,
+        veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
+        let veh_speed = veh_state.speed_ach;
         self.thrml
             .solve(&self.state, te_amb, heat_demand, veh_speed, dt)
             .with_context(|| format_dbg!())?;
@@ -342,6 +343,14 @@ impl FuelConverter {
             .iter()
             .fold(f64::NEG_INFINITY, |acc, &curr| acc.max(curr))
             * uc::R)
+    }
+
+    /// If thermal model is appropriately configured, returns current lumped engine temperature
+    pub fn temperature(&self) -> Option<si::Temperature> {
+        match &self.thrml {
+            FuelConverterThermalOption::FuelConverterThermal(fct) => Some(fct.state.temperature),
+            FuelConverterThermalOption::None => None,
+        }
     }
 }
 
@@ -519,7 +528,7 @@ impl FuelConverterThermal {
         dt: si::Time,
     ) -> anyhow::Result<()> {
         // film temperature for external convection calculations
-        let te_air_film = 0.5 * (self.state.temp + te_amb);
+        let te_air_film = 0.5 * (self.state.temperature + te_amb);
         // Reynolds number = density * speed * diameter / dynamic viscosity
         // NOTE: might be good to pipe in elevation
         let fc_air_film_re =
@@ -532,7 +541,7 @@ impl FuelConverterThermal {
             (uc::R
                 + self
                     .tstat_interp
-                    .interpolate(&[self.state.temp.get::<si::degree_celsius>()])
+                    .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
                     .with_context(|| format_dbg!())?
                     * self.radiator_effectiveness)
                 * self.htc_to_amb_stop
@@ -550,21 +559,22 @@ impl FuelConverterThermal {
                 / self.length_for_convection;
             // if stopped, scale based on thermostat opening and constant convection
             self.tstat_interp
-                .interpolate(&[self.state.temp.get::<si::degree_celsius>()])
+                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
                 .with_context(|| format_dbg!())?
                 * htc_to_amb_sphere
         };
 
         self.state.heat_to_amb =
             self.state.htc_to_amb * PI * self.length_for_convection.powi(typenum::P2::new()) / 4.0
-                * (self.state.temp - te_amb);
+                * (self.state.temperature - te_amb);
 
         // let heat_to_amb = ;
         // assumes fuel/air mixture is entering combustion chamber at block temperature
         // assumes stoichiometric combustion
         self.state.te_adiabatic = Air::get_te_from_u(
-            Air::get_specific_energy(self.state.temp).with_context(|| format_dbg!())?
-                + (Octane::get_specific_energy(self.state.temp).with_context(|| format_dbg!())?
+            Air::get_specific_energy(self.state.temperature).with_context(|| format_dbg!())?
+                + (Octane::get_specific_energy(self.state.temperature)
+                    .with_context(|| format_dbg!())?
                     + *GASOLINE_LHV)
                     / *AFR_STOICH_GASOLINE,
         )
@@ -572,13 +582,13 @@ impl FuelConverterThermal {
         // heat that will go both to the block and out the exhaust port
         let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
         let delta_temp: si::Temperature = (((self.htc_from_comb
-            * (self.state.te_adiabatic - self.state.temp))
+            * (self.state.te_adiabatic - self.state.temperature))
             .min(self.max_frac_from_comb * heat_gen)
             - heat_demand
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
-        self.state.temp += delta_temp;
+        self.state.temperature += delta_temp;
         Ok(())
     }
 }
@@ -613,7 +623,7 @@ pub struct FuelConverterThermalState {
     /// if fuel lean or stoich or all air is consumed if fuel rich) combustion
     pub te_adiabatic: si::Temperature,
     /// Current engine thermal mass temperature (lumped engine block and coolant)
-    pub temp: si::Temperature,
+    pub temperature: si::Temperature,
     /// Current heat transfer coefficient from [FuelConverter] to ambient
     pub htc_to_amb: si::HeatTransferCoeff,
     /// Current heat transfer to ambient
@@ -627,7 +637,7 @@ impl Default for FuelConverterThermalState {
         Self {
             i: Default::default(),
             te_adiabatic: *TE_ADIABATIC_STD,
-            temp: *TE_STD_AIR,
+            temperature: *TE_STD_AIR,
             htc_to_amb: Default::default(),
             heat_to_amb: Default::default(),
         }

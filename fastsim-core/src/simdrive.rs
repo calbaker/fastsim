@@ -200,7 +200,7 @@ impl SimDrive {
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
         self.veh
-            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state.speed_ach, dt)
+            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state, dt)
             .with_context(|| format_dbg!())?;
         self.veh.set_cumulative(dt);
         Ok(())
@@ -231,7 +231,7 @@ impl SimDrive {
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
                     .interpolate(&[vs.dist.get::<si::meter>()])?
         };
-        let elev_curr = if vs.cyc_met_overall {
+        vs.elev_curr = if vs.cyc_met_overall {
             *self.cyc.elev.get(i).with_context(|| format_dbg!())?
         } else {
             uc::M
@@ -258,7 +258,7 @@ impl SimDrive {
                     Some(te_amb_air)
                 }
             };
-            Air::get_density(te_amb_air.copied(), Some(elev_curr))
+            Air::get_density(te_amb_air.copied(), Some(vs.elev_curr))
         };
 
         let mass = self.veh.mass.with_context(|| {
@@ -545,6 +545,22 @@ mod tests {
     #[cfg(feature = "resources")]
     fn test_sim_drive_hev() {
         let _veh = mock_hev();
+        let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
+        let mut sd = SimDrive {
+            veh: _veh,
+            cyc: _cyc,
+            sim_params: Default::default(),
+        };
+        sd.walk().unwrap();
+        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
+        assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
+    }
+
+    #[test]
+    #[cfg(feature = "resources")]
+    fn test_sim_drive_bev() {
+        let _veh = mock_bev();
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive {
             veh: _veh,
