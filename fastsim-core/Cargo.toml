@@ -37,10 +37,10 @@ toml = { version = "0.8.12", optional = true }
 derive_more = "0.99.17"
 ureq = { version = "2.9.1", optional = true }
 url = { version = "2.5.0", optional = true }
-ninterp = { path = "../.subtrees/ninterp", features = ["serde"] }
+ninterp = { version = "0.1.0", features = ["serde"] }
 
 [features]
-default = ["resources", "web", "serde-default" ]
+default = ["resources", "serde-default" ]
 ## Enables `pyo3` to provide fastsim-3 structs, methods, and functions to Python
 pyo3 = ["dep:pyo3", "fastsim-2/pyo3"]
 ## Compiles external resources (e.g. vehicle files or cycle files) to be
