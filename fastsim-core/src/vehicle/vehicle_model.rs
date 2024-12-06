@@ -111,6 +111,7 @@ impl Init for AuxSource {}
     }
 )]
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for simulating vehicle
 pub struct Vehicle {
     /// Vehicle name
@@ -157,10 +158,6 @@ pub struct Vehicle {
     #[serde(default)]
     #[serde(skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
     pub history: VehicleStateHistoryVec,
-    // phantom private field to prevent direct instantiation in other modules
-    #[serde(skip)]
-    #[api(skip_get, skip_set)]
-    _phantom: PhantomData<()>,
 }
 
 impl Mass for Vehicle {
@@ -442,6 +439,7 @@ impl Vehicle {
 /// Vehicle state for current time step
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[non_exhaustive]
 pub struct VehicleState {
     /// time step index
     pub i: usize,

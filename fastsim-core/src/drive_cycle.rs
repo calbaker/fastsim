@@ -24,6 +24,7 @@ use fastsim_2::cycle::RustCycle as Cycle2;
     }
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+#[non_exhaustive]
 /// Container
 pub struct Cycle {
     /// Name of cycle (can be left empty)
@@ -402,6 +403,7 @@ impl Cycle {
 
 #[fastsim_api]
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[non_exhaustive]
 /// Element of `Cycle`.  Used for vec-like operations.
 pub struct CycleElement {
     /// simulation time \[s\]

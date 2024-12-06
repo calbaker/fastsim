@@ -22,7 +22,6 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             save_interval,
             history: Default::default(),
             mass: Some(f2veh.veh_kg * uc::KG),
-            _phantom: PhantomData,
         };
         f3veh.expunge_mass_fields();
         f3veh.init().with_context(|| anyhow!(format_dbg!()))?;
@@ -76,7 +75,6 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                             pwr_idle_fuel: si::Power::ZERO,
                             save_interval: Some(1),
                             history: Default::default(),
-                            _phantom: PhantomData,
                         };
                         fc.init()?;
                         fc.set_mass(None, MassSideEffect::None)
@@ -149,7 +147,6 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                             pwr_idle_fuel: si::Power::ZERO,
                             save_interval: Some(1),
                             history: Default::default(),
-                            _phantom: PhantomData,
                         };
                         fc.init()?;
                         fc.set_mass(None, MassSideEffect::None)

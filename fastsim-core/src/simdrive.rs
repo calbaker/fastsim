@@ -7,6 +7,7 @@ use crate::prelude::*;
 
 #[fastsim_api]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Solver parameters
 pub struct SimParams {
     pub ach_speed_max_iter: u32,
@@ -18,10 +19,6 @@ pub struct SimParams {
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
     pub f2_air_density: bool,
-    // phantom private field to prevent direct instantiation in other modules
-    #[serde(skip)]
-    #[api(skip_get, skip_set)]
-    pub _phantom: PhantomData<()>,
 }
 
 impl SerdeAPI for SimParams {}
@@ -36,7 +33,6 @@ impl Default for SimParams {
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
             f2_air_density: true,
-            _phantom: PhantomData,
         }
     }
 }
@@ -72,15 +68,12 @@ impl Default for SimParams {
 
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 pub struct SimDrive {
     #[has_state]
     pub veh: Vehicle,
     pub cyc: Cycle,
     pub sim_params: SimParams,
-    // phantom private field to prevent direct instantiation in other modules
-    #[serde(skip)]
-    #[api(skip_get, skip_set)]
-    _phantom: PhantomData<()>,
 }
 
 impl SerdeAPI for SimDrive {}
@@ -101,7 +94,6 @@ impl SimDrive {
             veh,
             cyc,
             sim_params: sim_params.unwrap_or_default(),
-            _phantom: PhantomData,
         }
     }
 
@@ -484,6 +476,7 @@ pwr deficit: {} kW
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 pub struct TraceMissTolerance {
     tol_dist: si::Length,
     tol_dist_frac: si::Ratio,

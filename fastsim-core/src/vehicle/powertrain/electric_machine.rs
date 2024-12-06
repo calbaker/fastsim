@@ -54,6 +54,7 @@ use crate::pyo3::*;
     // }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for modeling electric machines.  This lumps performance and efficiency of motor and power
 /// electronics.
 pub struct ElectricMachine {
@@ -142,10 +143,12 @@ impl ElectricMachine {
                 .eff_interp_at_max_input
                 .as_ref()
                 .map(|interpolator| {
-                    interpolator.interpolate(&[abs_checked_x_val(
-                        (pwr_in_fwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        interpolator.x().map_err(|e| anyhow!(e))?,
-                    )?]).map_err(|e| anyhow!(e))
+                    interpolator
+                        .interpolate(&[abs_checked_x_val(
+                            (pwr_in_fwd_lim / self.pwr_out_max).get::<si::ratio>(),
+                            interpolator.x().map_err(|e| anyhow!(e))?,
+                        )?])
+                        .map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -162,10 +165,12 @@ impl ElectricMachine {
                 .eff_interp_at_max_input
                 .as_ref()
                 .map(|interpolator| {
-                    interpolator.interpolate(&[abs_checked_x_val(
-                        (pwr_in_bwd_lim / self.pwr_out_max).get::<si::ratio>(),
-                        interpolator.x().map_err(|e| anyhow!(e))?,
-                    )?]).map_err(|e| anyhow!(e))
+                    interpolator
+                        .interpolate(&[abs_checked_x_val(
+                            (pwr_in_bwd_lim / self.pwr_out_max).get::<si::ratio>(),
+                            interpolator.x().map_err(|e| anyhow!(e))?,
+                        )?])
+                        .map_err(|e| anyhow!(e))
                 })
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
@@ -328,9 +333,7 @@ impl Init for ElectricMachine {
                 self.eff_interp_fwd.strategy()?.to_owned(),
                 self.eff_interp_fwd.extrapolate()?.to_owned(),
             )?;
-            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(
-                eff_interp_at_max_input,
-            ));
+            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(eff_interp_at_max_input));
         }
         Ok(())
     }
@@ -447,7 +450,8 @@ impl ElectricMachine {
                 .ok_or(anyhow!(
                     "eff_interp_bwd is None, which should never be the case at this point."
                 ))?
-                .f_x()?.to_owned();
+                .f_x()?
+                .to_owned();
             match &mut self.eff_interp_at_max_input {
                 Some(Interpolator::Interp1D(interp1d)) => {
                     // let old_interp = interp1d;
@@ -628,6 +632,7 @@ impl ElectricMachine {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[non_exhaustive]
 pub struct ElectricMachineState {
     /// time step index
     pub i: usize,
