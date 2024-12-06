@@ -44,7 +44,7 @@ print("List of history variable paths for SimDrive:" +  "\n".join(sd.history_pat
 print("\n")
 
 # print results as dataframe
-print("Results as dataframe:\n", sd.to_dataframe(), sep="")
+print("Results as dataframe:\n", sd.to_dataframe().to_pandas(), sep="")
 if ENABLE_REF_OVERRIDE:
     df:pl.DataFrame = sd.to_dataframe().lazy().collect()
     df.write_csv(ref_dir / "to_dataframe_expected.csv")

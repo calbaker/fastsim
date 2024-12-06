@@ -1,0 +1,37 @@
+name: Build and Test
+
+on: [push]
+
+jobs:
+  build-and-test:
+    name: build ${{ matrix.python-version }} on ${{ matrix.platform || matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu
+          - macos
+          - windows
+        python-version:
+          - "3.8"
+          - "3.9"
+          - "3.10"
+    runs-on: ${{ format('{0}-latest', matrix.os) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: set up rust
+        uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add aarch64-apple-darwin
+        if: matrix.os == 'macos'
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: install python dependencies
+        run: python -m pip install --upgrade pip setuptools wheel pytest
+      - name: run cargo tests
+        run: cargo test
+      - name: install FASTSim python
+        run: pip install -e .[dev]
+      - name: run pytest
+        run: pytest -v
