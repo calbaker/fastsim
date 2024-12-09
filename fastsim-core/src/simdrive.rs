@@ -7,6 +7,7 @@ use crate::prelude::*;
 
 #[fastsim_api]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Solver parameters
 pub struct SimParams {
     pub ach_speed_max_iter: u32,
@@ -39,11 +40,11 @@ impl Default for SimParams {
 #[fastsim_api(
     #[new]
     fn __new__(veh: Vehicle, cyc: Cycle, sim_params: Option<SimParams>) -> anyhow::Result<Self> {
-        Ok(SimDrive{
+        Ok(SimDrive::new(
             veh,
             cyc,
-            sim_params: sim_params.unwrap_or_default(),
-        })
+            sim_params,
+        ))
     }
 
     /// Run vehicle simulation once
@@ -67,6 +68,7 @@ impl Default for SimParams {
 
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 pub struct SimDrive {
     #[has_state]
     pub veh: Vehicle,
@@ -474,6 +476,7 @@ pwr deficit: {} kW
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 pub struct TraceMissTolerance {
     tol_dist: si::Length,
     tol_dist_frac: si::Ratio,
@@ -520,11 +523,7 @@ mod tests {
     fn test_sim_drive_conv() {
         let _veh = mock_conv_veh();
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
-        let mut sd = SimDrive {
-            veh: _veh,
-            cyc: _cyc,
-            sim_params: Default::default(),
-        };
+        let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
@@ -535,11 +534,7 @@ mod tests {
     fn test_sim_drive_hev() {
         let _veh = mock_hev();
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
-        let mut sd = SimDrive {
-            veh: _veh,
-            cyc: _cyc,
-            sim_params: Default::default(),
-        };
+        let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);

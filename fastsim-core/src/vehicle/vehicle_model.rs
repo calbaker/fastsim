@@ -111,6 +111,7 @@ impl Init for AuxSource {}
     }
 )]
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for simulating vehicle
 pub struct Vehicle {
     /// Vehicle name
@@ -438,6 +439,7 @@ impl Vehicle {
 /// Vehicle state for current time step
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[non_exhaustive]
 pub struct VehicleState {
     /// time step index
     pub i: usize,
@@ -613,11 +615,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_conv() {
         let veh = mock_conv_veh();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }
@@ -627,11 +625,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_hev() {
         let veh = mock_hev();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }
@@ -641,11 +635,7 @@ pub(crate) mod tests {
     fn test_to_fastsim2_bev() {
         let veh = mock_bev();
         let cyc = crate::drive_cycle::Cycle::from_resource("udds.csv", false).unwrap();
-        let sd = crate::simdrive::SimDrive {
-            veh,
-            cyc,
-            sim_params: Default::default(),
-        };
+        let sd = crate::simdrive::SimDrive::new(veh, cyc, Default::default());
         let mut sd2 = sd.to_fastsim2().unwrap();
         sd2.sim_drive(None, None).unwrap();
     }

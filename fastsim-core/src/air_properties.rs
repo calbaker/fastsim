@@ -91,6 +91,7 @@ lazy_static! {
 
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 pub struct Air {}
 impl Init for Air {}
 impl SerdeAPI for Air {}

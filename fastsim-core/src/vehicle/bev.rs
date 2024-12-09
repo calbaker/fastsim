@@ -1,6 +1,7 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, HistoryMethods)]
+#[non_exhaustive]
 /// Battery electric vehicle
 pub struct BatteryElectricVehicle {
     #[has_state]

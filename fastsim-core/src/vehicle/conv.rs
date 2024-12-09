@@ -1,6 +1,7 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, HistoryMethods)]
+#[non_exhaustive]
 /// Conventional vehicle with only a FuelConverter as a power source
 pub struct ConventionalVehicle {
     pub fs: FuelStorage,

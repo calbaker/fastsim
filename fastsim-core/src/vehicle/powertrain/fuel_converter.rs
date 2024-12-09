@@ -47,6 +47,7 @@ use super::*;
     }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
@@ -87,10 +88,6 @@ pub struct FuelConverter {
     #[serde(default)]
     #[serde(skip_serializing_if = "FuelConverterStateHistoryVec::is_empty")]
     pub history: FuelConverterStateHistoryVec,
-    #[serde(skip)]
-    // phantom private field to prevent direct instantiation in other modules
-    #[api(skip_get, skip_set)]
-    pub(in super::super) _phantom: PhantomData<()>,
 }
 
 impl SetCumulative for FuelConverter {
@@ -339,6 +336,7 @@ impl FuelConverter {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[non_exhaustive]
 pub struct FuelConverterState {
     /// time step index
     pub i: usize,
@@ -395,6 +393,7 @@ impl SerdeAPI for FuelConverterThermalOption {}
 
 #[fastsim_api]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
 pub struct FuelConverterThermal {
     /// [FuelConverter] thermal capacitance

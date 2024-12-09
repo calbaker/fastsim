@@ -2,6 +2,7 @@ use super::{vehicle_model::VehicleState, *};
 use crate::prelude::ElectricMachineState;
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, HistoryMethods)]
+#[non_exhaustive]
 /// Hybrid vehicle with both engine and reversible energy storage (aka battery)
 /// This type of vehicle is not likely to be widely prevalent due to modularity of consists.
 pub struct HybridElectricVehicle {
@@ -288,6 +289,7 @@ impl Mass for HybridElectricVehicle {
 
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct FCOnCauses(Vec<FCOnCause>);
 impl Init for FCOnCauses {}
 impl SerdeAPI for FCOnCauses {}
@@ -309,6 +311,7 @@ impl FCOnCauses {
 // TODO: figure out why this is not turning in the dataframe but is in teh pydict
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[non_exhaustive]
 pub struct HEVState {
     /// time step index
     pub i: usize,
@@ -381,6 +384,7 @@ impl fmt::Display for FCOnCause {
 
 /// Options for controlling simulation behavior
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct HEVSimulationParams {
     /// [ReversibleEnergyStorage] per [FuelConverter]
     pub res_per_fuel_lim: si::Ratio,
@@ -555,6 +559,7 @@ impl HEVPowertrainControls {
 /// Container for static controls parameters.  See [Self::init] for default
 /// values.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
+#[non_exhaustive]
 pub struct RESGreedyWithDynamicBuffers {
     /// RES energy delta from minimum SOC corresponding to kinetic energy of
     /// vehicle at this speed that triggers ramp down in RES discharge.
