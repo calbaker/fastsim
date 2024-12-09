@@ -183,11 +183,23 @@ impl SimDrive {
     }
 
     /// Solves current time step
-    /// # Arguments
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
         let i = self.veh.state.i;
         let dt = self.cyc.dt_at_i(i)?;
         let speed_prev = self.veh.state.speed_ach;
+        // TODO: make sure `pwr_aux` is updated in here and propagated to `set_curr_pwr_out_max`
+        // maybe make a static `pwr_aux_max` and controls like:
+        // ```
+        // pub enum HVACAuxPriority {
+        //     /// Prioritize [ReversibleEnergyStorage] thermal management
+        //     ReversibleEnergyStorage
+        //     /// Prioritize [Cabin] and [ReversibleEnergyStorage] proportionally to their requests
+        //     Proportional
+        // }
+        // ```
+        self.veh
+            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state, dt)
+            .with_context(|| format_dbg!())?;
         self.veh
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -199,9 +211,6 @@ impl SimDrive {
         self.veh
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
-        self.veh
-            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state, dt)
-            .with_context(|| format_dbg!())?;
         self.veh.set_cumulative(dt);
         Ok(())
     }

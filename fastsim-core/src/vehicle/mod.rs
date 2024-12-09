@@ -6,21 +6,16 @@
 pub(crate) use crate::imports::*;
 pub use crate::prelude::*;
 
-// powertrain types
 pub mod bev;
-pub mod conv;
-pub mod hev;
-
-// powertrain components
-pub mod powertrain;
-
-// vehicle model
 pub mod cabin;
 pub mod chassis;
+pub mod conv;
+pub mod hev;
+pub mod hvac;
+pub mod powertrain;
 pub mod powertrain_type;
 pub mod traits;
 pub mod vehicle_model;
-
 pub use bev::BatteryElectricVehicle;
 pub use chassis::Chassis;
 pub use conv::ConventionalVehicle;

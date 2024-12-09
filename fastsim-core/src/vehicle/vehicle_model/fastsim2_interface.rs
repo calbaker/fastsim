@@ -16,7 +16,10 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             pt_type,
             chassis: Chassis::try_from(&f2veh)?,
             cabin: Default::default(),
-            pwr_aux: f2veh.aux_kw * uc::KW,
+            hvac: Default::default(),
+            pwr_aux_base: f2veh.aux_kw * uc::KW,
+            // high value to make sure it has no effect
+            pwr_aux_max: f2veh.aux_kw * 2. * uc::KW,
             trans_eff: f2veh.trans_eff * uc::R,
             state: Default::default(),
             save_interval,
@@ -95,25 +98,29 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                 Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
             }
             HEV => {
-                let pt_cntrl = HEVPowertrainControls::RGWDB(hev::RESGreedyWithDynamicBuffers {
-                    speed_soc_fc_on_buffer: None,
-                    speed_soc_accel_buffer: None,
-                    speed_soc_accel_buffer_coeff: None,
-                    speed_soc_regen_buffer: None,
-                    speed_soc_regen_buffer_coeff: None,
-                    // note that this exists in `fastsim-2` but has no apparent effect!
-                    fc_min_time_on: None,
-                    speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
-                    frac_pwr_demand_fc_forced_on: Some(
-                        f2veh.kw_demand_fc_on
-                            / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
-                            * uc::R,
-                    ),
-                    frac_of_most_eff_pwr_to_run_fc: None,
-                    // TODO: make sure these actually do something, if deemed worthwhile
-                    frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
-                    frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
-                });
+                let pt_cntrl =
+                    HEVPowertrainControls::RGWDB(Box::new(hev::RESGreedyWithDynamicBuffers {
+                        speed_soc_fc_on_buffer: None,
+                        speed_soc_fc_on_buffer_coeff: None,
+                        speed_soc_disch_buffer: None,
+                        speed_soc_disch_buffer_coeff: None,
+                        speed_soc_regen_buffer: None,
+                        speed_soc_regen_buffer_coeff: None,
+                        // note that this exists in `fastsim-2` but has no apparent effect!
+                        fc_min_time_on: None,
+                        speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
+                        frac_pwr_demand_fc_forced_on: Some(
+                            f2veh.kw_demand_fc_on
+                                / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
+                                * uc::R,
+                        ),
+                        frac_of_most_eff_pwr_to_run_fc: None,
+                        // TODO: make sure these actually do something, if deemed worthwhile
+                        frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
+                        frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
+                        state: Default::default(),
+                        history: Default::default(),
+                    }));
                 let mut hev = HybridElectricVehicle {
                     fs: {
                         let mut fs = FuelStorage {
@@ -279,7 +286,7 @@ impl Vehicle {
                 _ => 1.0,
             },
             alt_eff_doc: None,
-            aux_kw: self.pwr_aux.get::<si::kilowatt>(),
+            aux_kw: self.pwr_aux_base.get::<si::kilowatt>(),
             aux_kw_doc: None,
             cargo_kg: self
                 .chassis

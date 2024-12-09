@@ -85,12 +85,13 @@ pub struct ElectricMachine {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: ElectricMachineState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ElectricMachineStateHistoryVec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "ElectricMachineStateHistoryVec::is_empty"
+    )]
     pub history: ElectricMachineStateHistoryVec,
 }
 

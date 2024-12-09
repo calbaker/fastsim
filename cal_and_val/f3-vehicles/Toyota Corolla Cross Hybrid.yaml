@@ -654,9 +654,10 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       RGWDB:
-        speed_soc_accel_buffer: 17.8816
-        speed_soc_accel_buffer_coeff: 1.0
+        speed_soc_disch_buffer: 17.8816
+        speed_soc_disch_buffer_coeff: 1.0
         speed_soc_fc_on_buffer: 19.66976
+        speed_soc_fc_on_buffer_coeff: 1.0
         speed_soc_regen_buffer: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
         fc_min_time_on: 5.0
@@ -685,7 +686,8 @@ chassis:
   drive_axle_weight_frac: 0.61
   wheel_base_meters: 2.56
 mass_kilograms: 1750.0
-pwr_aux_watts: 500.0
+pwr_aux_base_watts: 500.0
+pwr_aux_max_watts: 1000.0
 trans_eff: 0.97
 save_interval: 1
 state:

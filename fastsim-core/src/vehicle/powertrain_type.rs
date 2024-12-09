@@ -50,14 +50,20 @@ impl Powertrain for PowertrainType {
     fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         match self {
-            Self::ConventionalVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_state, dt),
-            Self::HybridElectricVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_state, dt),
-            Self::BatteryElectricVehicle(v) => v.solve_thermal(te_amb, heat_demand, veh_state, dt),
+            Self::ConventionalVehicle(v) => {
+                v.solve_thermal(te_amb, pwr_thrl_fc_to_cab, veh_state, dt)
+            }
+            Self::HybridElectricVehicle(v) => {
+                v.solve_thermal(te_amb, pwr_thrl_fc_to_cab, veh_state, dt)
+            }
+            Self::BatteryElectricVehicle(v) => {
+                v.solve_thermal(te_amb, si::Power::ZERO, veh_state, dt)
+            }
         }
     }
 

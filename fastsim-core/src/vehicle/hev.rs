@@ -24,12 +24,10 @@ pub struct HybridElectricVehicle {
     #[serde(default)]
     pub sim_params: HEVSimulationParams,
     /// field for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: HEVState,
     /// vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "HEVStateHistoryVec::is_empty")]
+    #[serde(default, skip_serializing_if = "HEVStateHistoryVec::is_empty")]
     pub history: HEVStateHistoryVec,
     /// vector of SOC balance iterations
     #[serde(default)]
@@ -81,7 +79,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
                 })? {
                     self.state.fc_on_causes.push(FCOnCause::OnTimeTooShort)
                 }
-            },
+            }
             HEVPowertrainControls::Placeholder => {
                 todo!()
             }
@@ -93,13 +91,13 @@ impl Powertrain for Box<HybridElectricVehicle> {
             HEVPowertrainControls::RGWDB(rgwb) => {
                 (0.5 * veh_state.mass
                     * (rgwb
-                        .speed_soc_accel_buffer
+                        .speed_soc_disch_buffer
                         .with_context(|| format_dbg!())?
                         .powi(typenum::P2::new())
                         - veh_state.speed_ach.powi(typenum::P2::new())))
                 .max(si::Energy::ZERO)
                     * rgwb
-                        .speed_soc_accel_buffer_coeff
+                        .speed_soc_disch_buffer_coeff
                         .with_context(|| format_dbg!())?
             }
             HEVPowertrainControls::Placeholder => {
@@ -173,6 +171,11 @@ impl Powertrain for Box<HybridElectricVehicle> {
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
+        // TODO: address these concerns
+        // - add a transmission here
+        // - what happens when the fc is on and producing more power than the
+        //   transmission requires? It seems like the excess goes straight to the battery,
+        //   but it should probably go thourgh the em somehow.
         let (fc_pwr_out_req, em_pwr_out_req) = self
             .pt_cntrl
             .get_pwr_fc_and_em(
@@ -193,6 +196,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
             .em
             .get_pwr_in_req(em_pwr_out_req, dt)
             .with_context(|| format_dbg!())?;
+        // TODO: `res_pwr_out_req` probably does not include charging from the engine
         self.res
             .solve(res_pwr_out_req, dt)
             .with_context(|| format_dbg!())?;
@@ -202,12 +206,12 @@ impl Powertrain for Box<HybridElectricVehicle> {
     fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.fc
-            .solve_thermal(te_amb, heat_demand, veh_state, dt)
+            .solve_thermal(te_amb, pwr_thrl_fc_to_cab, veh_state, dt)
             .with_context(|| format_dbg!())?;
         self.res
             .solve_thermal(te_amb, dt)
@@ -322,7 +326,7 @@ impl FCOnCauses {
     }
 }
 
-// TODO: figure out why this is not turning in the dataframe but is in teh pydict
+// TODO: figure out why this is not appearing in the dataframe but is in the pydict
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 pub struct HEVState {
@@ -334,8 +338,6 @@ pub struct HEVState {
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
     pub soc_bal_iters: u32,
-    /// buffer at which FC is forced on
-    pub soc_fc_on_buffer: si::Ratio,
 }
 
 impl Init for HEVState {}
@@ -431,8 +433,9 @@ pub enum HEVAuxControls {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum HEVPowertrainControls {
     /// Controls that attempt to match fastsim-2
-    RGWDB(RESGreedyWithDynamicBuffers),
-    /// Controls that have a dynamically updated discharge buffer but are otherwise similar to [Self::Fastsim2]
+    RGWDB(Box<RESGreedyWithDynamicBuffers>),
+    /// Controls that have a dynamically updated discharge buffer but are
+    /// otherwise similar to [Self::Fastsim2]
     Placeholder,
 }
 
@@ -456,7 +459,7 @@ impl Init for HEVPowertrainControls {
 
 impl HEVPowertrainControls {
     fn get_pwr_fc_and_em(
-        &self,
+        &mut self,
         pwr_out_req: si::Power,
         veh_state: VehicleState,
         hev_state: &mut HEVState,
@@ -464,8 +467,6 @@ impl HEVPowertrainControls {
         em_state: &ElectricMachineState,
         res: &ReversibleEnergyStorage,
     ) -> anyhow::Result<(si::Power, si::Power)> {
-        // TODO:
-        // - [ ] make buffers soft limits that aren't enforced, just suggested
         let fc_state = &fc.state;
         if pwr_out_req >= si::Power::ZERO {
             ensure!(
@@ -484,8 +485,8 @@ impl HEVPowertrainControls {
                 fc_state.pwr_prop_max.get::<si::kilowatt>()
             );
             // positive net power out of the powertrain
-            let (fc_pwr, em_pwr) = match &self {
-                HEVPowertrainControls::RGWDB(rgwb) => {
+            let (fc_pwr, em_pwr) = match self {
+                HEVPowertrainControls::RGWDB(ref mut rgwb) => {
                     // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
                     let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
                     let frac_pwr_demand_fc_forced_on: si::Ratio = rgwb
@@ -496,7 +497,6 @@ impl HEVPowertrainControls {
                         .with_context(|| format_dbg!())?;
                     // If the motor cannot produce more than the required power times a
                     // `fc_pwr_frac_demand_forced_on`, then the engine should be on
-                    // TODO: account for transmission efficiency here or somewhere
                     if pwr_out_req
                         > frac_pwr_demand_fc_forced_on
                             * (em_state.pwr_mech_fwd_out_max + fc_state.pwr_out_max)
@@ -512,21 +512,22 @@ impl HEVPowertrainControls {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
 
-                    hev_state.soc_fc_on_buffer = {
-                        (0.5 * veh_state.mass
+                    rgwb.state.soc_fc_on_buffer = {
+                        let energy_delta_to_buffer_speed = 0.5
+                            * veh_state.mass
                             * (rgwb
                                 .speed_soc_fc_on_buffer
                                 .with_context(|| format_dbg!())?
                                 .powi(typenum::P2::new())
-                                - veh_state.speed_ach.powi(typenum::P2::new())))
-                        .max(si::Energy::ZERO)
+                                - veh_state.speed_ach.powi(typenum::P2::new()));
+                        energy_delta_to_buffer_speed.max(si::Energy::ZERO)
                             * rgwb
-                                .speed_soc_accel_buffer_coeff
+                                .speed_soc_fc_on_buffer_coeff
                                 .with_context(|| format_dbg!())?
                     } / res.energy_capacity_usable()
                         + res.min_soc;
 
-                    if res.state.soc < hev_state.soc_fc_on_buffer {
+                    if res.state.soc < rgwb.state.soc_fc_on_buffer {
                         hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
                     }
                     if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
@@ -574,12 +575,14 @@ impl HEVPowertrainControls {
 pub struct RESGreedyWithDynamicBuffers {
     /// RES energy delta from minimum SOC corresponding to kinetic energy of
     /// vehicle at this speed that triggers ramp down in RES discharge.
-    pub speed_soc_accel_buffer: Option<si::Velocity>,
+    pub speed_soc_disch_buffer: Option<si::Velocity>,
     /// Coefficient for modifying amount of accel buffer
-    pub speed_soc_accel_buffer_coeff: Option<si::Ratio>,
+    pub speed_soc_disch_buffer_coeff: Option<si::Ratio>,
     /// RES energy delta from minimum SOC corresponding to kinetic energy of
     /// vehicle at this speed that triggers FC to be forced on.
     pub speed_soc_fc_on_buffer: Option<si::Velocity>,
+    /// Coefficient for modifying amount of [Self::speed_soc_fc_on_buffer]
+    pub speed_soc_fc_on_buffer_coeff: Option<si::Ratio>,
     /// RES energy delta from maximum SOC corresponding to kinetic energy of
     /// vehicle at current speed minus kinetic energy of vehicle at this speed
     /// triggers ramp down in RES discharge
@@ -591,34 +594,42 @@ pub struct RESGreedyWithDynamicBuffers {
     pub fc_min_time_on: Option<si::Time>,
     /// Speed at which [fuelconverter] is forced on.
     pub speed_fc_forced_on: Option<si::Velocity>,
-    /// Fraction of total aux and powertrain power demand at which
+    /// Fraction of total aux and powertrain rated power at which
     /// [FuelConverter] is forced on.
     pub frac_pwr_demand_fc_forced_on: Option<si::Ratio>,
     /// Force engine, if on, to run at this fraction of power at which peak
-    /// efficiency occurs or the required power, whichever is greater. If SOC
-    /// is below min buffer, engine will run at this level and charge.
-    /// to 1.
+    /// efficiency occurs or the required power, whichever is greater. If SOC is
+    /// below min buffer or engine is otherwise forced on and battery has room
+    /// to receive charge, engine will run at this level and charge.
     pub frac_of_most_eff_pwr_to_run_fc: Option<si::Ratio>,
     /// Fraction of available charging capacity to use toward running the engine
     /// efficiently.
     // NOTE: this is inherited from fastsim-2 and has no effect here.  After
     // further thought, either remove it or use it.
     pub frac_res_chrg_for_fc: si::Ratio,
+    // TODO: put `save_interval` in here
     // NOTE: this is inherited from fastsim-2 and has no effect here.  After
     // further thought, either remove it or use it.
     /// Fraction of available discharging capacity to use toward running the
     /// engine efficiently.
     pub frac_res_dschrg_for_fc: si::Ratio,
+    /// current state of control variables
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    pub state: RGWDBState,
+    #[serde(default, skip_serializing_if = "RGWDBStateHistoryVec::is_empty")]
+    /// history of current state
+    pub history: RGWDBStateHistoryVec,
 }
 
 impl Init for RESGreedyWithDynamicBuffers {
     fn init(&mut self) -> anyhow::Result<()> {
         // TODO: make sure these values propagate to the documented defaults above
-        self.speed_soc_accel_buffer = self.speed_soc_accel_buffer.or(Some(40.0 * uc::MPH));
-        self.speed_soc_accel_buffer_coeff = self.speed_soc_accel_buffer_coeff.or(Some(1.0 * uc::R));
+        self.speed_soc_disch_buffer = self.speed_soc_disch_buffer.or(Some(40.0 * uc::MPH));
+        self.speed_soc_disch_buffer_coeff = self.speed_soc_disch_buffer_coeff.or(Some(1.0 * uc::R));
         self.speed_soc_fc_on_buffer = self
             .speed_soc_fc_on_buffer
-            .or(Some(self.speed_soc_accel_buffer.unwrap() * 1.1));
+            .or(Some(self.speed_soc_disch_buffer.unwrap() * 1.1));
+        self.speed_soc_fc_on_buffer_coeff = self.speed_soc_fc_on_buffer_coeff.or(Some(1.0 * uc::R));
         self.speed_soc_regen_buffer = self.speed_soc_regen_buffer.or(Some(30. * uc::MPH));
         self.speed_soc_regen_buffer_coeff = self.speed_soc_regen_buffer_coeff.or(Some(1.0 * uc::R));
         self.fc_min_time_on = self.fc_min_time_on.or(Some(uc::S * 5.0));
@@ -631,3 +642,22 @@ impl Init for RESGreedyWithDynamicBuffers {
         Ok(())
     }
 }
+
+#[fastsim_api]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+/// State for [RESGreedyWithDynamicBuffers ]
+pub struct RGWDBState {
+    /// time step index
+    pub i: usize,
+    /// Vector of posssible reasons the fc is forced on
+    #[api(skip_get, skip_set)]
+    pub fc_on_causes: FCOnCauses,
+    /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
+    /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
+    pub soc_bal_iters: u32,
+    /// buffer at which FC is forced on
+    pub soc_fc_on_buffer: si::Ratio,
+}
+
+impl Init for RGWDBState {}
+impl SerdeAPI for RGWDBState {}

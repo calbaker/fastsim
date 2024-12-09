@@ -121,14 +121,20 @@ pub struct Vehicle {
     #[api(skip_get, skip_set)]
     pub cabin: CabinOption,
 
+    /// HVAC model
+    #[serde(default, skip_serializing_if = "HVACOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub hvac: HVACOption,
+
     /// Total vehicle mass
     #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
-    /// power required by auxilliary systems (e.g. HVAC, stereo)  
-    /// TODO: make this an enum to allow for future variations
-    pub pwr_aux: si::Power,
+    /// Baseline power required by auxilliary systems
+    pub pwr_aux_base: si::Power,
+    /// Max power available for auxilliary systems
+    pub pwr_aux_max: si::Power,
 
     /// transmission efficiency
     // TODO: check if `trans_eff` is redundant (most likely) and fix
@@ -141,12 +147,10 @@ pub struct Vehicle {
     #[serde(skip_serializing_if = "Option::is_none")]
     save_interval: Option<usize>,
     /// current state of vehicle
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: VehicleState,
     /// Vector-like history of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
+    #[serde(default, skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
     pub history: VehicleStateHistoryVec,
 }
 
@@ -399,7 +403,7 @@ impl Vehicle {
     /// Solves for energy consumption
     pub fn solve_powertrain(&mut self, dt: si::Time) -> anyhow::Result<()> {
         // TODO: do something more sophisticated with pwr_aux
-        self.state.pwr_aux = self.pwr_aux;
+        self.state.pwr_aux = self.pwr_aux_base;
         self.pt_type
             .solve(
                 self.state.pwr_tractive,
@@ -419,7 +423,7 @@ impl Vehicle {
         // TODO: account for traction limits here
 
         self.pt_type
-            .set_curr_pwr_prop_out_max(self.pwr_aux, dt, self.state)
+            .set_curr_pwr_prop_out_max(self.pwr_aux_base, dt, self.state)
             .with_context(|| anyhow!(format_dbg!()))?;
 
         (self.state.pwr_prop_fwd_max, self.state.pwr_prop_bwd_max) = self
@@ -432,24 +436,46 @@ impl Vehicle {
 
     pub fn solve_thermal(
         &mut self,
-        te_amb: si::Temperature,
+        te_amb_air: si::Temperature,
         veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
-        let heat_demand = match &mut self.cabin {
-            CabinOption::LumpedCabin(lc) => {
-                lc.solve(te_amb, te_fc, veh_state, dt)
+        let pwr_thrml_fc_to_cabin = match (&mut self.cabin, &mut self.hvac) {
+            (CabinOption::None, HVACOption::None) => si::Power::ZERO,
+            (CabinOption::LumpedCabin(lc), HVACOption::LumpedCabin(lc_hvac)) => {
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = lc_hvac
+                    .solve(te_amb_air, te_fc, lc.state, lc.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
-                lc.hvac.state.pwr_thermal_req
+                lc.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
+                    .with_context(|| format_dbg!())?;
+                pwr_thrml_fc_to_cab
             }
-            CabinOption::LumpedCabinWithShell => {
+            (CabinOption::LumpedCabinWithShell, HVACOption::LumpedCabinWithShell) => {
                 bail!("{}\nNot yet implemented.", format_dbg!())
             }
-            CabinOption::None => si::Power::ZERO,
+            (CabinOption::None, HVACOption::ReversibleEnergyStorageOnly) => {
+                bail!("{}\nNot yet implemented.", format_dbg!())
+            }
+            (CabinOption::None, _) => {
+                bail!(
+                    "{}\n`CabinOption::is_none` must be true if `HVACOption::is_none` is true.",
+                    format_dbg!()
+                )
+            }
+            (_, HVACOption::None) => {
+                bail!(
+                    "{}\n`CabinOption::is_none` must be true if `HVACOption::is_none` is true.",
+                    format_dbg!()
+                )
+            }
+            _ => todo!(
+                "This match needs more match arms to be fully correct in validating model config."
+            ),
         };
+
         self.pt_type
-            .solve_thermal(te_amb, heat_demand, veh_state, dt)
+            .solve_thermal(te_amb_air, pwr_thrml_fc_to_cabin, veh_state, dt)
             .with_context(|| format_dbg!())?;
         Ok(())
     }

@@ -241,7 +241,8 @@ chassis:
   drive_axle_weight_frac: 0.61
   wheel_base_meters: 1.236
 mass_kilograms: 172.0
-pwr_aux_watts: 0.0
+pwr_aux_base_watts: 0.0
+pwr_aux_max_watts: 0.0
 trans_eff: 0.92
 save_interval: 1
 state:

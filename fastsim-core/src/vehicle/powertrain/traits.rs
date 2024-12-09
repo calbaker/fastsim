@@ -38,7 +38,7 @@ pub trait Powertrain {
     fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()>;

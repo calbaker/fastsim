@@ -83,12 +83,13 @@ pub struct FuelConverter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: FuelConverterState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "FuelConverterStateHistoryVec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "FuelConverterStateHistoryVec::is_empty"
+    )]
     pub history: FuelConverterStateHistoryVec,
     #[serde(skip)]
     // phantom private field to prevent direct instantiation in other modules
@@ -276,6 +277,7 @@ impl FuelConverter {
             )
         );
         self.state.pwr_prop = pwr_out_req;
+        // TODO: make this temperature dependent
         self.state.eff = if fc_on {
             uc::R
                 * self
@@ -292,7 +294,7 @@ impl FuelConverter {
                     })?
         } else {
             si::Ratio::ZERO
-        };
+        } * self.thrml.temp_eff_coeff().unwrap_or(1.0 * uc::R);
         ensure!(
             (self.state.eff >= 0.0 * uc::R && self.state.eff <= 1.0 * uc::R),
             format!(
@@ -324,13 +326,13 @@ impl FuelConverter {
     pub fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let veh_speed = veh_state.speed_ach;
         self.thrml
-            .solve(&self.state, te_amb, heat_demand, veh_speed, dt)
+            .solve(&self.state, te_amb, pwr_thrl_fc_to_cab, veh_speed, dt)
             .with_context(|| format_dbg!())
     }
 
@@ -405,6 +407,7 @@ pub enum FuelConverterThermalOption {
     #[default]
     None,
 }
+
 impl Init for FuelConverterThermalOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
@@ -420,25 +423,39 @@ impl FuelConverterThermalOption {
     /// # Arguments
     /// - `fc_state`: [FuelConverter] state
     /// - `te_amb`: ambient temperature
-    /// - `heat_demand`: heat demand from HVAC system
+    /// - `pwr_thrl_fc_to_cab`: heat demand from HVAC system
     /// - `veh_speed`: current achieved speed
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         match self {
             Self::FuelConverterThermal(fct) => fct
-                .solve(fc_state, te_amb, heat_demand, veh_speed, dt)
+                .solve(fc_state, te_amb, pwr_thrl_fc_to_cab, veh_speed, dt)
                 .with_context(|| format_dbg!())?,
             Self::None => {
+                ensure!(
+                    pwr_thrl_fc_to_cab == si::Power::ZERO,
+                    format_dbg!(
+                        "`FuelConverterThermal needs to be configured to provide heat demand`"
+                    )
+                );
                 // TODO: make sure this triggers error if appropriate
             }
         }
         Ok(())
+    }
+
+    /// If appropriately configured, returns temperature-dependent efficiency coefficient
+    fn temp_eff_coeff(&self) -> Option<si::Ratio> {
+        match self {
+            Self::FuelConverterThermal(fct) => Some(fct.state.eff_coeff),
+            Self::None => None,
+        }
     }
 }
 
@@ -470,13 +487,17 @@ pub struct FuelConverterThermal {
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
     pub radiator_effectiveness: si::Ratio,
+    /// Model for [FuelConverter] dependence on efficiency
+    #[api(skip_get, skip_set)]
+    pub fc_eff_model: FCTempEffModel,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: FuelConverterThermalState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "FuelConverterThermalStateHistoryVec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "FuelConverterThermalStateHistoryVec::is_empty"
+    )]
     pub history: FuelConverterThermalStateHistoryVec,
     // TODO: add `save_interval` and associated methods
 }
@@ -518,14 +539,14 @@ impl FuelConverterThermal {
     /// # Arguments
     /// - `fc_state`: [FuelConverter] state
     /// - `te_amb`: ambient temperature
-    /// - `heat_demand`: heat demand from HVAC system
+    /// - `pwr_thrl_fc_to_cab`: heat demand from HVAC system
     /// - `veh_speed`: current achieved speed
     /// - `dt`: simulation time step size
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
         te_amb: si::Temperature,
-        heat_demand: si::Power,
+        pwr_thrl_fc_to_cab: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
@@ -587,11 +608,36 @@ impl FuelConverterThermal {
         let delta_temp: si::Temperature = (((self.htc_from_comb
             * (self.state.te_adiabatic - self.state.temperature))
             .min(self.max_frac_from_comb * heat_gen)
-            - heat_demand
+            - pwr_thrl_fc_to_cab
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
         self.state.temperature += delta_temp;
+
+        self.state.eff_coeff = match self.fc_eff_model {
+            FCTempEffModel::Linear(FCTempEffModelLinear {
+                offset,
+                slope_per_kelvin: slope,
+                minimum,
+            }) => minimum.max(
+                (offset + slope * uc::R / uc::KELVIN * self.state.temperature).min(1.0 * uc::R),
+            ),
+            FCTempEffModel::Exponential(FCTempEffModelExponential {
+                offset,
+                lag,
+                minimum,
+            }) => ((1.0
+                - f64::exp({
+                    (-1.0 / {
+                        let exp_denom: si::Ratio =
+                            (lag / uc::KELVIN) * (self.state.temperature - offset);
+                        exp_denom
+                    })
+                    .get::<si::ratio>()
+                }))
+                * uc::R)
+                .max(minimum),
+        };
         Ok(())
     }
 }
@@ -631,6 +677,8 @@ pub struct FuelConverterThermalState {
     pub htc_to_amb: si::HeatTransferCoeff,
     /// Current heat transfer to ambient
     pub heat_to_amb: si::Power,
+    /// Efficency coefficient, used to modify [FuelConverter] effciency based on temperature
+    pub eff_coeff: si::Ratio,
 }
 
 impl Init for FuelConverterThermalState {}
@@ -643,6 +691,60 @@ impl Default for FuelConverterThermalState {
             temperature: *TE_STD_AIR,
             htc_to_amb: Default::default(),
             heat_to_amb: Default::default(),
+            eff_coeff: uc::R,
+        }
+    }
+}
+
+/// Model variants for how FC efficiency depends on temperature
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum FCTempEffModel {
+    /// Linear temperature dependence
+    Linear(FCTempEffModelLinear),
+    /// Exponential temperature dependence
+    Exponential(FCTempEffModelExponential),
+}
+
+impl Default for FCTempEffModel {
+    fn default() -> Self {
+        FCTempEffModel::Exponential(FCTempEffModelExponential::default())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct FCTempEffModelLinear {
+    pub offset: si::Ratio,
+    /// Change in efficiency factor per change in temperature [K]
+    pub slope_per_kelvin: f64,
+    pub minimum: si::Ratio,
+}
+
+impl Default for FCTempEffModelLinear {
+    fn default() -> Self {
+        Self {
+            offset: 0.0 * uc::R,
+            slope_per_kelvin: 25.0,
+            minimum: 0.2 * uc::R,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct FCTempEffModelExponential {
+    /// temperature at which `fc_eta_temp_coeff` begins to grow
+    pub offset: si::Temperature,
+    /// exponential lag parameter [K^-1]
+    pub lag: f64,
+    /// minimum value that `fc_eta_temp_coeff` can take
+    pub minimum: si::Ratio,
+}
+
+impl Default for FCTempEffModelExponential {
+    fn default() -> Self {
+        Self {
+            offset: 0.0 * uc::KELVIN + *uc::CELSIUS_TO_KELVIN,
+            lag: 25.0,
+            minimum: 0.2 * uc::R,
         }
     }
 }

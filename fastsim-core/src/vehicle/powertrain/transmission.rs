@@ -17,12 +17,10 @@ pub struct Transmission {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: TransmissionState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "TransmissionStateHistoryVec::is_empty")]
+    #[serde(default, skip_serializing_if = "TransmissionStateHistoryVec::is_empty")]
     pub history: TransmissionStateHistoryVec,
 }
 
