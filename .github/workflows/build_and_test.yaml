@@ -7,6 +7,9 @@ jobs:
     name: build py3.${{ matrix.python-version }} on ${{ matrix.platform || matrix.os.base }}-${{ matrix.os.version }}
     strategy:
       fail-fast: true
+      # NOTE: In the matrix below, we call out macos 13 and 14 explicitly. This is to enable running on both Intel and Apple Silicon for Mac.
+      # As of this writing, MacOS 13 is Intel and MacOS 14 is Apple Silicon. Ideally, the Apple transition to their new chip occurs fast and
+      # we can drop macos-13 checks and then just use 'latest'.
       matrix:
         os:
           - base: ubuntu
