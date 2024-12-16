@@ -57,8 +57,24 @@ const TOL: f64 = 1e-3;
     fn get_energy_capacity_usable_joules(&self) -> f64 {
         self.energy_capacity_usable().get::<si::joule>()
     }
+
+    #[pyo3(name = "set_default_1d_interp")]
+    fn set_default_1d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_1d_interp()
+    }
+
+    #[pyo3(name = "set_default_2d_interp")]
+    fn set_default_2d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_2d_interp()
+    }
+
+    #[pyo3(name = "set_default_3d_interp")]
+    fn set_default_3d_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_3d_interp()
+    }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for modeling technology-naive Reversible Energy Storage (e.g. battery, flywheel).
 pub struct ReversibleEnergyStorage {
     /// [Self] Thermal plant, including thermal management controls
@@ -424,6 +440,55 @@ impl ReversibleEnergyStorage {
         self.energy_capacity * (self.max_soc - self.min_soc)
     }
 
+    /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 1D
+    /// interpolator with the default x and f_x arrays  
+    /// Source of default efficiency values:  
+    /// x: values in the third sub-array (corresponding to power) in Altrios'
+    /// eta_interp_grid  
+    /// f_x: efficiency array as a function of power at constant 50% SOC and 23
+    /// degrees C corresponds to eta_interp_values[0][5] in Altrios
+    #[cfg(all(feature = "yaml", feature = "resources"))]
+    pub fn set_default_1d_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp = ninterp::Interpolator::from_resource("res/default_1d.yaml", false)?;
+        Ok(())
+    }
+
+    /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 2D
+    /// interpolator with the default x, y and f_xy arrays  
+    /// Source of default efficiency values:  
+    /// x: values in the third sub-array (corresponding to power) in Altrios'
+    /// eta_interp_grid  
+    /// y: values in the second sub-array (corresponding to SOC) in
+    /// Altrios' eta_interp_grid  
+    /// f_xy: efficiency array as a function of power and SOC at constant 23
+    /// degrees C corresponds to eta_interp_values[0] in Altrios, transposed so
+    /// that the outermost layer is now power, and the innermost layer SOC (in
+    /// altrios, the outermost layer is SOC and innermost is power)
+    #[cfg(all(feature = "yaml", feature = "resources"))]
+    pub fn set_default_2d_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp = ninterp::Interpolator::from_resource("res/default_2d.yaml", false)?;
+        Ok(())
+    }
+
+    /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 3D
+    /// interpolator with the default x, y, z and f_xyz arrays  
+    /// Source of default efficiency values:  
+    /// x: values in the third sub-array (corresponding to power) in Altrios'
+    /// eta_interp_grid  
+    /// y: values in the second sub-array (corresponding to SOC) in Altrios'
+    /// eta_interp_grid  
+    /// z: values in the first sub-array (corresponding to temperature) in
+    /// Altrios' eta_interp_grid  
+    /// f_xyz: efficiency array as a function of power, SOC, and temperature
+    /// corresponds to eta_interp_values in Altrios, transposed so that the
+    /// outermost layer is now power, and the innermost layer temperature (in
+    /// altrios, the outermost layer is temperature and innermost is power)
+    #[cfg(all(feature = "yaml", feature = "resources"))]
+    pub fn set_default_3d_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp = ninterp::Interpolator::from_resource("res/default_3d.yaml", false)?;
+        Ok(())
+    }
+
     /// If thermal model is appropriately configured, returns current lumped [Self] temperature
     pub fn temperature(&self) -> Option<si::Temperature> {
         match &self.thrml {
@@ -532,6 +597,7 @@ pub enum SpecificEnergySideEffect {
 
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[non_exhaustive]
 // component limits
 /// ReversibleEnergyStorage state variables
 pub struct ReversibleEnergyStorageState {

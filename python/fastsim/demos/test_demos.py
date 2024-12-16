@@ -1,3 +1,4 @@
+import sys
 import subprocess
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ def demo_paths():
 def test_demo(demo_path: Path):
     os.environ['SHOW_PLOTS'] = "false"
     rslt = subprocess.run(
-        ["python", demo_path],
+        [sys.executable, demo_path],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True

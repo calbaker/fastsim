@@ -54,6 +54,7 @@ use crate::pyo3::*;
     // }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Struct for modeling electric machines.  This lumps performance and efficiency of motor and power
 /// electronics.
 pub struct ElectricMachine {
@@ -632,6 +633,7 @@ impl ElectricMachine {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[non_exhaustive]
 pub struct ElectricMachineState {
     /// time step index
     pub i: usize,

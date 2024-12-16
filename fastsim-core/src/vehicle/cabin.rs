@@ -29,6 +29,7 @@ impl SerdeAPI for CabinOption {}
 
 #[fastsim_api]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[non_exhaustive]
 /// Basic single thermal capacitance cabin thermal model, including HVAC
 /// system and controls
 pub struct LumpedCabin {
