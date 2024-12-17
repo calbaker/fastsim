@@ -451,11 +451,20 @@ impl Vehicle {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
         let pwr_thrml_fc_to_cabin = match (&mut self.cabin, &mut self.hvac) {
             (CabinOption::None, HVACOption::None) => si::Power::ZERO,
-            (CabinOption::LumpedCabin(lc), HVACOption::LumpedCabin(lc_hvac)) => {
-                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = lc_hvac
-                    .solve(te_amb_air, te_fc, lc.state, lc.heat_capacitance, dt)
+            (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabin(hvac)) => {
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
+                    .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
-                lc.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
+                cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
+                    .with_context(|| format_dbg!())?;
+                pwr_thrml_fc_to_cab
+            }
+            (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabinAndRES(hvac)) => {
+                todo!("Connect HVAC system to RES.");
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
+                    .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
+                    .with_context(|| format_dbg!())?;
+                cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
                     .with_context(|| format_dbg!())?;
                 pwr_thrml_fc_to_cab
             }
