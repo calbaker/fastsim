@@ -124,6 +124,12 @@ pub(crate) fn history_vec_derive(input: TokenStream) -> TokenStream {
                 }
                 state_vec
             }
+
+            // TODO: flesh this out
+            // /// Returns fieldnames of any fields that are constant throughout history
+            // pub fn names_of_static_fields(&self) -> Vec<String> {
+
+            // }
         }
 
         impl Default for #new_name {

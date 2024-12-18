@@ -39,7 +39,7 @@ pub trait Powertrain {
         &mut self,
         te_amb: si::Temperature,
         pwr_thrl_fc_to_cab: si::Power,
-        veh_state: VehicleState,
+        veh_state: &mut VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()>;
 

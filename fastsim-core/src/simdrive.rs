@@ -189,8 +189,7 @@ impl SimDrive {
         let i = self.veh.state.i;
         let dt = self.cyc.dt_at_i(i)?;
         let speed_prev = self.veh.state.speed_ach;
-        // TODO: make sure `pwr_aux` is updated in here and propagated to `set_curr_pwr_out_max`
-        // maybe make a static `pwr_aux_max` and controls like:
+        // maybe make controls like:
         // ```
         // pub enum HVACAuxPriority {
         //     /// Prioritize [ReversibleEnergyStorage] thermal management
@@ -200,7 +199,7 @@ impl SimDrive {
         // }
         // ```
         self.veh
-            .solve_thermal(self.cyc.temp_amb_air[i], self.veh.state, dt)
+            .solve_thermal(self.cyc.temp_amb_air[i], dt)
             .with_context(|| format_dbg!())?;
         self.veh
             .set_curr_pwr_out_max(dt)

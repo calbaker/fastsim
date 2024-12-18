@@ -142,8 +142,8 @@ impl Powertrain for BatteryElectricVehicle {
     fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        _pwr_thrl_fc_to_cab: si::Power,
-        _veh_state: VehicleState,
+        _pwr_thrml_fc_to_cab: si::Power,
+        _veh_state: &mut VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.res

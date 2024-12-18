@@ -69,14 +69,14 @@ impl LumpedCabin {
     pub fn solve(
         &mut self,
         te_amb_air: si::Temperature,
-        veh_state: VehicleState,
+        veh_state: &mut VehicleState,
         pwr_thermal_from_hvac: si::Power,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.state.pwr_thermal_from_hvac = pwr_thermal_from_hvac;
         // flat plate model for isothermal, mixed-flow from Incropera and deWitt, Fundamentals of Heat and Mass
         // Transfer, 7th Edition
-        let cab_te_film_ext = 0.5 * (self.state.temp + te_amb_air);
+        let cab_te_film_ext = 0.5 * (self.state.temperature + te_amb_air);
         self.state.reynolds_for_plate =
             Air::get_density(Some(cab_te_film_ext), Some(veh_state.elev_curr))
                 * veh_state.speed_ach
@@ -107,15 +107,15 @@ impl LumpedCabin {
                         * Air::get_therm_cond(cab_te_film_ext).with_context(|| format_dbg!())?
                         / self.length)
                     + 1.0 / self.cab_htc_to_amb);
-            (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temp)
+            (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temperature)
         } else {
             (self.length * self.width)
                 / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_htc_to_amb)
-                * (te_amb_air - self.state.temp)
+                * (te_amb_air - self.state.temperature)
         };
 
-        self.state.temp_prev = self.state.temp;
-        self.state.temp += (self.state.pwr_thermal_from_hvac + self.state.pwr_thermal_from_amb)
+        self.state.temp_prev = self.state.temperature;
+        self.state.temperature += (self.state.pwr_thermal_from_hvac + self.state.pwr_thermal_from_amb)
             / self.heat_capacitance
             * dt;
         Ok(())
@@ -130,7 +130,7 @@ pub struct LumpedCabinState {
     /// time step counter
     pub i: u32,
     /// lumped cabin temperature
-    pub temp: si::Temperature,
+    pub temperature: si::Temperature,
     /// lumped cabin temperature at previous simulation time step
     // TODO: make sure this gets updated
     pub temp_prev: si::Temperature,

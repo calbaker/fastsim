@@ -20,7 +20,8 @@ pub use crate::vehicle::powertrain::fuel_converter::{
     FuelConverterThermalOption,
 };
 pub use crate::vehicle::powertrain::reversible_energy_storage::{
-    ReversibleEnergyStorage, ReversibleEnergyStorageState, ReversibleEnergyStorageStateHistoryVec,
+    RESLumpedThermal, RESLumpedThermalState, RESThermalOption, ReversibleEnergyStorage,
+    ReversibleEnergyStorageState, ReversibleEnergyStorageStateHistoryVec,
 };
 pub use crate::vehicle::PowertrainType;
 pub use crate::vehicle::Vehicle;

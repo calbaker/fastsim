@@ -18,8 +18,6 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             cabin: Default::default(),
             hvac: Default::default(),
             pwr_aux_base: f2veh.aux_kw * uc::KW,
-            // high value to make sure it has no effect
-            pwr_aux_max: f2veh.aux_kw * 2. * uc::KW,
             trans_eff: f2veh.trans_eff * uc::R,
             state: Default::default(),
             save_interval,

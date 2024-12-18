@@ -141,8 +141,6 @@ pub struct Vehicle {
 
     /// Baseline power required by auxilliary systems
     pub pwr_aux_base: si::Power,
-    /// Max power available for auxilliary systems
-    pub pwr_aux_max: si::Power,
 
     /// transmission efficiency
     // TODO: check if `trans_eff` is redundant (most likely) and fix
@@ -410,8 +408,6 @@ impl Vehicle {
 
     /// Solves for energy consumption
     pub fn solve_powertrain(&mut self, dt: si::Time) -> anyhow::Result<()> {
-        // TODO: do something more sophisticated with pwr_aux
-        self.state.pwr_aux = self.pwr_aux_base;
         self.pt_type
             .solve(
                 self.state.pwr_tractive,
@@ -426,12 +422,11 @@ impl Vehicle {
     }
 
     pub fn set_curr_pwr_out_max(&mut self, dt: si::Time) -> anyhow::Result<()> {
-        // TODO: when a fancier model for `pwr_aux` is implemented, put it here
         // TODO: make transmission field in vehicle and make it be able to produce an efficiency
-        // TODO: account for traction limits here
+        // TODO: account for traction limits here or somewhere?
 
         self.pt_type
-            .set_curr_pwr_prop_out_max(self.pwr_aux_base, dt, self.state)
+            .set_curr_pwr_prop_out_max(self.state.pwr_aux, dt, self.state)
             .with_context(|| anyhow!(format_dbg!()))?;
 
         (self.state.pwr_prop_fwd_max, self.state.pwr_prop_bwd_max) = self
@@ -445,27 +440,50 @@ impl Vehicle {
     pub fn solve_thermal(
         &mut self,
         te_amb_air: si::Temperature,
-        veh_state: VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
+        let veh_state = &mut self.state;
         let pwr_thrml_fc_to_cabin = match (&mut self.cabin, &mut self.hvac) {
-            (CabinOption::None, HVACOption::None) => si::Power::ZERO,
+            (CabinOption::None, HVACOption::None) => {
+                veh_state.pwr_aux = self.pwr_aux_base;
+                si::Power::ZERO
+            }
             (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabin(hvac)) => {
                 let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
                     .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
                 cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
                     .with_context(|| format_dbg!())?;
+                veh_state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 pwr_thrml_fc_to_cab
             }
             (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabinAndRES(hvac)) => {
-                todo!("Connect HVAC system to RES.");
-                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
-                    .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
+                let res = self.res_mut().with_context(|| format_dbg!("`HVACOption::LumpedCabinAndRES(...)` requires powertrain with `ReversibleEnergyStorage`"))?;
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab, pwr_thrml_hvac_to_res) = hvac
+                    .solve(
+                        te_amb_air,
+                        te_fc,
+                        cab.state,
+                        cab.heat_capacitance,
+                        res.temperature().with_context(|| {
+                            format_dbg!(
+                                "`ReversibleEnergyStorage` must be configured with thermal model."
+                            )
+                        })?,
+                        res.temp_prev().with_context(|| {
+                            format_dbg!(
+                                "`ReversibleEnergyStorage` must be configured with thermal model."
+                            )
+                        })?,
+                        dt,
+                    )
                     .with_context(|| format_dbg!())?;
                 cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
                     .with_context(|| format_dbg!())?;
+                res.solve_thermal(te_amb_air, pwr_thrml_hvac_to_res, cab.state.temperature, dt)
+                    .with_context(|| format_dbg!())?;
+                veh_state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 pwr_thrml_fc_to_cab
             }
             (CabinOption::LumpedCabinWithShell, HVACOption::LumpedCabinWithShell) => {

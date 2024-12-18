@@ -300,8 +300,6 @@ impl FuelConverter {
             )
         );
 
-        // TODO: consider how idle is handled.  The goal is to make it so that even if `self.state.pwr_aux` is
-        // zero, there will be fuel consumption to overcome internal dissipation.
         self.state.pwr_fuel = if self.state.fc_on {
             ((pwr_out_req + self.state.pwr_aux) / self.state.eff).max(self.pwr_idle_fuel)
         } else {
@@ -324,7 +322,7 @@ impl FuelConverter {
         &mut self,
         te_amb: si::Temperature,
         pwr_thrl_fc_to_cab: si::Power,
-        veh_state: VehicleState,
+        veh_state: &mut VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let veh_speed = veh_state.speed_ach;
