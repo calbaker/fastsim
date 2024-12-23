@@ -14,7 +14,7 @@ pt_type:
       max_soc: 1.0
       save_interval: 1
     em:
-      eff_interp_fwd:
+      eff_interp_achieved:
         Interp1D:
           x:
             - 0.0
@@ -94,7 +94,6 @@ chassis:
   wheel_base_meters: 2.685
 mass_kilograms: 1706.0
 pwr_aux_base_watts: 250.0
-pwr_aux_max_watts: 500.0
 trans_eff: 0.98
 save_interval: 1
 state:

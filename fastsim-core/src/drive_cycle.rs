@@ -1,5 +1,6 @@
 use crate::imports::*;
 use crate::prelude::*;
+#[cfg(feature = "pyo3")]
 use crate::resources;
 use fastsim_2::cycle::RustCycle as Cycle2;
 
@@ -74,7 +75,7 @@ lazy_static! {
 impl Init for Cycle {
     /// Sets `self.dist` and `self.elev`
     /// # Assumptions
-    /// - if `init_elev.is_none()`, then defaults to [ELEV_DEFAULT]
+    /// - if `init_elev.is_none()`, then defaults to [static@ELEV_DEFAULT]
     fn init(&mut self) -> anyhow::Result<()> {
         ensure!(self.time.len() == self.speed.len());
         ensure!(self.grade.len() == self.len());

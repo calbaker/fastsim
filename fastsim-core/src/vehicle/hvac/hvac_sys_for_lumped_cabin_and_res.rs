@@ -2,7 +2,7 @@ use super::*;
 
 #[fastsim_api]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
-/// HVAC system for [LumpedCabin] and []
+/// HVAC system for [LumpedCabin] and [ReversibleEnergyStorage::thrml]
 pub struct HVACSystemForLumpedCabinAndRES {
     /// set point temperature
     pub te_set: si::Temperature,
@@ -61,27 +61,27 @@ impl HVACSystemForLumpedCabinAndRES {
     /// # Arguments
     /// - `te_amb_air`: ambient air temperature
     /// - `te_fc`: [FuelConverter] temperature, if equipped
-    /// - `cab_state`: [Cabin] state
-    /// - `cab_heat_cap`: [Cabin] heat capacity
-    /// - `res_temp`: [ReversibleEnergyStorage] temperature
-    /// - `res_temp_prev`: [ReversibleEnergyStorage] temperature at previous time step
-    /// - `dt`: time step size
+    /// - `cab_state`: [LumpedCabinState]
+    /// - `cab_heat_cap`: [LumpedCabinState] heat capacity
+    /// - `res_temp`: [ReversibleEnergyStorage] temperatures at current and previous time step
+    /// - `dt`: simulation time step size
     ///
     /// # Returns
-    /// - `pwr_thrml_hvac_to_cabin`: thermal power flowing from HVAC system to cabin  
+    /// - `pwr_thrml_hvac_to_cabin`: thermal power flowing from [Vehicle::hvac] system to cabin  
     /// - `pwr_thrml_fc_to_cabin`: thermal power flowing from [FuelConverter] to cabin  
-    /// - `pwr_thrml_hvac_to_res`: thermal power flowing from HVAC system to
-    /// [ReversibleEnergyStorage] `thrml` system  
+    /// - `pwr_thrml_hvac_to_res`: thermal power flowing from [Vehicle::hvac] system to
+    ///     [ReversibleEnergyStorage] `thrml` system  
+    #[allow(clippy::too_many_arguments)] // the order is reasonably protected by typing
     pub fn solve(
         &mut self,
         te_amb_air: si::Temperature,
         te_fc: Option<si::Temperature>,
         cab_state: LumpedCabinState,
         cab_heat_cap: si::HeatCapacity,
-        res_temp: si::Temperature,
-        res_temp_prev: si::Temperature,
+        res_temps: (si::Temperature, si::Temperature),
         dt: si::Time,
     ) -> anyhow::Result<(si::Power, si::Power, si::Power)> {
+        let (res_temp, res_temp_prev) = res_temps;
         let mut pwr_thrml_hvac_to_cabin = self
             .solve_for_cabin(te_fc, cab_state, cab_heat_cap, dt)
             .with_context(|| format_dbg!())?;
@@ -355,6 +355,7 @@ impl HVACSystemForLumpedCabinAndRES {
                     // If `pwr_i_res` is less than zero reset to switch from cooling to heating
                     self.state.pwr_i_res = si::Power::ZERO;
                 }
+                #[allow(clippy::let_and_return)] // for readability
                 let pwr_thrml_hvac_to_res =
                     (-self.state.pwr_p_res - self.state.pwr_i_res - self.state.pwr_d_res)
                         .min(self.pwr_thermal_max);
@@ -421,21 +422,21 @@ pub struct HVACSystemForLumpedCabinAndRESState {
     pub pwr_d: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to derivative gain
     pub energy_d: si::Energy,
-    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage] due to proportional gain
+    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage::thrml] due to proportional gain
     pub pwr_p_res: si::Power,
-    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage] due to proportional gain
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage::thrml] due to proportional gain
     pub energy_p_res: si::Energy,
-    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage] due to integral gain
+    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage::thrml] due to integral gain
     pub pwr_i_res: si::Power,
-    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage] due to integral gain
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage::thrml] due to integral gain
     pub energy_i_res: si::Energy,
-    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage] due to derivative gain
+    /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage::thrml] due to derivative gain
     pub pwr_d_res: si::Power,
-    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage] due to derivative gain
+    /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage::thrml] due to derivative gain
     pub energy_d_res: si::Energy,
     /// coefficient of performance (i.e. efficiency) of vapor compression cycle
     pub cop: si::Ratio,
-    /// Au power demand from HVAC system
+    /// Au power demand from [Vehicle::hvac] system
     pub pwr_aux_for_hvac: si::Power,
     /// Cumulative aux energy for HVAC system
     pub energy_aux: si::Energy,

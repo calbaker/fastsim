@@ -14,7 +14,7 @@ lazy_static! {
 }
 
 #[fastsim_api(
-    /// Returns density of air [kg/m^3]
+    /// Returns density of air \[kg/m^3\]
     /// Source: <https://www.grc.nasa.gov/WWW/K-12/rocket/atmosmet.html>  
     ///
     /// # Equations used
@@ -23,7 +23,7 @@ lazy_static! {
     ///
     /// # Arguments  
     /// * `te_air_deg_c` - optional ambient temperature [°C] of air, defaults to 22 C
-    /// * `h_m` - optional elevation [m] above sea level, defaults to 180 m
+    /// * `h_m` - optional elevation \[m\] above sea level, defaults to 180 m
     #[staticmethod]
     #[pyo3(name = "get_density")]
     pub fn get_density_py(te_air_deg_c: Option<f64>, h_m: Option<f64>) -> f64 {

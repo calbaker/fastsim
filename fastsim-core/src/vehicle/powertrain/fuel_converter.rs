@@ -204,7 +204,7 @@ impl FuelConverter {
     /// Sets maximum possible total power [FuelConverter]
     /// can produce.
     /// # Arguments
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn set_curr_pwr_out_max(&mut self, dt: si::Time) -> anyhow::Result<()> {
         if self.pwr_out_max_init == si::Power::ZERO {
             // TODO: think about how to initialize power
@@ -238,7 +238,7 @@ impl FuelConverter {
     /// # Arguments
     /// - `pwr_out_req`: tractive power output required to achieve presribed speed
     /// - `fc_on`: whether component is actively running
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn solve(
         &mut self,
         pwr_out_req: si::Power,
@@ -321,13 +321,13 @@ impl FuelConverter {
     pub fn solve_thermal(
         &mut self,
         te_amb: si::Temperature,
-        pwr_thrl_fc_to_cab: si::Power,
+        pwr_thrml_fc_to_cab: Option<si::Power>,
         veh_state: &mut VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let veh_speed = veh_state.speed_ach;
         self.thrml
-            .solve(&self.state, te_amb, pwr_thrl_fc_to_cab, veh_speed, dt)
+            .solve(&self.state, te_amb, pwr_thrml_fc_to_cab, veh_speed, dt)
             .with_context(|| format_dbg!())
     }
 
@@ -419,28 +419,33 @@ impl FuelConverterThermalOption {
     /// # Arguments
     /// - `fc_state`: [FuelConverter] state
     /// - `te_amb`: ambient temperature
-    /// - `pwr_thrl_fc_to_cab`: heat demand from HVAC system
+    /// - `pwr_thrml_fc_to_cab`: heat demand from [Vehicle::hvac] system -- zero if `None` is passed
     /// - `veh_speed`: current achieved speed
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
         te_amb: si::Temperature,
-        pwr_thrl_fc_to_cab: si::Power,
+        pwr_thrml_fc_to_cab: Option<si::Power>,
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
         match self {
             Self::FuelConverterThermal(fct) => fct
-                .solve(fc_state, te_amb, pwr_thrl_fc_to_cab, veh_speed, dt)
+                .solve(
+                    fc_state,
+                    te_amb,
+                    pwr_thrml_fc_to_cab.unwrap_or_default(),
+                    veh_speed,
+                    dt,
+                )
                 .with_context(|| format_dbg!())?,
             Self::None => {
                 ensure!(
-                    pwr_thrl_fc_to_cab == si::Power::ZERO,
+                    pwr_thrml_fc_to_cab.is_none(),
                     format_dbg!(
                         "`FuelConverterThermal needs to be configured to provide heat demand`"
                     )
                 );
-                // TODO: make sure this triggers error if appropriate
             }
         }
         Ok(())
@@ -536,14 +541,14 @@ impl FuelConverterThermal {
     /// # Arguments
     /// - `fc_state`: [FuelConverter] state
     /// - `te_amb`: ambient temperature
-    /// - `pwr_thrl_fc_to_cab`: heat demand from HVAC system
+    /// - `pwr_thrml_fc_to_cab`: heat demand from [Vehicle::hvac] system
     /// - `veh_speed`: current achieved speed
     /// - `dt`: simulation time step size
     fn solve(
         &mut self,
         fc_state: &FuelConverterState,
         te_amb: si::Temperature,
-        pwr_thrl_fc_to_cab: si::Power,
+        pwr_thrml_fc_to_cab: si::Power,
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
@@ -605,7 +610,7 @@ impl FuelConverterThermal {
         let delta_temp: si::Temperature = (((self.htc_from_comb
             * (self.state.te_adiabatic - self.state.temperature))
             .min(self.max_frac_from_comb * heat_gen)
-            - pwr_thrl_fc_to_cab
+            - pwr_thrml_fc_to_cab
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
@@ -711,7 +716,7 @@ impl Default for FCTempEffModel {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct FCTempEffModelLinear {
     pub offset: si::Ratio,
-    /// Change in efficiency factor per change in temperature [K]
+    /// Change in efficiency factor per change in temperature /[K/]
     pub slope_per_kelvin: f64,
     pub minimum: si::Ratio,
 }

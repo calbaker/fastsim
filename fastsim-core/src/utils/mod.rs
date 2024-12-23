@@ -106,7 +106,8 @@ pub fn abs_checked_x_val(x_val: f64, x_data: &[f64]) -> anyhow::Result<f64> {
     }
 }
 
-pub(crate) const COMP_EPSILON: f64 = 1e-8;
+// public to enable exposure in docs
+pub const COMP_EPSILON: f64 = 1e-8;
 
 /// Returns true if `val1` and `val2` are within a relative/absolute `epsilon` of each other,
 /// depending on magnitude.

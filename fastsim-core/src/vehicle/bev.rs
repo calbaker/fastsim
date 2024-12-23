@@ -139,19 +139,6 @@ impl Powertrain for BatteryElectricVehicle {
         Ok(())
     }
 
-    fn solve_thermal(
-        &mut self,
-        te_amb: si::Temperature,
-        _pwr_thrml_fc_to_cab: si::Power,
-        _veh_state: &mut VehicleState,
-        dt: si::Time,
-    ) -> anyhow::Result<()> {
-        self.res
-            .solve_thermal(te_amb, dt)
-            .with_context(|| format_dbg!())?;
-        Ok(())
-    }
-
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         Ok((
             self.em.state.pwr_mech_fwd_out_max,
@@ -192,5 +179,26 @@ impl Powertrain for BatteryElectricVehicle {
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d
         // for example
         -self.em.state.pwr_mech_prop_out.min(si::Power::ZERO)
+    }
+}
+
+impl BatteryElectricVehicle {
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `te_amb`: ambient temperature
+    /// - `pwr_thrml_hvac_to_res`: thermal power flowing from [Vehicle::hvac] system to [ReversibleEnergyStorage::thrml]
+    /// - `te_cab`: cabin temperature for heat transfer interaction with [ReversibleEnergyStorage]
+    /// - `dt`: simulation time step size
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::Temperature,
+        pwr_thrml_hvac_to_res: si::Power,
+        te_cab: Option<si::Temperature>,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.res
+            .solve_thermal(te_amb, pwr_thrml_hvac_to_res, te_cab, dt)
+            .with_context(|| format_dbg!())?;
+        Ok(())
     }
 }

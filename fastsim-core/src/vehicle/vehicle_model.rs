@@ -443,48 +443,53 @@ impl Vehicle {
         dt: si::Time,
     ) -> anyhow::Result<()> {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
-        let veh_state = &mut self.state;
-        let pwr_thrml_fc_to_cabin = match (&mut self.cabin, &mut self.hvac) {
+        let res_temp = self.res().and_then(|res| res.temperature());
+        let res_temp_prev = self.res().and_then(|res| res.temp_prev());
+        let (pwr_thrml_fc_to_cabin, pwr_thrml_hvac_to_res, te_cab): (
+            Option<si::Power>,
+            Option<si::Power>,
+            Option<si::Temperature>,
+        ) = match (&mut self.cabin, &mut self.hvac) {
             (CabinOption::None, HVACOption::None) => {
-                veh_state.pwr_aux = self.pwr_aux_base;
-                si::Power::ZERO
+                self.state.pwr_aux = self.pwr_aux_base;
+                (None, None, None)
             }
             (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabin(hvac)) => {
                 let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
                     .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
-                cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
+                let te_cab = cab
+                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
                     .with_context(|| format_dbg!())?;
-                veh_state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
-                pwr_thrml_fc_to_cab
+                self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
+                (Some(pwr_thrml_fc_to_cab), None, Some(te_cab))
             }
             (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabinAndRES(hvac)) => {
-                let res = self.res_mut().with_context(|| format_dbg!("`HVACOption::LumpedCabinAndRES(...)` requires powertrain with `ReversibleEnergyStorage`"))?;
                 let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab, pwr_thrml_hvac_to_res) = hvac
                     .solve(
                         te_amb_air,
                         te_fc,
                         cab.state,
                         cab.heat_capacitance,
-                        res.temperature().with_context(|| {
-                            format_dbg!(
-                                "`ReversibleEnergyStorage` must be configured with thermal model."
-                            )
-                        })?,
-                        res.temp_prev().with_context(|| {
-                            format_dbg!(
-                                "`ReversibleEnergyStorage` must be configured with thermal model."
-                            )
-                        })?,
+                        (
+                            res_temp
+                            .with_context(
+                                || "{}\n[HVACOption::LumpedCabinAndRES] requires [ReversibleEnergyStorage::thrml] to be `Some`"
+                            )?,
+                            res_temp_prev.unwrap()
+                        ),
                         dt,
                     )
                     .with_context(|| format_dbg!())?;
-                cab.solve(te_amb_air, veh_state, pwr_thrml_hvac_to_cabin, dt)
+                let te_cab = cab
+                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
                     .with_context(|| format_dbg!())?;
-                res.solve_thermal(te_amb_air, pwr_thrml_hvac_to_res, cab.state.temperature, dt)
-                    .with_context(|| format_dbg!())?;
-                veh_state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
-                pwr_thrml_fc_to_cab
+                self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
+                (
+                    Some(pwr_thrml_fc_to_cab),
+                    Some(pwr_thrml_hvac_to_res),
+                    Some(te_cab),
+                )
             }
             (CabinOption::LumpedCabinWithShell, HVACOption::LumpedCabinWithShell) => {
                 bail!("{}\nNot yet implemented.", format_dbg!())
@@ -510,7 +515,14 @@ impl Vehicle {
         };
 
         self.pt_type
-            .solve_thermal(te_amb_air, pwr_thrml_fc_to_cabin, veh_state, dt)
+            .solve_thermal(
+                te_amb_air,
+                pwr_thrml_fc_to_cabin,
+                &mut self.state,
+                pwr_thrml_hvac_to_res,
+                te_cab,
+                dt,
+            )
             .with_context(|| format_dbg!())?;
         Ok(())
     }
@@ -534,7 +546,7 @@ pub struct VehicleState {
     pub pwr_tractive: si::Power,
     /// Tractive power required for prescribed speed
     pub pwr_tractive_for_cyc: si::Power,
-    /// integral of [Self::pwr_out]
+    /// integral of [Self::pwr_tractive]
     pub energy_tractive: si::Energy,
     /// time varying aux load
     pub pwr_aux: si::Power,

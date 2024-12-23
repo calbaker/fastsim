@@ -3,6 +3,7 @@ pub const RESOURCES_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/resources");
 
 /// List the available resources in the resources directory
 /// - subdir: &str, a subdirectory to choose from the resources directory
+///
 /// NOTE: if subdir cannot be resolved, returns an empty list
 /// RETURNS: a vector of strings for resources that can be loaded
 pub fn list_resources(subdir: &str) -> Vec<String> {

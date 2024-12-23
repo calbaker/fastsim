@@ -173,7 +173,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     },
                     em: ElectricMachine {
                         state: Default::default(),
-                        eff_interp_fwd: (Interpolator::Interp1D(
+                        eff_interp_achieved: (Interpolator::Interp1D(
                             Interp1D::new(
                                 f2veh.mc_perc_out_array.to_vec(),
                                 {
@@ -223,7 +223,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     },
                     em: ElectricMachine {
                         state: Default::default(),
-                        eff_interp_fwd: (Interpolator::Interp1D(Interp1D::new(
+                        eff_interp_achieved: (Interpolator::Interp1D(Interp1D::new(
                             f2veh.mc_pwr_out_perc.to_vec(),
                             f2veh.mc_eff_array.to_vec(),
                             Strategy::LeftNearest,
@@ -464,7 +464,7 @@ impl Vehicle {
             mc_eff_array: Default::default(), // calculated in `set_derived`
             mc_eff_map: self
                 .em()
-                .map(|em| em.eff_interp_fwd.f_x())
+                .map(|em| em.eff_interp_achieved.f_x())
                 .transpose()?
                 .map(|f_x| f_x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])
@@ -492,7 +492,7 @@ impl Vehicle {
             // short array that can use xEV when implented.  TODO: fix this when implementing xEV
             mc_pwr_out_perc: self
                 .em()
-                .map(|em| em.eff_interp_fwd.x())
+                .map(|em| em.eff_interp_achieved.x())
                 .transpose()?
                 .map(|x| x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])

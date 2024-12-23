@@ -204,27 +204,45 @@ impl Powertrain for Box<HybridElectricVehicle> {
         Ok(())
     }
 
-    fn solve_thermal(
-        &mut self,
-        te_amb: si::Temperature,
-        pwr_thrl_fc_to_cab: si::Power,
-        veh_state: &mut VehicleState,
-        dt: si::Time,
-    ) -> anyhow::Result<()> {
-        self.fc
-            .solve_thermal(te_amb, pwr_thrl_fc_to_cab, veh_state, dt)
-            .with_context(|| format_dbg!())?;
-        self.res
-            .solve_thermal(te_amb, dt)
-            .with_context(|| format_dbg!())?;
-        Ok(())
-    }
-
     fn pwr_regen(&self) -> si::Power {
         // When `pwr_mech_prop_out` is negative, regen is happening.  First, clip it at 0, and then negate it.
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d
         // for example
         -self.em.state.pwr_mech_prop_out.min(0. * uc::W)
+    }
+}
+
+impl HybridElectricVehicle {
+    /// # Arguments
+    /// - `te_amb`: ambient temperature
+    /// - `pwr_thrml_fc_to_cab`: thermal power flow from [FuelConverter::thrml]
+    ///     to [Vehicle::cabin], if cabin is equipped
+    /// - `veh_state`: current [VehicleState]
+    /// - `pwr_thrml_hvac_to_res`: thermal power flow from [Vehicle::hvac] --
+    ///     zero if `None` is passed
+    /// - `te_cab`: cabin temperature, required if [ReversibleEnergyStorage::thrml] is `Some`
+    /// - `dt`: simulation time step size
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::Temperature,
+        pwr_thrml_fc_to_cab: Option<si::Power>,
+        veh_state: &mut VehicleState,
+        pwr_thrml_hvac_to_res: Option<si::Power>,
+        te_cab: Option<si::Temperature>,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.fc
+            .solve_thermal(te_amb, pwr_thrml_fc_to_cab, veh_state, dt)
+            .with_context(|| format_dbg!())?;
+        self.res
+            .solve_thermal(
+                te_amb,
+                pwr_thrml_hvac_to_res.unwrap_or_default(),
+                te_cab,
+                dt,
+            )
+            .with_context(|| format_dbg!())?;
+        Ok(())
     }
 }
 
@@ -325,6 +343,10 @@ impl FCOnCauses {
 
     fn push(&mut self, new: FCOnCause) {
         self.0.push(new)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -438,8 +460,7 @@ pub enum HEVAuxControls {
 pub enum HEVPowertrainControls {
     /// Controls that attempt to match fastsim-2
     RGWDB(Box<RESGreedyWithDynamicBuffers>),
-    /// Controls that have a dynamically updated discharge buffer but are
-    /// otherwise similar to [Self::Fastsim2]
+    /// place holder for future variants
     Placeholder,
 }
 
@@ -597,7 +618,7 @@ pub struct RESGreedyWithDynamicBuffers {
     /// Minimum time engine must remain on if it was on during the previous
     /// simulation time step.
     pub fc_min_time_on: Option<si::Time>,
-    /// Speed at which [fuelconverter] is forced on.
+    /// Speed at which [FuelConverter] is forced on.
     pub speed_fc_forced_on: Option<si::Velocity>,
     /// Fraction of total aux and powertrain rated power at which
     /// [FuelConverter] is forced on.

@@ -220,7 +220,7 @@ impl SimDrive {
     /// # Arguments
     /// - `speed`: prescribed or achieved speed
     // - `speed_prev`: previously achieved speed
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn set_pwr_prop_for_speed(
         &mut self,
         speed: si::Velocity,
@@ -313,7 +313,7 @@ impl SimDrive {
     /// Sets achieved speed based on known current max power
     /// # Arguments
     /// - `cyc_speed`: prescribed speed
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     /// - `speed_prev`: previously achieved speed
     pub fn set_ach_speed(
         &mut self,

@@ -94,7 +94,7 @@ pub struct TransmissionState {
 
     pub pwr_out: si::Power,
     pub pwr_in: si::Power,
-    /// Power loss: [`pwr_in`] - [`pwr_out`]
+    /// Power loss: [Self::pwr_in] - [Self::pwr_out]
     pub pwr_loss: si::Power,
 
     pub energy_out: si::Energy,

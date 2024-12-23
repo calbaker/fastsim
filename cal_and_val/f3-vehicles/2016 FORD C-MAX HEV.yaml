@@ -232,7 +232,7 @@ pt_type:
       pwr_idle_fuel_watts: 0.0
       save_interval: 1
     em:
-      eff_interp_fwd:
+      eff_interp_achieved:
         Interp1D:
           x:
             - 0.0
@@ -687,7 +687,6 @@ chassis:
   wheel_base_meters: 2.6
 mass_kilograms: 1950.3693212520827
 pwr_aux_base_watts: 500.0
-pwr_aux_max_watts: 1000.0
 trans_eff: 0.95
 save_interval: 1
 state:

@@ -59,14 +59,16 @@ use crate::pyo3::*;
 /// electronics.
 pub struct ElectricMachine {
     #[api(skip_set, skip_get)]
-    /// Efficiency array corresponding to [Self::pwr_out_frac_interp] and [Self::pwr_in_frac_interp]
-    /// eff_interp_fwd and eff_interp_bwd have the same f_x but different x
-    /// note that the Extrapolate field of this variable is changed in get_pwr_in_req()
-    pub eff_interp_fwd: Interpolator,
+    /// Efficiency interpolator corresponding to achieved output power
+    ///
+    /// Note that the Extrapolate field of this variable is changed in [Self::get_pwr_in_req]
+    pub eff_interp_achieved: Interpolator,
     #[serde(default)]
     #[api(skip_set, skip_get)]
-    /// if it is not provided, will be set during init
-    /// note that the Extrapolate field of this variable is changed in set_cur_pwr_prop_out_max()
+    /// Efficiency interpolator corresponding to max input power
+    /// If `None`, will be set during [Self::init].
+    ///
+    /// Note that the Extrapolate field of this variable is changed in [Self::set_curr_pwr_prop_out_max]
     pub eff_interp_at_max_input: Option<Interpolator>,
     /// Electrical input power fraction array at which efficiencies are evaluated.
     /// Calculated during runtime if not provided.
@@ -108,7 +110,7 @@ impl ElectricMachine {
     ///     component. Zero means no power can be sent to upstream compnents and positive
     ///     values indicate upstream components can absorb energy.
     /// - `pwr_aux`: aux-related power required from this component
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn set_curr_pwr_prop_out_max(
         &mut self,
         pwr_in_fwd_lim: si::Power,
@@ -200,7 +202,7 @@ impl ElectricMachine {
     /// Solves for this powertrain system/component efficiency and sets/returns power input required.
     /// # Arguments
     /// - `pwr_out_req`: propulsion-related power output required
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn get_pwr_in_req(
         &mut self,
         pwr_out_req: si::Power,
@@ -242,17 +244,18 @@ impl ElectricMachine {
         self.state.pwr_out_req = pwr_out_req;
 
         // ensuring eff_interp_fwd has Extrapolate set to Error before calculating self.state.eff
-        self.eff_interp_fwd.set_extrapolate(Extrapolate::Error)?;
+        self.eff_interp_achieved
+            .set_extrapolate(Extrapolate::Error)?;
 
         self.state.eff = uc::R
             * self
-                .eff_interp_fwd
+                .eff_interp_achieved
                 .interpolate(
                     &[{
                         let pwr = |pwr_uncorrected: f64| -> anyhow::Result<f64> {
                             Ok({
                                 if self
-                                    .eff_interp_fwd
+                                    .eff_interp_achieved
                                     .x()?
                                     .first()
                                     .with_context(|| anyhow!(format_dbg!()))?
@@ -307,7 +310,7 @@ impl SerdeAPI for ElectricMachine {}
 impl Init for ElectricMachine {
     fn init(&mut self) -> anyhow::Result<()> {
         let _ = self.mass().with_context(|| anyhow!(format_dbg!()))?;
-        let _ = check_interp_frac_data(self.eff_interp_fwd.x()?, InterpRange::Either)
+        let _ = check_interp_frac_data(self.eff_interp_achieved.x()?, InterpRange::Either)
             .with_context(||
                 "Invalid values for `ElectricMachine::pwr_out_frac_interp`; must range from [-1..1] or [0..1].")?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
@@ -321,18 +324,18 @@ impl Init for ElectricMachine {
             // sets eff_interp_bwd to eff_interp_fwd, but changes the x-value.
             // TODO: what should the default strategy be for eff_interp_bwd?
             let eff_interp_at_max_input = Interp1D::new(
-                self.eff_interp_fwd
+                self.eff_interp_achieved
                     .x()?
                     .iter()
-                    .zip(self.eff_interp_fwd.f_x()?)
+                    .zip(self.eff_interp_achieved.f_x()?)
                     .map(|(x, y)| x / y)
                     .collect(),
-                self.eff_interp_fwd.f_x()?.to_owned(),
+                self.eff_interp_achieved.f_x()?.to_owned(),
                 // TODO: should these be set to be the same as eff_interp_fwd,
                 // as currently is done, or should they be set to be specific
                 // Extrapolate and Strategy types?
-                self.eff_interp_fwd.strategy()?.to_owned(),
-                self.eff_interp_fwd.extrapolate()?.to_owned(),
+                self.eff_interp_achieved.strategy()?.to_owned(),
+                self.eff_interp_achieved.extrapolate()?.to_owned(),
             )?;
             self.eff_interp_at_max_input = Some(Interpolator::Interp1D(eff_interp_at_max_input));
         }
@@ -414,7 +417,7 @@ impl ElectricMachine {
     pub fn get_eff_max_fwd(&self) -> anyhow::Result<f64> {
         // since efficiency is all f64 between 0 and 1, NEG_INFINITY is safe
         Ok(self
-            .eff_interp_fwd
+            .eff_interp_achieved
             .f_x()?
             .iter()
             .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr)))
@@ -437,8 +440,8 @@ impl ElectricMachine {
         if (0.0..=1.0).contains(&eff_max) {
             let old_max_fwd = self.get_eff_max_fwd()?;
             let old_max_bwd = self.get_eff_max_bwd()?;
-            let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
-            match &mut self.eff_interp_fwd {
+            let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
+            match &mut self.eff_interp_achieved {
                 Interpolator::Interp1D(interp1d) => {
                     interp1d
                         .set_f_x(f_x_fwd.iter().map(|x| x * eff_max / old_max_fwd).collect())?;
@@ -478,7 +481,7 @@ impl ElectricMachine {
     pub fn get_eff_min_fwd(&self) -> anyhow::Result<f64> {
         // since efficiency is all f64 between 0 and 1, NEG_INFINITY is safe
         Ok(self
-            .eff_interp_fwd
+            .eff_interp_achieved
             .f_x()
             .with_context(|| "eff_interp_fwd does not have f_x field")?
             .iter()
@@ -517,12 +520,12 @@ impl ElectricMachine {
         if eff_range == 0.0 {
             let f_x_fwd = vec![
                 eff_max_fwd;
-                self.eff_interp_fwd
+                self.eff_interp_achieved
                     .f_x()
                     .with_context(|| "eff_interp_fwd does not have f_x field")?
                     .len()
             ];
-            self.eff_interp_fwd.set_f_x(f_x_fwd)?;
+            self.eff_interp_achieved.set_f_x(f_x_fwd)?;
             let f_x_bwd = vec![
                 eff_max_bwd;
                 match &self.eff_interp_at_max_input {
@@ -548,8 +551,8 @@ impl ElectricMachine {
                     "`eff_range` is already zero so it cannot be modified."
                 ));
             }
-            let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
-            match &mut self.eff_interp_fwd {
+            let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
+            match &mut self.eff_interp_achieved {
                 Interpolator::Interp1D(interp1d) => {
                     interp1d.set_f_x(
                         f_x_fwd
@@ -562,8 +565,8 @@ impl ElectricMachine {
             }
             if self.get_eff_min_fwd()? < 0.0 {
                 let x_neg = self.get_eff_min_fwd()?;
-                let f_x_fwd = self.eff_interp_fwd.f_x()?.to_owned();
-                match &mut self.eff_interp_fwd {
+                let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
+                match &mut self.eff_interp_achieved {
                     Interpolator::Interp1D(interp1d) => {
                         interp1d.set_f_x(f_x_fwd.iter().map(|x| x - x_neg).collect())?;
                     }

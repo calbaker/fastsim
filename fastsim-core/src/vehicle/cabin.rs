@@ -64,15 +64,18 @@ impl LumpedCabin {
     /// Arguments:
     /// - `te_amb_air`: ambient air temperature
     /// - `veh_state`: current [VehicleState]
-    /// - 'pwr_thermal_from_hvac`: power to cabin from HVAC system
+    /// - 'pwr_thermal_from_hvac`: power to cabin from [Vehicle::hvac] system
     /// - `dt`: simulation time step size
+    /// # Returns
+    /// - `te_cab`: current cabin temperature, after solving cabin for current
+    ///     simulation time step
     pub fn solve(
         &mut self,
         te_amb_air: si::Temperature,
-        veh_state: &mut VehicleState,
+        veh_state: &VehicleState,
         pwr_thermal_from_hvac: si::Power,
         dt: si::Time,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<si::Temperature> {
         self.state.pwr_thermal_from_hvac = pwr_thermal_from_hvac;
         // flat plate model for isothermal, mixed-flow from Incropera and deWitt, Fundamentals of Heat and Mass
         // Transfer, 7th Edition
@@ -115,10 +118,11 @@ impl LumpedCabin {
         };
 
         self.state.temp_prev = self.state.temperature;
-        self.state.temperature += (self.state.pwr_thermal_from_hvac + self.state.pwr_thermal_from_amb)
+        self.state.temperature += (self.state.pwr_thermal_from_hvac
+            + self.state.pwr_thermal_from_amb)
             / self.heat_capacitance
             * dt;
-        Ok(())
+        Ok(self.state.temperature)
     }
 }
 
@@ -134,10 +138,10 @@ pub struct LumpedCabinState {
     /// lumped cabin temperature at previous simulation time step
     // TODO: make sure this gets updated
     pub temp_prev: si::Temperature,
-    /// Thermal power coming to cabin from HVAC system.  Positive indicates
+    /// Thermal power coming to cabin from [Vehicle::hvac] system.  Positive indicates
     /// heating, and negative indicates cooling.
     pub pwr_thermal_from_hvac: si::Power,
-    /// Cumulative thermal energy coming to cabin from HVAC system.  Positive indicates
+    /// Cumulative thermal energy coming to cabin from [Vehicle::hvac] system.  Positive indicates
     /// heating, and negative indicates cooling.
     pub energy_thermal_from_hvac: si::Energy,
     /// Thermal power coming to cabin from ambient air.  Positive indicates

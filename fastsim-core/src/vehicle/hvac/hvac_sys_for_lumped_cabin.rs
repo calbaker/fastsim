@@ -41,6 +41,15 @@ pub struct HVACSystemForLumpedCabin {
 impl Init for HVACSystemForLumpedCabin {}
 impl SerdeAPI for HVACSystemForLumpedCabin {}
 impl HVACSystemForLumpedCabin {
+    /// # Arguments
+    /// - `te_amb_air`: ambient air temperature
+    /// - `te_fc`: [FuelConverter] temperature, if equipped
+    /// - `cab_state`: [LumpedCabinState]
+    /// - `cab_heat_cap`: cabin heat capacitance
+    /// - `dt`: simulation time step size
+    /// # Returns
+    /// - `pwr_thrml_hvac_to_cabin`: thermal power flow from [Vehicle::hvac] system to cabin
+    /// - `pwr_thrml_fc_to_cabin`: thermal power flow from [FuelConverter] to cabin via HVAC system
     pub fn solve(
         &mut self,
         te_amb_air: si::Temperature,
@@ -242,7 +251,7 @@ pub struct HVACSystemForLumpedCabinState {
     pub energy_d: si::Energy,
     /// coefficient of performance (i.e. efficiency) of vapor compression cycle
     pub cop: si::Ratio,
-    /// Aux power demand from HVAC system
+    /// Aux power demand from [Vehicle::hvac] system
     pub pwr_aux_for_hvac: si::Power,
     /// Cumulative aux energy for HVAC system
     pub energy_aux: si::Energy,

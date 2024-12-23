@@ -9,7 +9,7 @@ pub trait Powertrain {
     /// required.
     /// # Arguments
     /// - `pwr_aux`: aux-related power required from this component
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     fn set_curr_pwr_prop_out_max(
         &mut self,
         pwr_aux: si::Power,
@@ -26,20 +26,12 @@ pub trait Powertrain {
     /// - `pwr_out_req`: propulsion-related power output required
     /// - `veh_state`: state of vehicle
     /// - `enabled`: whether the component is active in current time step (e.g. engine idling v. shut off)
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
         veh_state: VehicleState,
         enabled: bool,
-        dt: si::Time,
-    ) -> anyhow::Result<()>;
-
-    fn solve_thermal(
-        &mut self,
-        te_amb: si::Temperature,
-        pwr_thrl_fc_to_cab: si::Power,
-        veh_state: &mut VehicleState,
         dt: si::Time,
     ) -> anyhow::Result<()>;
 
