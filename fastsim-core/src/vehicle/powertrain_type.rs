@@ -24,7 +24,7 @@ impl Powertrain for PowertrainType {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
     ) -> anyhow::Result<()> {
         match self {
             Self::ConventionalVehicle(v) => v.set_curr_pwr_prop_out_max(pwr_aux, dt, veh_state),
@@ -36,7 +36,7 @@ impl Powertrain for PowertrainType {
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
         enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
@@ -82,6 +82,45 @@ impl SaveInterval for PowertrainType {
 }
 
 impl PowertrainType {
+    /// # Arguments:
+    /// - `te_amb`: ambient temperature
+    /// - `pwr_thrml_fc_to_cab`: thermal power flow from [FuelConverter::thrml] to [Vehicle::cabin], if both are equipped
+    /// - `veh_state`: current state of vehicle
+    /// - `pwr_thrml_hvac_to_res`: thermal power flow from [Vehicle::hvac]
+    ///    system, if equipped, to [ReversibleEnergyStorage::thrml] -- zero if `None` is
+    ///    passed
+    /// - `te_cab`: [Vehicle::cabin] temperature, if equipped
+    /// - `dt`: simulation time step size
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::Temperature,
+        pwr_thrml_fc_to_cab: Option<si::Power>,
+        veh_state: &mut VehicleState,
+        pwr_thrml_hvac_to_res: Option<si::Power>,
+        te_cab: Option<si::Temperature>,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::ConventionalVehicle(v) => {
+                v.solve_thermal(te_amb, pwr_thrml_fc_to_cab, veh_state, dt)
+            }
+            Self::HybridElectricVehicle(v) => v.solve_thermal(
+                te_amb,
+                pwr_thrml_fc_to_cab,
+                veh_state,
+                pwr_thrml_hvac_to_res,
+                te_cab,
+                dt,
+            ),
+            Self::BatteryElectricVehicle(v) => v.solve_thermal(
+                te_amb,
+                pwr_thrml_hvac_to_res.unwrap_or_default(),
+                te_cab,
+                dt,
+            ),
+        }
+    }
+
     pub fn conv_mut(&mut self) -> Option<&mut ConventionalVehicle> {
         match self {
             Self::ConventionalVehicle(conv) => Some(conv),

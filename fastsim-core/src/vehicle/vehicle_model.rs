@@ -1,6 +1,4 @@
-use cabin::CabinOption;
-
-use crate::prelude::Air;
+use crate::prelude::*;
 
 use super::{hev::HEVPowertrainControls, *};
 use crate::resources;
@@ -131,14 +129,18 @@ pub struct Vehicle {
     #[api(skip_get, skip_set)]
     pub cabin: CabinOption,
 
+    /// HVAC model
+    #[serde(default, skip_serializing_if = "HVACOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub hvac: HVACOption,
+
     /// Total vehicle mass
     #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
-    /// power required by auxilliary systems (e.g. HVAC, stereo)  
-    /// TODO: make this an enum to allow for future variations
-    pub pwr_aux: si::Power,
+    /// Baseline power required by auxilliary systems
+    pub pwr_aux_base: si::Power,
 
     /// transmission efficiency
     // TODO: check if `trans_eff` is redundant (most likely) and fix
@@ -151,12 +153,10 @@ pub struct Vehicle {
     #[serde(skip_serializing_if = "Option::is_none")]
     save_interval: Option<usize>,
     /// current state of vehicle
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: VehicleState,
     /// Vector-like history of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
+    #[serde(default, skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
     pub history: VehicleStateHistoryVec,
 }
 
@@ -290,6 +290,11 @@ impl SetCumulative for Vehicle {
         if let Some(em) = self.em_mut() {
             em.set_cumulative(dt);
         }
+        match &mut self.cabin {
+            CabinOption::LumpedCabin(lumped_cabin) => lumped_cabin.set_cumulative(dt),
+            CabinOption::LumpedCabinWithShell => todo!(),
+            CabinOption::None => {}
+        }
         self.state.dist += self.state.speed_ach * dt;
     }
 }
@@ -403,12 +408,10 @@ impl Vehicle {
 
     /// Solves for energy consumption
     pub fn solve_powertrain(&mut self, dt: si::Time) -> anyhow::Result<()> {
-        // TODO: do something more sophisticated with pwr_aux
-        self.state.pwr_aux = self.pwr_aux;
         self.pt_type
             .solve(
                 self.state.pwr_tractive,
-                &self.state,
+                self.state,
                 true, // `enabled` should always be true at the powertrain level
                 dt,
             )
@@ -419,12 +422,11 @@ impl Vehicle {
     }
 
     pub fn set_curr_pwr_out_max(&mut self, dt: si::Time) -> anyhow::Result<()> {
-        // TODO: when a fancier model for `pwr_aux` is implemented, put it here
         // TODO: make transmission field in vehicle and make it be able to produce an efficiency
-        // TODO: account for traction limits here
+        // TODO: account for traction limits here or somewhere?
 
         self.pt_type
-            .set_curr_pwr_prop_out_max(self.pwr_aux, dt, &self.state)
+            .set_curr_pwr_prop_out_max(self.state.pwr_aux, dt, self.state)
             .with_context(|| anyhow!(format_dbg!()))?;
 
         (self.state.pwr_prop_fwd_max, self.state.pwr_prop_bwd_max) = self
@@ -432,6 +434,96 @@ impl Vehicle {
             .get_curr_pwr_prop_out_max()
             .with_context(|| anyhow!(format_dbg!()))?;
 
+        Ok(())
+    }
+
+    pub fn solve_thermal(
+        &mut self,
+        te_amb_air: si::Temperature,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
+        let res_temp = self.res().and_then(|res| res.temperature());
+        let res_temp_prev = self.res().and_then(|res| res.temp_prev());
+        let (pwr_thrml_fc_to_cabin, pwr_thrml_hvac_to_res, te_cab): (
+            Option<si::Power>,
+            Option<si::Power>,
+            Option<si::Temperature>,
+        ) = match (&mut self.cabin, &mut self.hvac) {
+            (CabinOption::None, HVACOption::None) => {
+                self.state.pwr_aux = self.pwr_aux_base;
+                (None, None, None)
+            }
+            (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabin(hvac)) => {
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab) = hvac
+                    .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
+                    .with_context(|| format_dbg!())?;
+                let te_cab = cab
+                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .with_context(|| format_dbg!())?;
+                self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
+                (Some(pwr_thrml_fc_to_cab), None, Some(te_cab))
+            }
+            (CabinOption::LumpedCabin(cab), HVACOption::LumpedCabinAndRES(hvac)) => {
+                let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cab, pwr_thrml_hvac_to_res) = hvac
+                    .solve(
+                        te_amb_air,
+                        te_fc,
+                        cab.state,
+                        cab.heat_capacitance,
+                        (
+                            res_temp
+                            .with_context(
+                                || "{}\n[HVACOption::LumpedCabinAndRES] requires [ReversibleEnergyStorage::thrml] to be `Some`"
+                            )?,
+                            res_temp_prev.unwrap()
+                        ),
+                        dt,
+                    )
+                    .with_context(|| format_dbg!())?;
+                let te_cab = cab
+                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .with_context(|| format_dbg!())?;
+                self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
+                (
+                    Some(pwr_thrml_fc_to_cab),
+                    Some(pwr_thrml_hvac_to_res),
+                    Some(te_cab),
+                )
+            }
+            (CabinOption::LumpedCabinWithShell, HVACOption::LumpedCabinWithShell) => {
+                bail!("{}\nNot yet implemented.", format_dbg!())
+            }
+            (CabinOption::None, HVACOption::ReversibleEnergyStorageOnly) => {
+                bail!("{}\nNot yet implemented.", format_dbg!())
+            }
+            (CabinOption::None, _) => {
+                bail!(
+                    "{}\n`CabinOption::is_none` must be true if `HVACOption::is_none` is true.",
+                    format_dbg!()
+                )
+            }
+            (_, HVACOption::None) => {
+                bail!(
+                    "{}\n`CabinOption::is_none` must be true if `HVACOption::is_none` is true.",
+                    format_dbg!()
+                )
+            }
+            _ => todo!(
+                "This match needs more match arms to be fully correct in validating model config."
+            ),
+        };
+
+        self.pt_type
+            .solve_thermal(
+                te_amb_air,
+                pwr_thrml_fc_to_cabin,
+                &mut self.state,
+                pwr_thrml_hvac_to_res,
+                te_cab,
+                dt,
+            )
+            .with_context(|| format_dbg!())?;
         Ok(())
     }
 }
@@ -454,7 +546,7 @@ pub struct VehicleState {
     pub pwr_tractive: si::Power,
     /// Tractive power required for prescribed speed
     pub pwr_tractive_for_cyc: si::Power,
-    /// integral of [Self::pwr_out]
+    /// integral of [Self::pwr_tractive]
     pub energy_tractive: si::Energy,
     /// time varying aux load
     pub pwr_aux: si::Power,
@@ -497,6 +589,9 @@ pub struct VehicleState {
     pub dist: si::Length,
     /// current grade
     pub grade_curr: si::Ratio,
+    /// current grade
+    #[serde(skip_deserializing, default)]
+    pub elev_curr: si::Length,
     /// current air density
     #[serde(skip_serializing, default)]
     pub air_density: si::MassDensity,
@@ -535,6 +630,8 @@ impl Default for VehicleState {
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
             grade_curr: si::Ratio::ZERO,
+            // note that this value will be overwritten
+            elev_curr: f64::NAN * uc::M,
             air_density: Air::get_density(None, None),
             mass: uc::KG * f64::NAN,
         }
@@ -592,8 +689,8 @@ pub(crate) mod tests {
             veh.unwrap()
         };
 
-        // veh.to_file(vehicles_dir().join("2022_Renault_Zoe_ZE50_R135.yaml"))
-        //     .unwrap();
+        veh.to_file(vehicles_dir().join("2022_Renault_Zoe_ZE50_R135.yaml"))
+            .unwrap();
         assert!(veh.pt_type.is_battery_electric_vehicle());
         veh
     }

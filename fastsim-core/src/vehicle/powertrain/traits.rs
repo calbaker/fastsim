@@ -9,12 +9,12 @@ pub trait Powertrain {
     /// required.
     /// # Arguments
     /// - `pwr_aux`: aux-related power required from this component
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     fn set_curr_pwr_prop_out_max(
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
     ) -> anyhow::Result<()>;
 
     /// Returns maximum achievable positive and negative propulsion powers after
@@ -26,11 +26,11 @@ pub trait Powertrain {
     /// - `pwr_out_req`: propulsion-related power output required
     /// - `veh_state`: state of vehicle
     /// - `enabled`: whether the component is active in current time step (e.g. engine idling v. shut off)
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        veh_state: &VehicleState,
+        veh_state: VehicleState,
         enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()>;

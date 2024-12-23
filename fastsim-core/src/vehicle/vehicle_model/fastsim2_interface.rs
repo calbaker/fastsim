@@ -16,7 +16,8 @@ impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
             pt_type,
             chassis: Chassis::try_from(&f2veh)?,
             cabin: Default::default(),
-            pwr_aux: f2veh.aux_kw * uc::KW,
+            hvac: Default::default(),
+            pwr_aux_base: f2veh.aux_kw * uc::KW,
             trans_eff: f2veh.trans_eff * uc::R,
             state: Default::default(),
             save_interval,
@@ -57,7 +58,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
-                            thermal_plant: Default::default(),
+                            thrml: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,
@@ -94,25 +95,31 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                 Ok(PowertrainType::ConventionalVehicle(Box::new(conv)))
             }
             HEV => {
-                let pt_cntrl = HEVPowertrainControls::RGWDB(hev::RESGreedyWithDynamicBuffers {
-                    speed_soc_fc_on_buffer: None,
-                    speed_soc_accel_buffer: None,
-                    speed_soc_accel_buffer_coeff: None,
-                    speed_soc_regen_buffer: None,
-                    speed_soc_regen_buffer_coeff: None,
-                    // note that this exists in `fastsim-2` but has no apparent effect!
-                    fc_min_time_on: None,
-                    speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
-                    frac_pwr_demand_fc_forced_on: Some(
-                        f2veh.kw_demand_fc_on
-                            / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
-                            * uc::R,
-                    ),
-                    frac_of_most_eff_pwr_to_run_fc: None,
-                    // TODO: make sure these actually do something, if deemed worthwhile
-                    frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
-                    frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
-                });
+                let pt_cntrl =
+                    HEVPowertrainControls::RGWDB(Box::new(hev::RESGreedyWithDynamicBuffers {
+                        speed_soc_fc_on_buffer: None,
+                        speed_soc_fc_on_buffer_coeff: None,
+                        speed_soc_disch_buffer: None,
+                        speed_soc_disch_buffer_coeff: None,
+                        speed_soc_regen_buffer: None,
+                        speed_soc_regen_buffer_coeff: None,
+                        // note that this exists in `fastsim-2` but has no apparent effect!
+                        fc_min_time_on: None,
+                        speed_fc_forced_on: Some(f2veh.mph_fc_on * uc::MPH),
+                        frac_pwr_demand_fc_forced_on: Some(
+                            f2veh.kw_demand_fc_on
+                                / (f2veh.fc_max_kw + f2veh.ess_max_kw.min(f2veh.mc_max_kw))
+                                * uc::R,
+                        ),
+                        frac_of_most_eff_pwr_to_run_fc: None,
+                        // TODO: make sure these actually do something, if deemed worthwhile
+                        frac_res_chrg_for_fc: f2veh.ess_chg_to_fc_max_eff_perc * uc::R,
+                        frac_res_dschrg_for_fc: f2veh.ess_dischg_to_fc_max_eff_perc * uc::R,
+                        temp_fc_forced_on: None,
+                        temp_fc_allowed_off: None,
+                        state: Default::default(),
+                        history: Default::default(),
+                    }));
                 let mut hev = HybridElectricVehicle {
                     fs: {
                         let mut fs = FuelStorage {
@@ -129,7 +136,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     fc: {
                         let mut fc = FuelConverter {
                             state: Default::default(),
-                            thermal_plant: Default::default(),
+                            thrml: Default::default(),
                             mass: None,
                             specific_pwr: Some(f2veh.fc_kw_per_kg * uc::KW / uc::KG),
                             pwr_out_max: f2veh.fc_max_kw * uc::KW,
@@ -154,6 +161,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         fc
                     },
                     res: ReversibleEnergyStorage {
+                        thrml: Default::default(),
                         state: Default::default(),
                         mass: None,
                         specific_energy: None,
@@ -167,7 +175,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     },
                     em: ElectricMachine {
                         state: Default::default(),
-                        eff_interp_fwd: (Interpolator::Interp1D(
+                        eff_interp_achieved: (Interpolator::Interp1D(
                             Interp1D::new(
                                 f2veh.mc_perc_out_array.to_vec(),
                                 {
@@ -203,6 +211,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
             BEV => {
                 let bev = BatteryElectricVehicle {
                     res: ReversibleEnergyStorage {
+                        thrml: Default::default(),
                         state: Default::default(),
                         mass: None,
                         specific_energy: None,
@@ -216,7 +225,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                     },
                     em: ElectricMachine {
                         state: Default::default(),
-                        eff_interp_fwd: (Interpolator::Interp1D(Interp1D::new(
+                        eff_interp_achieved: (Interpolator::Interp1D(Interp1D::new(
                             f2veh.mc_pwr_out_perc.to_vec(),
                             f2veh.mc_eff_array.to_vec(),
                             Strategy::LeftNearest,
@@ -275,7 +284,7 @@ impl Vehicle {
                 _ => 1.0,
             },
             alt_eff_doc: None,
-            aux_kw: self.pwr_aux.get::<si::kilowatt>(),
+            aux_kw: self.pwr_aux_base.get::<si::kilowatt>(),
             aux_kw_doc: None,
             cargo_kg: self
                 .chassis
@@ -457,7 +466,7 @@ impl Vehicle {
             mc_eff_array: Default::default(), // calculated in `set_derived`
             mc_eff_map: self
                 .em()
-                .map(|em| em.eff_interp_fwd.f_x())
+                .map(|em| em.eff_interp_achieved.f_x())
                 .transpose()?
                 .map(|f_x| f_x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])
@@ -485,7 +494,7 @@ impl Vehicle {
             // short array that can use xEV when implented.  TODO: fix this when implementing xEV
             mc_pwr_out_perc: self
                 .em()
-                .map(|em| em.eff_interp_fwd.x())
+                .map(|em| em.eff_interp_achieved.x())
                 .transpose()?
                 .map(|x| x.to_vec())
                 .unwrap_or_else(|| vec![0., 1.])

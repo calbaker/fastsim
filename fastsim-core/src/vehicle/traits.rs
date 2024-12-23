@@ -2,7 +2,7 @@
 
 use super::*;
 
-#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, IsVariant)]
 /// Governs which side effect to trigger when setting mass
 pub enum MassSideEffect {
     /// To be used when [MassSideEffect] is not applicable

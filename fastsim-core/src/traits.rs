@@ -81,8 +81,6 @@ pub trait SerdeAPI: Serialize + for<'a> Deserialize<'a> + Init {
         "json",
         #[cfg(feature = "toml")]
         "toml",
-        #[cfg(feature = "bincode")]
-        "bin",
     ];
     const ACCEPTED_STR_FORMATS: &'static [&'static str] = &[
         #[cfg(feature = "yaml")]
@@ -190,8 +188,6 @@ pub trait SerdeAPI: Serialize + for<'a> Deserialize<'a> + Init {
                 let toml_string = self.to_toml()?;
                 wtr.write_all(toml_string.as_bytes())?;
             }
-            #[cfg(feature = "bincode")]
-            "bin" => bincode::serialize_into(wtr, self)?,
             _ => bail!(
                 "Unsupported format {format:?}, must be one of {:?}",
                 Self::ACCEPTED_BYTE_FORMATS
@@ -223,8 +219,6 @@ pub trait SerdeAPI: Serialize + for<'a> Deserialize<'a> + Init {
                 rdr.read_to_string(&mut buf)?;
                 Self::from_toml(buf, skip_init)?
             }
-            #[cfg(feature = "bincode")]
-            "bin" => bincode::deserialize_from(rdr)?,
             _ => bail!(
                 "Unsupported format {format:?}, must be one of {:?}",
                 Self::ACCEPTED_BYTE_FORMATS
@@ -279,27 +273,6 @@ pub trait SerdeAPI: Serialize + for<'a> Deserialize<'a> + Init {
                 ),
             },
         )
-    }
-
-    /// Write (serialize) an object to bincode-encoded bytes
-    #[cfg(feature = "bincode")]
-    fn to_bincode(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(bincode::serialize(&self)?)
-    }
-
-    /// Read (deserialize) an object from bincode-encoded bytes
-    ///
-    /// # Arguments
-    ///
-    /// * `encoded` - Encoded bytes to deserialize from
-    ///
-    #[cfg(feature = "bincode")]
-    fn from_bincode(encoded: &[u8], skip_init: bool) -> anyhow::Result<Self> {
-        let mut bincode_de: Self = bincode::deserialize(encoded)?;
-        if !skip_init {
-            bincode_de.init()?;
-        }
-        Ok(bincode_de)
     }
 
     /// Write (serialize) an object to a JSON string

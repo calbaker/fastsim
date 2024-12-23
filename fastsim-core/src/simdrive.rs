@@ -18,7 +18,7 @@ pub struct SimParams {
     #[api(skip_get, skip_set)]
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
-    pub f2_air_density: bool,
+    pub f2_const_air_density: bool,
 }
 
 impl SerdeAPI for SimParams {}
@@ -32,7 +32,7 @@ impl Default for SimParams {
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
-            f2_air_density: true,
+            f2_const_air_density: true,
         }
     }
 }
@@ -185,11 +185,22 @@ impl SimDrive {
     }
 
     /// Solves current time step
-    /// # Arguments
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
         let i = self.veh.state.i;
         let dt = self.cyc.dt_at_i(i)?;
         let speed_prev = self.veh.state.speed_ach;
+        // maybe make controls like:
+        // ```
+        // pub enum HVACAuxPriority {
+        //     /// Prioritize [ReversibleEnergyStorage] thermal management
+        //     ReversibleEnergyStorage
+        //     /// Prioritize [Cabin] and [ReversibleEnergyStorage] proportionally to their requests
+        //     Proportional
+        // }
+        // ```
+        self.veh
+            .solve_thermal(self.cyc.temp_amb_air[i], dt)
+            .with_context(|| format_dbg!())?;
         self.veh
             .set_curr_pwr_out_max(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -209,7 +220,7 @@ impl SimDrive {
     /// # Arguments
     /// - `speed`: prescribed or achieved speed
     // - `speed_prev`: previously achieved speed
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     pub fn set_pwr_prop_for_speed(
         &mut self,
         speed: si::Velocity,
@@ -230,7 +241,7 @@ impl SimDrive {
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
                     .interpolate(&[vs.dist.get::<si::meter>()])?
         };
-        let elev_curr = if vs.cyc_met_overall {
+        vs.elev_curr = if vs.cyc_met_overall {
             *self.cyc.elev.get(i).with_context(|| format_dbg!())?
         } else {
             uc::M
@@ -242,14 +253,22 @@ impl SimDrive {
                     .interpolate(&[vs.dist.get::<si::meter>()])?
         };
 
-        vs.air_density = if self.sim_params.f2_air_density {
+        vs.air_density = if self.sim_params.f2_const_air_density {
             1.2 * uc::KGPM3
         } else {
-            let te_amb_air = match &self.cyc.temp_amb_air {
-                Some(t) => Some(t.get(i).with_context(|| format_dbg!())?),
-                None => None,
+            let te_amb_air = {
+                let te_amb_air = self
+                    .cyc
+                    .temp_amb_air
+                    .get(i)
+                    .with_context(|| format_dbg!())?;
+                if *te_amb_air == *TE_STD_AIR {
+                    None
+                } else {
+                    Some(te_amb_air)
+                }
             };
-            Air::get_density(te_amb_air.cloned(), Some(elev_curr))
+            Air::get_density(te_amb_air.copied(), Some(vs.elev_curr))
         };
 
         let mass = self.veh.mass.with_context(|| {
@@ -294,7 +313,7 @@ impl SimDrive {
     /// Sets achieved speed based on known current max power
     /// # Arguments
     /// - `cyc_speed`: prescribed speed
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     /// - `speed_prev`: previously achieved speed
     pub fn set_ach_speed(
         &mut self,
@@ -499,7 +518,7 @@ impl Default for TraceMissTolerance {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
@@ -527,6 +546,7 @@ mod tests {
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
+        assert!(sd.veh.res().is_none());
     }
 
     #[test]
@@ -538,6 +558,22 @@ mod tests {
         sd.walk().unwrap();
         assert!(sd.veh.state.i == sd.cyc.len());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
+        assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
+    }
+
+    #[test]
+    #[cfg(feature = "resources")]
+    fn test_sim_drive_bev() {
+        let _veh = mock_bev();
+        let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
+        let mut sd = SimDrive {
+            veh: _veh,
+            cyc: _cyc,
+            sim_params: Default::default(),
+        };
+        sd.walk().unwrap();
+        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
 

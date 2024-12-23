@@ -159,26 +159,6 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
             Self::from_str(contents, format, skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
-        /// Write (serialize) an object to bincode-encoded `bytes`
-        #[cfg(feature = "bincode")]
-        #[pyo3(name = "to_bincode")]
-        pub fn to_bincode_py<'py>(&self, py: Python<'py>) -> PyResult<&'py PyBytes> {
-            PyResult::Ok(PyBytes::new(py, &self.to_bincode()?)).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
-        }
-
-        /// Read (deserialize) an object from bincode-encoded `bytes`
-        ///
-        /// # Arguments
-        ///
-        /// * `encoded`: `bytes` - Encoded bytes to deserialize from
-        ///
-        #[cfg(feature = "bincode")]
-        #[staticmethod]
-        #[pyo3(name = "from_bincode")]
-        pub fn from_bincode_py(encoded: &PyBytes, skip_init: Option<bool>) -> PyResult<Self> {
-            Self::from_bincode(encoded.as_bytes(), skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
-        }
-
         /// Write (serialize) an object to a JSON string
         #[cfg(feature = "json")]
         #[pyo3(name = "to_json")]
@@ -303,7 +283,8 @@ fn process_tuple_struct(
                                 self.0.len()
                             }
                             /// PyO3-exposed method to check if the vec-containing struct is empty.
-                            fn is_empty(&self) -> bool {
+                            #[pyo3(name = "is_empty")]
+                            fn is_empty_py(&self) -> bool {
                                 self.0.is_empty()
                             }
                         }

@@ -42,7 +42,7 @@ impl Powertrain for Box<ConventionalVehicle> {
         &mut self,
         pwr_aux: si::Power,
         dt: si::Time,
-        _veh_state: &VehicleState,
+        _veh_state: VehicleState,
     ) -> anyhow::Result<()> {
         // TODO: account for transmission efficiency in here
         self.fc
@@ -61,7 +61,7 @@ impl Powertrain for Box<ConventionalVehicle> {
     fn solve(
         &mut self,
         pwr_out_req: si::Power,
-        _veh_state: &VehicleState,
+        _veh_state: VehicleState,
         _enabled: bool,
         dt: si::Time,
     ) -> anyhow::Result<()> {
@@ -80,6 +80,19 @@ impl Powertrain for Box<ConventionalVehicle> {
 
     fn pwr_regen(&self) -> si::Power {
         si::Power::ZERO
+    }
+}
+
+impl ConventionalVehicle {
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::Temperature,
+        pwr_thrml_fc_to_cab: Option<si::Power>,
+        veh_state: &mut VehicleState,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.fc
+            .solve_thermal(te_amb, pwr_thrml_fc_to_cab, veh_state, dt)
     }
 }
 

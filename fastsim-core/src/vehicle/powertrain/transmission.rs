@@ -18,12 +18,10 @@ pub struct Transmission {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: TransmissionState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "TransmissionStateHistoryVec::is_empty")]
+    #[serde(default, skip_serializing_if = "TransmissionStateHistoryVec::is_empty")]
     pub history: TransmissionStateHistoryVec,
 }
 
@@ -96,7 +94,7 @@ pub struct TransmissionState {
 
     pub pwr_out: si::Power,
     pub pwr_in: si::Power,
-    /// Power loss: [`pwr_in`] - [`pwr_out`]
+    /// Power loss: [Self::pwr_in] - [Self::pwr_out]
     pub pwr_loss: si::Power,
 
     pub energy_out: si::Energy,

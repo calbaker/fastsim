@@ -1,3 +1,4 @@
+#![allow(non_local_definitions)] // see https://github.com/PyO3/pyo3/discussions/4083 as this is a `pyo3` problem
 #![allow(clippy::field_reassign_with_default)]
 // TODO: uncomment when docs are somewhat mature to check for missing docs
 // #![warn(missing_docs)]
@@ -11,8 +12,8 @@
 #[macro_use]
 pub mod macros;
 
-pub mod air_properties;
 pub mod drive_cycle;
+pub mod gas_properties;
 pub mod imports;
 pub mod prelude;
 // #[cfg(feature = "pyo3")] -- feature gate provided inside module
@@ -37,8 +38,6 @@ pub fn enabled_features() -> Vec<String> {
         "web".into(),
         #[cfg(feature = "serde-default")]
         "serde-default".into(),
-        #[cfg(feature = "bincode")]
-        "bincode".into(),
         #[cfg(feature = "csv")]
         "csv".into(),
         #[cfg(feature = "json")]

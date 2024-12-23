@@ -14,7 +14,7 @@ pt_type:
       max_soc: 0.96689295
       save_interval: 1
     em:
-      eff_interp_fwd:
+      eff_interp_achieved:
         Interp1D:
           x:
             - 0.0
@@ -93,7 +93,7 @@ chassis:
   drive_axle_weight_frac: 0.61
   wheel_base_meters: 3.0
 mass_kilograms: 2600.0
-pwr_aux_watts: 250.0
+pwr_aux_base_watts: 250.0
 trans_eff: 0.98
 save_interval: 1
 state:
@@ -122,4 +122,5 @@ state:
   speed_ach_meters_per_second: 0.0
   dist_meters: 0.0
   grade_curr: 0.0
+  elev_curr_meters: .nan
   mass_kilograms: .nan

@@ -106,7 +106,8 @@ pub fn abs_checked_x_val(x_val: f64, x_data: &[f64]) -> anyhow::Result<f64> {
     }
 }
 
-pub(crate) const COMP_EPSILON: f64 = 1e-8;
+// public to enable exposure in docs
+pub const COMP_EPSILON: f64 = 1e-8;
 
 /// Returns true if `val1` and `val2` are within a relative/absolute `epsilon` of each other,
 /// depending on magnitude.
@@ -227,6 +228,7 @@ impl From<Vec<Vec<Vec<f64>>>> for Pyo3Vec3Wrapper {
 impl SerdeAPI for Pyo3Vec3Wrapper {}
 impl Init for Pyo3Vec3Wrapper {}
 
+#[derive(IsVariant)]
 pub(crate) enum InterpRange {
     ZeroThroughOne,
     NegativeOneThroughOne,

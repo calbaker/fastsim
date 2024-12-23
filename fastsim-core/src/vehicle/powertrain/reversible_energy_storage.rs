@@ -77,6 +77,10 @@ const TOL: f64 = 1e-3;
 #[non_exhaustive]
 /// Struct for modeling technology-naive Reversible Energy Storage (e.g. battery, flywheel).
 pub struct ReversibleEnergyStorage {
+    /// [Self] Thermal plant, including thermal management controls
+    #[serde(default, skip_serializing_if = "RESThermalOption::is_none")]
+    #[api(skip_get, skip_set)]
+    pub thrml: RESThermalOption,
     /// ReversibleEnergyStorage mass
     #[serde(default)]
     #[api(skip_get, skip_set)]
@@ -107,17 +111,19 @@ pub struct ReversibleEnergyStorage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default)]
-    #[serde(skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: ReversibleEnergyStorageState,
     /// Custom vector of [Self::state]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "ReversibleEnergyStorageStateHistoryVec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "ReversibleEnergyStorageStateHistoryVec::is_empty"
+    )]
     pub history: ReversibleEnergyStorageStateHistoryVec,
 }
 
 impl ReversibleEnergyStorage {
     pub fn solve(&mut self, pwr_out_req: si::Power, dt: si::Time) -> anyhow::Result<()> {
+        let te_res = self.temperature();
         let state = &mut self.state;
 
         ensure!(
@@ -133,8 +139,8 @@ impl ReversibleEnergyStorage {
             state.soc.get::<si::ratio>()
         );
 
-        state.pwr_out_propulsion = pwr_out_req;
-        state.pwr_out_electrical = state.pwr_out_propulsion + state.pwr_aux;
+        state.pwr_out_prop = pwr_out_req;
+        state.pwr_out_electrical = state.pwr_out_prop + state.pwr_aux;
 
         if pwr_out_req + state.pwr_aux >= si::Power::ZERO {
             // discharging
@@ -210,7 +216,9 @@ impl ReversibleEnergyStorage {
                 interp3d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>(),
                     state.soc.get::<si::ratio>(),
-                    state.temperature.get::<si::degree_celsius>(),
+                    te_res
+                        .with_context(|| format_dbg!("Expected thermal model to be configured"))?
+                        .get::<si::degree_celsius>(),
                 ])? * uc::R
             }
             _ => bail!("Invalid interpolator.  See docs for `ReversibleEnergyStorage::eff_interp`"),
@@ -241,9 +249,29 @@ impl ReversibleEnergyStorage {
         Ok(())
     }
 
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `fc_state`: [ReversibleEnergyStorage] state
+    /// - `te_amb`: ambient temperature
+    /// - `pwr_thrml_hvac_to_res`: thermal power flowing from [Vehicle::hvac] system to [Self::thrml]
+    /// - `te_cab`: cabin temperature for heat transfer interaction with
+    ///    [Self], required if [Self::thrml] is `Some`
+    /// - `dt`: simulation time step size
+    pub fn solve_thermal(
+        &mut self,
+        te_amb: si::Temperature,
+        pwr_thrml_hvac_to_res: si::Power,
+        te_cab: Option<si::Temperature>,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.thrml
+            .solve(self.state, te_amb, pwr_thrml_hvac_to_res, te_cab, dt)
+            .with_context(|| format_dbg!())
+    }
+
     /// Sets and returns max output and max regen power based on current state
     /// # Arguments
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     /// - `disch_buffer`: buffer offset from static SOC limit at which discharging is not allowed
     /// - `chrg_buffer`: buffer offset from static SOC limit at which charging is not allowed
     pub fn set_curr_pwr_out_max(
@@ -259,7 +287,7 @@ impl ReversibleEnergyStorage {
     }
 
     /// # Arguments
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     /// - `buffer`: buffer below static maximum SOC above which charging is disabled
     pub fn set_pwr_charge_max(
         &mut self,
@@ -267,16 +295,17 @@ impl ReversibleEnergyStorage {
         chrg_buffer: si::Energy,
     ) -> anyhow::Result<()> {
         // to protect against excessive topping off of the battery
-        let soc_buffer = (chrg_buffer / (self.energy_capacity * (self.max_soc - self.min_soc)))
+        let soc_buffer_delta = (chrg_buffer
+            / (self.energy_capacity * (self.max_soc - self.min_soc)))
             .max(si::Ratio::ZERO);
-        ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
-        self.state.soc_regen_buffer = self.max_soc - soc_buffer;
+        ensure!(soc_buffer_delta >= si::Ratio::ZERO, "{}", format_dbg!());
+        self.state.soc_regen_buffer = self.max_soc - soc_buffer_delta;
         let pwr_max_for_dt =
             ((self.max_soc - self.state.soc) * self.energy_capacity / dt).max(si::Power::ZERO);
-        self.state.pwr_charge_max = if self.state.soc <= self.max_soc - soc_buffer {
+        self.state.pwr_charge_max = if self.state.soc <= self.state.soc_regen_buffer {
             self.pwr_out_max
-        } else if self.state.soc < self.max_soc && soc_buffer > si::Ratio::ZERO {
-            self.pwr_out_max * (self.max_soc - self.state.soc) / soc_buffer
+        } else if self.state.soc < self.max_soc && soc_buffer_delta > si::Ratio::ZERO {
+            self.pwr_out_max * (self.max_soc - self.state.soc) / soc_buffer_delta
         } else {
             // current SOC is less than both
             si::Power::ZERO
@@ -289,14 +318,14 @@ impl ReversibleEnergyStorage {
             format_dbg!(),
             stringify!(self.state.pwr_charge_max),
             self.state.pwr_charge_max.get::<si::watt>().format_eng(None),
-            format_dbg!(soc_buffer)
+            format_dbg!(soc_buffer_delta)
         );
 
         Ok(())
     }
 
     /// # Arguments
-    /// - `dt`: time step size
+    /// - `dt`: simulation time step size
     /// - `buffer`: buffer above static minimum SOC above which charging is disabled
     pub fn set_pwr_disch_max(
         &mut self,
@@ -304,15 +333,15 @@ impl ReversibleEnergyStorage {
         disch_buffer: si::Energy,
     ) -> anyhow::Result<()> {
         // to protect against excessive bottoming out of the battery
-        let soc_buffer = (disch_buffer / self.energy_capacity_usable()).max(si::Ratio::ZERO);
-        ensure!(soc_buffer >= si::Ratio::ZERO, "{}", format_dbg!());
-        self.state.soc_accel_buffer = self.min_soc + soc_buffer;
+        let soc_buffer_delta = (disch_buffer / self.energy_capacity_usable()).max(si::Ratio::ZERO);
+        ensure!(soc_buffer_delta >= si::Ratio::ZERO, "{}", format_dbg!());
+        self.state.soc_disch_buffer = self.min_soc + soc_buffer_delta;
         let pwr_max_for_dt =
             ((self.state.soc - self.min_soc) * self.energy_capacity / dt).max(si::Power::ZERO);
-        self.state.pwr_disch_max = if self.state.soc > self.min_soc + soc_buffer {
+        self.state.pwr_disch_max = if self.state.soc > self.state.soc_disch_buffer {
             self.pwr_out_max
-        } else if self.state.soc > self.min_soc && soc_buffer > si::Ratio::ZERO {
-            self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer
+        } else if self.state.soc > self.min_soc && soc_buffer_delta > si::Ratio::ZERO {
+            self.pwr_out_max * (self.state.soc - self.min_soc) / soc_buffer_delta
         } else {
             // current SOC is less than both
             si::Power::ZERO
@@ -325,7 +354,7 @@ impl ReversibleEnergyStorage {
             format_dbg!(),
             stringify!(self.state.pwr_disch_max),
             self.state.pwr_disch_max.get::<si::watt>().format_eng(None),
-            format_dbg!(soc_buffer)
+            format_dbg!(soc_buffer_delta)
         );
 
         Ok(())
@@ -422,11 +451,11 @@ impl ReversibleEnergyStorage {
 
     /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 1D
     /// interpolator with the default x and f_x arrays  
-    /// Source of default efficiency values:  
-    /// x: values in the third sub-array (corresponding to power) in Altrios'
-    /// eta_interp_grid  
-    /// f_x: efficiency array as a function of power at constant 50% SOC and 23
-    /// degrees C corresponds to eta_interp_values[0][5] in Altrios
+    /// # Source of default efficiency values  
+    /// - `x`: values in the third sub-array (corresponding to power) in ALTRIOS's
+    ///    eta_interp_grid  
+    /// - `f_x`: efficiency array as a function of power at constant 50% SOC and 23
+    ///    °C corresponds to `eta_interp_values[0][5]` in ALTRIOS
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_1d_interp(&mut self) -> anyhow::Result<()> {
         self.eff_interp = ninterp::Interpolator::from_resource("res/default_1d.yaml", false)?;
@@ -434,16 +463,16 @@ impl ReversibleEnergyStorage {
     }
 
     /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 2D
-    /// interpolator with the default x, y and f_xy arrays  
-    /// Source of default efficiency values:  
-    /// x: values in the third sub-array (corresponding to power) in Altrios'
-    /// eta_interp_grid  
-    /// y: values in the second sub-array (corresponding to SOC) in
-    /// Altrios' eta_interp_grid  
-    /// f_xy: efficiency array as a function of power and SOC at constant 23
-    /// degrees C corresponds to eta_interp_values[0] in Altrios, transposed so
-    /// that the outermost layer is now power, and the innermost layer SOC (in
-    /// altrios, the outermost layer is SOC and innermost is power)
+    /// interpolator with the default x, y, and f_xy arrays  
+    /// # Source of default efficiency values  
+    /// - `x`: values in the third sub-array (corresponding to power) in ALTRIOS's
+    ///    eta_interp_grid  
+    /// - `y`: values in the second sub-array (corresponding to SOC) in
+    ///    ALTRIOS's eta_interp_grid  
+    /// - `f_xy`: efficiency array as a function of power and SOC at constant 23
+    ///    °C corresponds to `eta_interp_values[0]` in ALTRIOS, transposed so
+    ///    that the outermost layer is now power and the innermost layer SOC (in
+    ///    ALTRIOS, the outermost layer is SOC and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_2d_interp(&mut self) -> anyhow::Result<()> {
         self.eff_interp = ninterp::Interpolator::from_resource("res/default_2d.yaml", false)?;
@@ -451,22 +480,39 @@ impl ReversibleEnergyStorage {
     }
 
     /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 3D
-    /// interpolator with the default x, y, z and f_xyz arrays  
-    /// Source of default efficiency values:  
-    /// x: values in the third sub-array (corresponding to power) in Altrios'
-    /// eta_interp_grid  
-    /// y: values in the second sub-array (corresponding to SOC) in Altrios'
-    /// eta_interp_grid  
-    /// z: values in the first sub-array (corresponding to temperature) in
-    /// Altrios' eta_interp_grid  
-    /// f_xyz: efficiency array as a function of power, SOC, and temperature
-    /// corresponds to eta_interp_values in Altrios, transposed so that the
-    /// outermost layer is now power, and the innermost layer temperature (in
-    /// altrios, the outermost layer is temperature and innermost is power)
+    /// interpolator with the default x, y, z, and f_xyz arrays  
+    /// # Source of default efficiency values  
+    /// - `x`: values in the third sub-array (corresponding to power) in ALTRIOS's
+    ///    eta_interp_grid  
+    /// - `y`: values in the second sub-array (corresponding to SOC) in ALTRIOS's
+    ///    eta_interp_grid  
+    /// - `z`: values in the first sub-array (corresponding to temperature) in
+    ///    ALTRIOS's eta_interp_grid  
+    /// - `f_xyz`: efficiency array as a function of power, SOC, and temperature
+    ///    corresponds to eta_interp_values in ALTRIOS, transposed so that the
+    ///    outermost layer is now power, and the innermost layer temperature (in
+    ///    ALTRIOS, the outermost layer is temperature and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_3d_interp(&mut self) -> anyhow::Result<()> {
         self.eff_interp = ninterp::Interpolator::from_resource("res/default_3d.yaml", false)?;
         Ok(())
+    }
+
+    /// If thermal model is appropriately configured, returns current lumped [Self] temperature
+    pub fn temperature(&self) -> Option<si::Temperature> {
+        match &self.thrml {
+            RESThermalOption::RESLumpedThermal(rest) => Some(rest.state.temperature),
+            RESThermalOption::None => None,
+        }
+    }
+
+    /// If thermal model is appropriately configured, returns lumped [Self]
+    /// temperature at previous time step
+    pub fn temp_prev(&self) -> Option<si::Temperature> {
+        match &self.thrml {
+            RESThermalOption::RESLumpedThermal(rest) => Some(rest.state.temp_prev),
+            RESThermalOption::None => None,
+        }
     }
 }
 
@@ -588,10 +634,12 @@ pub struct ReversibleEnergyStorageState {
 
     /// state of charge (SOC)
     pub soc: si::Ratio,
-    /// max state of charge (SOC) buffer for regen
+    /// SOC at which [ReversibleEnergyStorage] regen power begins linearly
+    /// derating as it approaches maximum SOC
     pub soc_regen_buffer: si::Ratio,
-    /// min state of charge (SOC) buffer for acceleration
-    pub soc_accel_buffer: si::Ratio,
+    /// SOC at which [ReversibleEnergyStorage] discharge power begins linearly
+    /// derating as it approaches minimum SOC
+    pub soc_disch_buffer: si::Ratio,
     /// Chemical <-> Electrical conversion efficiency based on current power demand
     pub eff: si::Ratio,
     /// State of Health (SOH)
@@ -602,7 +650,7 @@ pub struct ReversibleEnergyStorageState {
     /// total electrical power; positive is discharging
     pub pwr_out_electrical: si::Power,
     /// electrical power going to propulsion
-    pub pwr_out_propulsion: si::Power,
+    pub pwr_out_prop: si::Power,
     /// electrical power going to aux loads
     pub pwr_aux: si::Power,
     /// power dissipated as loss
@@ -614,16 +662,13 @@ pub struct ReversibleEnergyStorageState {
     /// cumulative total electrical energy; positive is discharging
     pub energy_out_electrical: si::Energy,
     /// cumulative electrical energy going to propulsion
-    pub energy_out_propulsion: si::Energy,
+    pub energy_out_prop: si::Energy,
     /// cumulative electrical energy going to aux loads
     pub energy_aux: si::Energy,
     /// cumulative energy dissipated as loss
     pub energy_loss: si::Energy,
     /// cumulative chemical energy; positive is discharging
     pub energy_out_chemical: si::Energy,
-
-    /// component temperature
-    pub temperature: si::ThermodynamicTemperature,
 }
 
 impl Default for ReversibleEnergyStorageState {
@@ -636,23 +681,159 @@ impl Default for ReversibleEnergyStorageState {
             i: Default::default(),
             soc: uc::R * 0.5,
             soc_regen_buffer: uc::R * 1.,
-            soc_accel_buffer: si::Ratio::ZERO,
+            soc_disch_buffer: si::Ratio::ZERO,
             eff: si::Ratio::ZERO,
             soh: 0.,
             pwr_out_electrical: si::Power::ZERO,
-            pwr_out_propulsion: si::Power::ZERO,
+            pwr_out_prop: si::Power::ZERO,
             pwr_aux: si::Power::ZERO,
             pwr_loss: si::Power::ZERO,
             pwr_out_chemical: si::Power::ZERO,
             energy_out_electrical: si::Energy::ZERO,
-            energy_out_propulsion: si::Energy::ZERO,
+            energy_out_prop: si::Energy::ZERO,
             energy_aux: si::Energy::ZERO,
             energy_loss: si::Energy::ZERO,
             energy_out_chemical: si::Energy::ZERO,
-            temperature: *crate::air_properties::TE_STD_AIR,
         }
     }
 }
 
 impl Init for ReversibleEnergyStorageState {}
 impl SerdeAPI for ReversibleEnergyStorageState {}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+pub enum RESThermalOption {
+    /// Basic thermal plant for [ReversibleEnergyStorage]
+    RESLumpedThermal(Box<RESLumpedThermal>),
+    /// no thermal plant for [ReversibleEnergyStorage]
+    #[default]
+    None,
+}
+impl Init for RESThermalOption {
+    fn init(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::RESLumpedThermal(rest) => rest.init()?,
+            Self::None => {}
+        }
+        Ok(())
+    }
+}
+impl SerdeAPI for RESThermalOption {}
+impl RESThermalOption {
+    /// Solve change in temperature and other thermal effects
+    /// # Arguments
+    /// - `res_state`: [ReversibleEnergyStorage] state
+    /// - `te_amb`: ambient temperature
+    /// - `pwr_thrml_hvac_to_res`: thermal power flowing from [Vehicle::hvac]
+    ///    system to [Self], required if [Self::is_none] is false
+    /// - `dt`: simulation time step size
+    fn solve(
+        &mut self,
+        res_state: ReversibleEnergyStorageState,
+        te_amb: si::Temperature,
+        pwr_thrml_hvac_to_res: si::Power,
+        te_cab: Option<si::Temperature>,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::RESLumpedThermal(rest) => rest
+                .solve(
+                    res_state,
+                    te_amb,
+                    pwr_thrml_hvac_to_res,
+                    te_cab.with_context(|| {
+                        format_dbg!(
+                            "`te_cab` must be `Some` for [RESThermalOption::RESLumpedThermal]"
+                        )
+                    })?,
+                    dt,
+                )
+                .with_context(|| format_dbg!())?,
+            Self::None => {
+                // TODO: make sure this triggers error if appropriate
+            }
+        }
+        Ok(())
+    }
+}
+
+#[fastsim_api]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+/// Struct for modeling [ReversibleEnergyStorage] (e.g. battery) thermal plant
+pub struct RESLumpedThermal {
+    /// [ReversibleEnergyStorage] thermal capacitance
+    pub heat_capacitance: si::HeatCapacity,
+    /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to ambient
+    pub htc_to_amb: si::ThermalConductance,
+    /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to cabin
+    pub htc_to_cab: si::ThermalConductance,
+    /// current state
+    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    pub state: RESLumpedThermalState,
+    /// history of state
+    #[serde(
+        default,
+        skip_serializing_if = "RESLumpedThermalStateHistoryVec::is_empty"
+    )]
+    pub history: RESLumpedThermalStateHistoryVec,
+    // TODO: add `save_interval` and associated methods
+}
+
+impl SerdeAPI for RESLumpedThermal {}
+impl Init for RESLumpedThermal {}
+impl RESLumpedThermal {
+    fn solve(
+        &mut self,
+        res_state: ReversibleEnergyStorageState,
+        te_amb: si::Temperature,
+        pwr_thrml_hvac_to_res: si::Power,
+        te_cab: si::Temperature,
+        dt: si::Time,
+    ) -> anyhow::Result<()> {
+        self.state.temp_prev = self.state.temperature;
+        self.state.pwr_thrml_from_cabin = self.htc_to_cab * (te_cab - self.state.temperature);
+        self.state.pwr_thrml_from_amb = self.htc_to_cab * (te_amb - self.state.temperature);
+        self.state.temperature += (pwr_thrml_hvac_to_res
+            + res_state.pwr_out_electrical * (1.0 * uc::R - res_state.eff)
+            + self.state.pwr_thrml_from_cabin
+            + self.state.pwr_thrml_from_amb)
+            / self.heat_capacitance
+            * dt;
+        Ok(())
+    }
+}
+
+#[fastsim_api]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+pub struct RESLumpedThermalState {
+    /// time step index
+    pub i: usize,
+    /// Current thermal mass temperature
+    pub temperature: si::Temperature,
+    /// Thermal mass temperature at previous time step
+    pub temp_prev: si::Temperature,
+    /// Thermal power flow to [RESLumpedThermal] from cabin
+    pub pwr_thrml_from_cabin: si::Power,
+    /// Thermal power flow to [RESLumpedThermal] from ambient
+    pub pwr_thrml_from_amb: si::Power,
+    /// Cumulatev thermal energy flow to [RESLumpedThermal] from cabin
+    pub energy_thrml_from_cabin: si::Energy,
+    /// Cumulatev thermal energy flow to [RESLumpedThermal] from ambient
+    pub energy_thrml_from_amb: si::Energy,
+}
+
+impl Init for RESLumpedThermalState {}
+impl SerdeAPI for RESLumpedThermalState {}
+impl Default for RESLumpedThermalState {
+    fn default() -> Self {
+        Self {
+            i: Default::default(),
+            temperature: *TE_STD_AIR,
+            temp_prev: *TE_STD_AIR,
+            pwr_thrml_from_cabin: Default::default(),
+            energy_thrml_from_cabin: Default::default(),
+            pwr_thrml_from_amb: Default::default(),
+            energy_thrml_from_amb: Default::default(),
+        }
+    }
+}
