@@ -509,15 +509,46 @@ impl HEVPowertrainControls {
                 em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
                 fc_state.pwr_prop_max.get::<si::kilowatt>()
             );
+
             // positive net power out of the powertrain
             let (fc_pwr, em_pwr) = match self {
-                HEVPowertrainControls::RGWDB(ref mut rgwb) => {
+                HEVPowertrainControls::RGWDB(ref mut rgwdb) => {
+                    match (
+                        fc.temperature(),
+                        fc.temp_prev(),
+                        rgwdb.temp_fc_forced_on,
+                        rgwdb.temp_fc_allowed_off,
+                    ) {
+                        (None, None, None, None) => {}
+                        (
+                            Some(temperature),
+                            Some(temp_prev),
+                            Some(temp_fc_forced_on),
+                            Some(temp_fc_allowed_off),
+                        ) => {
+                            if
+                            // temperature is currently below forced on threshold
+                            temperature < temp_fc_forced_on ||
+                            // temperature was below forced on threshold and still has not exceeded allowed off threshold
+                            (temp_prev < temp_fc_forced_on && temperature < temp_fc_allowed_off)
+                            {
+                                hev_state.fc_on_causes.push(FCOnCause::FCTemperatureTooLow);
+                            }
+                        }
+                        _ => {
+                            bail!(
+                                "{}\n`fc.temperature()`, `fc.temp_prev()`, `rgwdb.temp_fc_forced_on`, and 
+`rgwdb.temp_fc_allowed_off` must all be `None` or `Some`", 
+                                format_dbg!()
+                            );
+                        }
+                    }
                     // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
                     let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-                    let frac_pwr_demand_fc_forced_on: si::Ratio = rgwb
+                    let frac_pwr_demand_fc_forced_on: si::Ratio = rgwdb
                         .frac_pwr_demand_fc_forced_on
                         .with_context(|| format_dbg!())?;
-                    let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwb
+                    let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwdb
                         .frac_of_most_eff_pwr_to_run_fc
                         .with_context(|| format_dbg!())?;
                     // If the motor cannot produce more than the required power times a
@@ -532,27 +563,27 @@ impl HEVPowertrainControls {
                     }
 
                     if veh_state.speed_ach
-                        > rgwb.speed_fc_forced_on.with_context(|| format_dbg!())?
+                        > rgwdb.speed_fc_forced_on.with_context(|| format_dbg!())?
                     {
                         hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
                     }
 
-                    rgwb.state.soc_fc_on_buffer = {
+                    rgwdb.state.soc_fc_on_buffer = {
                         let energy_delta_to_buffer_speed = 0.5
                             * veh_state.mass
-                            * (rgwb
+                            * (rgwdb
                                 .speed_soc_fc_on_buffer
                                 .with_context(|| format_dbg!())?
                                 .powi(typenum::P2::new())
                                 - veh_state.speed_ach.powi(typenum::P2::new()));
                         energy_delta_to_buffer_speed.max(si::Energy::ZERO)
-                            * rgwb
+                            * rgwdb
                                 .speed_soc_fc_on_buffer_coeff
                                 .with_context(|| format_dbg!())?
                     } / res.energy_capacity_usable()
                         + res.min_soc;
 
-                    if res.state.soc < rgwb.state.soc_fc_on_buffer {
+                    if res.state.soc < rgwdb.state.soc_fc_on_buffer {
                         hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
                     }
                     if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
@@ -639,6 +670,12 @@ pub struct RESGreedyWithDynamicBuffers {
     /// Fraction of available discharging capacity to use toward running the
     /// engine efficiently.
     pub frac_res_dschrg_for_fc: si::Ratio,
+    /// temperature at which engine is forced on to warm up
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temp_fc_forced_on: Option<si::Temperature>,
+    /// temperature at which engine is allowed to turn off due to being sufficiently warm
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temp_fc_allowed_off: Option<si::Temperature>,
     /// current state of control variables
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: RGWDBState,

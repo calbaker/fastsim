@@ -348,6 +348,15 @@ impl FuelConverter {
             FuelConverterThermalOption::None => None,
         }
     }
+
+    /// If thermal model is appropriately configured, returns previous time step
+    /// lumped [Self] temperature
+    pub fn temp_prev(&self) -> Option<si::Temperature> {
+        match &self.thrml {
+            FuelConverterThermalOption::FuelConverterThermal(fct) => Some(fct.state.temp_prev),
+            FuelConverterThermalOption::None => None,
+        }
+    }
 }
 
 // impl FuelConverter {
@@ -614,6 +623,7 @@ impl FuelConverterThermal {
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
+        self.state.temp_prev = self.state.temperature;
         self.state.temperature += delta_temp;
 
         self.state.eff_coeff = match self.fc_eff_model {
@@ -675,6 +685,8 @@ pub struct FuelConverterThermalState {
     pub te_adiabatic: si::Temperature,
     /// Current engine thermal mass temperature (lumped engine block and coolant)
     pub temperature: si::Temperature,
+    /// Engine thermal mass temperature (lumped engine block and coolant) at previous time step
+    pub temp_prev: si::Temperature,
     /// Current heat transfer coefficient from [FuelConverter] to ambient
     pub htc_to_amb: si::HeatTransferCoeff,
     /// Current heat transfer to ambient
@@ -691,6 +703,7 @@ impl Default for FuelConverterThermalState {
             i: Default::default(),
             te_adiabatic: *TE_ADIABATIC_STD,
             temperature: *TE_STD_AIR,
+            temp_prev: *TE_STD_AIR,
             htc_to_amb: Default::default(),
             heat_to_amb: Default::default(),
             eff_coeff: uc::R,
