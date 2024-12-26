@@ -14,6 +14,15 @@ fn fastsim(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<FuelConverter>()?;
     m.add_class::<FuelConverterState>()?;
     m.add_class::<FuelConverterStateHistoryVec>()?;
+    m.add_class::<FuelConverterThermal>()?;
+    m.add_class::<FuelConverterThermalState>()?;
+    m.add_class::<FuelConverterThermalStateHistoryVec>()?;
+    m.add_class::<RESLumpedThermal>()?;
+    m.add_class::<RESLumpedThermalState>()?;
+    m.add_class::<RESLumpedThermalStateHistoryVec>()?;
+    m.add_class::<LumpedCabin>()?;
+    m.add_class::<LumpedCabinState>()?;
+    m.add_class::<LumpedCabinStateHistoryVec>()?;
     m.add_class::<ReversibleEnergyStorage>()?;
     m.add_class::<ReversibleEnergyStorageState>()?;
     m.add_class::<ReversibleEnergyStorageStateHistoryVec>()?;

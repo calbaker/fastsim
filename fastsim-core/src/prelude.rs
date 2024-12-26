@@ -17,11 +17,11 @@ pub use crate::vehicle::powertrain::electric_machine::{
 };
 pub use crate::vehicle::powertrain::fuel_converter::{
     FuelConverter, FuelConverterState, FuelConverterStateHistoryVec, FuelConverterThermal,
-    FuelConverterThermalOption,
+    FuelConverterThermalOption, FuelConverterThermalState, FuelConverterThermalStateHistoryVec,
 };
 pub use crate::vehicle::powertrain::reversible_energy_storage::{
-    RESLumpedThermal, RESLumpedThermalState, RESThermalOption, ReversibleEnergyStorage,
-    ReversibleEnergyStorageState, ReversibleEnergyStorageStateHistoryVec,
+    RESLumpedThermal, RESLumpedThermalState, RESLumpedThermalStateHistoryVec, RESThermalOption,
+    ReversibleEnergyStorage, ReversibleEnergyStorageState, ReversibleEnergyStorageStateHistoryVec,
 };
 pub use crate::vehicle::PowertrainType;
 pub use crate::vehicle::Vehicle;
