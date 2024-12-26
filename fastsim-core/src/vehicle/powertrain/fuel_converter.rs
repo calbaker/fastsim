@@ -199,7 +199,6 @@ impl SaveInterval for FuelConverter {
 }
 
 // non-py methods
-
 impl FuelConverter {
     /// Sets maximum possible total power [FuelConverter]
     /// can produce.
@@ -482,7 +481,7 @@ pub struct FuelConverterThermal {
     pub htc_to_amb_stop: si::HeatTransferCoeff,
 
     /// Heat transfer coefficient between adiabatic flame temperature and [FuelConverterThermal] temperature
-    pub htc_from_comb: si::ThermalConductance,
+    pub conductance_from_comb: si::ThermalConductance,
     /// Max coefficient for fraction of combustion heat that goes to [FuelConverter]
     /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
     pub max_frac_from_comb: si::Ratio,
@@ -492,7 +491,7 @@ pub struct FuelConverterThermal {
     /// temperature delta over which thermostat is partially open
     #[api(skip_get, skip_set)]
     pub tstat_te_delta: Option<si::Temperature>,
-    #[serde(skip_serializing, deserialize_with = "tstat_interp_default")]
+    #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
     #[api(skip_get, skip_set)]
     pub tstat_interp: Interp1D,
     /// Radiator effectiveness -- ratio of active heat rejection from
@@ -514,18 +513,22 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
+fn tstat_interp_default_de<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
 where
     D: Deserializer<'de>,
 {
-    Ok(Interp1D::new(
+    Ok(tstat_interp_default())
+}
+
+fn tstat_interp_default() -> Interp1D {
+    Interp1D::new(
         vec![85.0, 90.0],
         vec![0.0, 1.0],
         Strategy::Linear,
         Extrapolate::Clamp,
     )
     .with_context(|| format_dbg!())
-    .unwrap())
+    .unwrap()
 }
 
 lazy_static! {
@@ -616,7 +619,7 @@ impl FuelConverterThermal {
         .with_context(|| format_dbg!())?;
         // heat that will go both to the block and out the exhaust port
         let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
-        let delta_temp: si::Temperature = (((self.htc_from_comb
+        let delta_temp: si::Temperature = (((self.conductance_from_comb
             * (self.state.te_adiabatic - self.state.temperature))
             .min(self.max_frac_from_comb * heat_gen)
             - pwr_thrml_fc_to_cab
@@ -672,6 +675,24 @@ impl Init for FuelConverterThermal {
         )
         .with_context(|| format_dbg!())?;
         Ok(())
+    }
+}
+impl Default for FuelConverterThermal {
+    fn default() -> Self {
+        Self {
+            heat_capacitance: Default::default(),
+            length_for_convection: Default::default(),
+            htc_to_amb_stop: Default::default(),
+            conductance_from_comb: Default::default(),
+            max_frac_from_comb: Default::default(),
+            tstat_te_sto: None,
+            tstat_te_delta: None,
+            tstat_interp: tstat_interp_default(),
+            radiator_effectiveness: Default::default(),
+            fc_eff_model: Default::default(),
+            state: Default::default(),
+            history: Default::default(),
+        }
     }
 }
 
