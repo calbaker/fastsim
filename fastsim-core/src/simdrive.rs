@@ -171,11 +171,12 @@ impl SimDrive {
 
     /// Run vehicle simulation once
     pub fn walk_once(&mut self) -> anyhow::Result<()> {
-        ensure!(self.cyc.len() >= 2, format_dbg!(self.cyc.len() < 2));
+        let len = self.cyc.len().with_context(|| format_dbg!())?;
+        ensure!(len >= 2, format_dbg!(len < 2));
         self.save_state();
         // to increment `i` to 1 everywhere
         self.step();
-        while self.veh.state.i < self.cyc.len() {
+        while self.veh.state.i < len {
             self.solve_step()
                 .with_context(|| format!("{}\ntime step: {}", format_dbg!(), self.veh.state.i))?;
             self.save_state();
@@ -544,7 +545,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().is_none());
     }
@@ -556,7 +557,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
@@ -572,7 +573,7 @@ mod tests {
             sim_params: Default::default(),
         };
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
