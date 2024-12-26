@@ -458,7 +458,9 @@ pub enum HEVAuxControls {
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum HEVPowertrainControls {
-    /// Controls that attempt to match fastsim-2
+    /// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
+    /// and discharge power inside of static min and max SOC range.  Also, includes
+    /// buffer for forcing [FuelConverter] to be active/on.
     RGWDB(Box<RESGreedyWithDynamicBuffers>),
     /// place holder for future variants
     Placeholder,
@@ -625,8 +627,10 @@ impl HEVPowertrainControls {
     }
 }
 
-/// Container for static controls parameters.  See [Self::init] for default
-/// values.
+/// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
+/// and discharge power inside of static min and max SOC range.  Also, includes
+/// buffer for forcing [FuelConverter] to be active/on. See [Self::init] for
+/// default values.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 #[non_exhaustive]
 pub struct RESGreedyWithDynamicBuffers {

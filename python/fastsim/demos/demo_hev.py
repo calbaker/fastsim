@@ -236,7 +236,7 @@ def plot_fc_pwr() -> Tuple[Figure, Axes]:
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+    df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
         label='f3 accel buffer',
         alpha=0.5,
     )
@@ -361,7 +361,7 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+    df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
         label='f3 accel buffer',
         alpha=0.5,
     )
@@ -471,7 +471,7 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+    df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
         label='f3 accel buffer',
         alpha=0.5,
     )
@@ -569,7 +569,7 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     )
     ax[2].plot(
         df["cyc.time_seconds"],
-        df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
+    df["veh.pt_type.HybridElectricVehicle.res.history.soc_accel_buffer"],
         label='f3 accel buffer',
         alpha=0.5,
     )
