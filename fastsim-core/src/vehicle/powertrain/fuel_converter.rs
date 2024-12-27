@@ -468,7 +468,13 @@ impl FuelConverterThermalOption {
     }
 }
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
@@ -679,7 +685,7 @@ impl Init for FuelConverterThermal {
 }
 impl Default for FuelConverterThermal {
     fn default() -> Self {
-        Self {
+        let mut fct = Self {
             heat_capacitance: Default::default(),
             length_for_convection: Default::default(),
             htc_to_amb_stop: Default::default(),
@@ -692,7 +698,9 @@ impl Default for FuelConverterThermal {
             fc_eff_model: Default::default(),
             state: Default::default(),
             history: Default::default(),
-        }
+        };
+        fct.init().unwrap();
+        fct
     }
 }
 
