@@ -1,13 +1,20 @@
 use super::*;
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+   
+)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin] and [ReversibleEnergyStorage::thrml]
 pub struct HVACSystemForLumpedCabinAndRES {
     /// set point temperature
     pub te_set: si::Temperature,
-    /// deadband range.  any cabin temperature within this range of
-    /// `te_set` results in no HVAC power draw
+    /// Deadband range.  Any cabin temperature within this range of `te_set`
+    /// results in no HVAC power draw
     pub te_deadband: si::Temperature,
     /// HVAC proportional gain for cabin
     pub p_cabin: si::ThermalConductance,
@@ -54,6 +61,30 @@ pub struct HVACSystemForLumpedCabinAndRES {
         skip_serializing_if = "HVACSystemForLumpedCabinAndRESStateHistoryVec::is_empty"
     )]
     pub history: HVACSystemForLumpedCabinAndRESStateHistoryVec,
+}
+impl Default for HVACSystemForLumpedCabinAndRES {
+    fn default() -> Self {
+        Self {
+            te_set: *TE_STD_AIR,
+            te_deadband: 1.5 * uc::KELVIN,
+            p_cabin: Default::default(),
+            i_cabin: Default::default(),
+            d_cabin: Default::default(),
+            pwr_i_max_cabin: 5. * uc::KW,
+            p_res: Default::default(),
+            i_res: Default::default(),
+            d_res: Default::default(),
+            pwr_i_max_res: 5. * uc::KW,
+            pwr_thermal_max: 10. * uc::KW,
+            frac_of_ideal_cop: 0.15,
+            cabin_heat_source: CabinHeatSource::ResistanceHeater,
+            res_heat_source: RESHeatSource::ResistanceHeater,
+            res_cooling_source: RESCoolingSource::HVAC,
+            pwr_aux_for_hvac_max: uc::KW * 5.,
+            state: Default::default(),
+            history: Default::default(),
+        }
+    }
 }
 impl Init for HVACSystemForLumpedCabinAndRES {}
 impl SerdeAPI for HVACSystemForLumpedCabinAndRES {}

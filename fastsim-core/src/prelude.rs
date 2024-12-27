@@ -9,8 +9,9 @@ pub use crate::vehicle::cabin::{
     CabinOption, LumpedCabin, LumpedCabinState, LumpedCabinStateHistoryVec,
 };
 pub use crate::vehicle::hvac::{
-    HVACOption, HVACSystemForLumpedCabin, HVACSystemForLumpedCabinState,
-    HVACSystemForLumpedCabinStateHistoryVec,
+    HVACOption, HVACSystemForLumpedCabin, HVACSystemForLumpedCabinAndRES,
+    HVACSystemForLumpedCabinAndRESState, HVACSystemForLumpedCabinAndRESStateHistoryVec,
+    HVACSystemForLumpedCabinState, HVACSystemForLumpedCabinStateHistoryVec,
 };
 pub use crate::vehicle::powertrain::electric_machine::{
     ElectricMachine, ElectricMachineState, ElectricMachineStateHistoryVec,

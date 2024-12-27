@@ -1,6 +1,12 @@
 use super::*;
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin]
 pub struct HVACSystemForLumpedCabin {
@@ -37,6 +43,24 @@ pub struct HVACSystemForLumpedCabin {
         skip_serializing_if = "HVACSystemForLumpedCabinStateHistoryVec::is_empty"
     )]
     pub history: HVACSystemForLumpedCabinStateHistoryVec,
+}
+impl Default for HVACSystemForLumpedCabin {
+    fn default() -> Self {
+        Self {
+            te_set: *TE_STD_AIR,
+            te_deadband: 1.5 * uc::KELVIN,
+            p: Default::default(),
+            i: Default::default(),
+            d: Default::default(),
+            pwr_i_max: 5. * uc::KW,
+            pwr_thermal_max: 10. * uc::KW,
+            frac_of_ideal_cop: 0.15,
+            heat_source: CabinHeatSource::ResistanceHeater,
+            pwr_aux_for_hvac_max: uc::KW * 5.,
+            state: Default::default(),
+            history: Default::default(),
+        }
+    }
 }
 impl Init for HVACSystemForLumpedCabin {}
 impl SerdeAPI for HVACSystemForLumpedCabin {}
