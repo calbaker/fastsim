@@ -40,9 +40,9 @@ impl SerdeAPI for CabinOption {}
 /// system and controls
 pub struct LumpedCabin {
     /// Inverse of cabin shell thermal resistance
-    pub cab_htc_to_amb: si::HeatTransferCoeff,
-    /// parameter for heat transfer coeff from cabin to ambient during
-    /// vehicle stop
+    pub cab_shell_htc_to_amb: si::HeatTransferCoeff,
+    /// parameter for heat transfer coeff from cabin outer surface to ambient
+    /// during vehicle stop
     pub cab_htc_to_amb_stop: si::HeatTransferCoeff,
     /// cabin thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
@@ -115,11 +115,11 @@ impl LumpedCabin {
                     / (nu_l_bar
                         * Air::get_therm_cond(cab_te_film_ext).with_context(|| format_dbg!())?
                         / self.length)
-                    + 1.0 / self.cab_htc_to_amb);
+                    + 1.0 / self.cab_shell_htc_to_amb);
             (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temperature)
         } else {
             (self.length * self.width)
-                / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_htc_to_amb)
+                / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_shell_htc_to_amb)
                 * (te_amb_air - self.state.temperature)
         };
 

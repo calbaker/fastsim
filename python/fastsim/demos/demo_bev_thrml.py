@@ -27,7 +27,7 @@ SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 # %%
 
 # load 2012 Ford Fusion from file
-veh = fsim.Vehicle.from_file("../../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml")
+veh = fsim.Vehicle.from_file(fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml")
 
 # Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states
 fsim.set_param_from_path(veh, "save_interval" , 1)

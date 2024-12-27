@@ -137,7 +137,7 @@
 ['cyc']['grade_interp']['Interp1D']['f_x']
 ['cyc']['elev_interp']['Interp1D']['x']
 ['cyc']['elev_interp']['Interp1D']['f_x']
-['cyc']['temp_amb_air_degrees_Celsius']
+['cyc']['temp_amb_air_kelvin']
 ['sim_params']['ach_speed_max_iter']
 ['sim_params']['ach_speed_solver_gain']
 ['sim_params']['trace_miss_tol']['tol_dist']

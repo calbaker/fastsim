@@ -194,7 +194,7 @@ impl HVACSystemForLumpedCabinAndRES {
                 si::Ratio::ZERO
             };
         self.state.cop = cop_ideal * self.frac_of_ideal_cop;
-        assert!(self.state.cop > 0.0 * uc::R);
+        ensure!(self.state.cop >= 0.0 * uc::R, "{}", format_dbg!(cop_ideal));
 
         let mut pwr_thrml_fc_to_cabin = si::Power::ZERO;
         self.state.pwr_aux_for_hvac = if pwr_thrml_hvac_to_cabin > si::Power::ZERO {

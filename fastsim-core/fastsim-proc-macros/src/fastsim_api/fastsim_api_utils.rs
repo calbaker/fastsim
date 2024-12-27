@@ -9,6 +9,8 @@ macro_rules! extract_units {
         $(
             let field_units: TokenStream2 = stringify!($field_units).parse().expect("failed to parse `field_units`");
             let unit_name = <$field_units as uom::si::Unit>::plural().replace(' ', "_");
+            // fix the UOM Kelvin atrocity
+            let unit_name = unit_name.replace("kelvins", "kelvin");
             unit_impls.push((field_units, unit_name));
         )+
         unit_impls
@@ -351,10 +353,7 @@ pub(crate) fn impl_getters_and_setters(
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "Temperature" => extract_units!(
-                uom::si::temperature_interval::degree_celsius,
-                uom::si::temperature_interval::kelvin
-            ),
+            "Temperature" => extract_units!(uom::si::temperature_interval::kelvin),
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }
