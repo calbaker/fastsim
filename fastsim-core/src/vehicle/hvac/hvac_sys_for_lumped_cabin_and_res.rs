@@ -6,7 +6,6 @@ use super::*;
     fn default_py() -> Self {
         Default::default()
     }
-   
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin] and [ReversibleEnergyStorage::thrml]
