@@ -107,6 +107,13 @@ impl Init for AuxSource {}
     fn list_resources_py(&self) -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
+
+    /// Load vehicle from file saved in fastsim-2 format
+    #[pyo3(name = "from_f2_file")]
+    #[staticmethod]
+    fn from_f2_file_py(file: PathBuf) -> anyhow::Result<Self> {
+        Self::from_f2_file(file)
+    }
 )]
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, HistoryMethods)]
 #[non_exhaustive]
@@ -525,6 +532,13 @@ impl Vehicle {
             )
             .with_context(|| format_dbg!())?;
         Ok(())
+    }
+
+    fn from_f2_file(file: PathBuf) -> anyhow::Result<Self> {
+        use fastsim_2::traits::SerdeAPI;
+        let f2veh =
+            fastsim_2::vehicle::RustVehicle::from_file(file).with_context(|| format_dbg!())?;
+        Self::try_from(f2veh)
     }
 }
 

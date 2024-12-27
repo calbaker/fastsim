@@ -78,6 +78,7 @@ fn process_pyclass_generic(
 }
 
 fn add_serde_methods(py_impl_block: &mut TokenStream2) {
+    // NOTE: may be helpful to add an `init_py` method
     py_impl_block.extend::<TokenStream2>(quote! {
         pub fn copy(&self) -> Self {self.clone()}
         pub fn __copy__(&self) -> Self {self.clone()}
