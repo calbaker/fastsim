@@ -112,13 +112,15 @@ impl HVACSystemForLumpedCabinAndRES {
         dt: si::Time,
     ) -> anyhow::Result<(si::Power, si::Power, si::Power)> {
         let (res_temp, res_temp_prev) = res_temps;
+        ensure!(!res_temp.is_nan(), format_dbg!(res_temp));
+        ensure!(!res_temp_prev.is_nan(), format_dbg!(res_temp_prev));
         let mut pwr_thrml_hvac_to_cabin = self
             .solve_for_cabin(te_fc, cab_state, cab_heat_cap, dt)
             .with_context(|| format_dbg!())?;
         let mut pwr_thrml_hvac_to_res: si::Power = self
             .solve_for_res(res_temp, res_temp_prev, dt)
             .with_context(|| format_dbg!())?;
-        let cop_ideal: si::Ratio =
+        let (cop_ideal, te_ref) =
             if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin > si::Power::ZERO {
                 // heating mode
                 // TODO: account for cabin and battery heat sources in COP calculation!!!!
@@ -151,9 +153,9 @@ impl HVACSystemForLumpedCabinAndRES {
                 if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
                     // cabin is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
-                    te_ref / (5.0 * uc::KELVIN)
+                    (te_ref / (5.0 * uc::KELVIN), te_ref)
                 } else {
-                    te_ref / te_delta_vs_amb.abs()
+                    (te_ref / te_delta_vs_amb.abs(), te_ref)
                 }
             } else if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin < si::Power::ZERO {
                 // cooling mode
@@ -186,15 +188,20 @@ impl HVACSystemForLumpedCabinAndRES {
                 if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
                     // cooling-dominating component is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
-                    te_ref / (5.0 * uc::KELVIN)
+                    (te_ref / (5.0 * uc::KELVIN), te_ref)
                 } else {
-                    te_ref / te_delta_vs_amb.abs()
+                    (te_ref / te_delta_vs_amb.abs(), te_ref)
                 }
             } else {
-                si::Ratio::ZERO
+                (si::Ratio::ZERO, f64::NAN * uc::KELVIN)
             };
         self.state.cop = cop_ideal * self.frac_of_ideal_cop;
-        ensure!(self.state.cop >= 0.0 * uc::R, "{}", format_dbg!(cop_ideal));
+        ensure!(
+            self.state.cop >= 0.0 * uc::R,
+            "{}\n{}",
+            format_dbg!(cop_ideal),
+            format_dbg!(te_ref)
+        );
 
         let mut pwr_thrml_fc_to_cabin = si::Power::ZERO;
         self.state.pwr_aux_for_hvac = if pwr_thrml_hvac_to_cabin > si::Power::ZERO {

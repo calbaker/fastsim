@@ -770,9 +770,9 @@ pub struct RESLumpedThermal {
     /// [ReversibleEnergyStorage] thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
     /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to ambient
-    pub htc_to_amb: si::ThermalConductance,
+    pub conductance_to_amb: si::ThermalConductance,
     /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to cabin
-    pub htc_to_cab: si::ThermalConductance,
+    pub conductance_to_cab: si::ThermalConductance,
     /// current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: RESLumpedThermalState,
@@ -797,8 +797,9 @@ impl RESLumpedThermal {
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.state.temp_prev = self.state.temperature;
-        self.state.pwr_thrml_from_cabin = self.htc_to_cab * (te_cab - self.state.temperature);
-        self.state.pwr_thrml_from_amb = self.htc_to_cab * (te_amb - self.state.temperature);
+        self.state.pwr_thrml_from_cabin =
+            self.conductance_to_cab * (te_cab - self.state.temperature);
+        self.state.pwr_thrml_from_amb = self.conductance_to_cab * (te_amb - self.state.temperature);
         self.state.temperature += (pwr_thrml_hvac_to_res
             + res_state.pwr_out_electrical * (1.0 * uc::R - res_state.eff)
             + self.state.pwr_thrml_from_cabin

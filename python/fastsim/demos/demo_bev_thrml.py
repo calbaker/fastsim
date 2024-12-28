@@ -16,8 +16,6 @@ sns.set_theme()
 
 from plot_utils  import *
 
-# if enivronment var `DEBUG_LOG=true` is set, turns on debug logging
-DEBUG_LOG = os.environ.get("DEBUG_LOG", "false").lower() == "true"     
 # if environment var `SHOW_PLOTS=false` is set, no plots are shown
 SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"     
 # if environment var `SAVE_FIGS=true` is set, save plots
@@ -27,7 +25,9 @@ SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 # %%
 
 # load 2012 Ford Fusion from file
-veh = fsim.Vehicle.from_file(fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml")
+veh = fsim.Vehicle.from_file(
+    fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml"
+)
 
 # Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states
 fsim.set_param_from_path(veh, "save_interval" , 1)
@@ -41,13 +41,7 @@ sd = fsim.SimDrive(veh, cyc)
 # simulation start time
 t0 = time.perf_counter()
 # run simulation
-# toggle commented code to enable logging
-if DEBUG_LOG:
-    print('Running `sd.walk()` with debug logging')
-    with fsim.utils.with_logging():
-        sd.walk()
-else:
-    sd.walk()
+sd.walk()
 # simulation end time
 t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0
