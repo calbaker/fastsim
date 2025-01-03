@@ -1,7 +1,7 @@
 pub use super::*;
 
 /// Possible drive wheel configurations for traction limit calculations
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum DriveTypes {
     /// Rear-wheel drive
     RWD,

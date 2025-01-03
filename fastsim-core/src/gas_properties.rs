@@ -26,6 +26,7 @@ lazy_static! {
     /// * `h_m` - optional elevation \[m\] above sea level, defaults to 180 m
     #[staticmethod]
     #[pyo3(name = "get_density")]
+    #[pyo3(signature = (te_air_deg_c=None, h_m=None))]
     pub fn get_density_py(te_air_deg_c: Option<f64>, h_m: Option<f64>) -> f64 {
         Self::get_density(
             te_air_deg_c.map(|te_air_deg_c| (te_air_deg_c + 273.15) * uc::KELVIN),

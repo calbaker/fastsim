@@ -403,7 +403,7 @@ impl SerdeAPI for FuelConverterState {}
 impl Init for FuelConverterState {}
 
 /// Options for handling [FuelConverter] thermal model
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum FuelConverterThermalOption {
     /// Basic thermal plant for [FuelConverter]
     FuelConverterThermal(Box<FuelConverterThermal>),
@@ -741,7 +741,7 @@ impl Default for FuelConverterThermalState {
 }
 
 /// Model variants for how FC efficiency depends on temperature
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 pub enum FCTempEffModel {
     /// Linear temperature dependence
     Linear(FCTempEffModelLinear),

@@ -394,7 +394,7 @@ impl std::fmt::Display for FCOnCauses {
 }
 
 #[fastsim_enum_api]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 pub enum FCOnCause {
     /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,
@@ -447,7 +447,7 @@ impl Default for HEVSimulationParams {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default, IsVariant)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default, IsVariant, From, TryInto)]
 pub enum HEVAuxControls {
     /// If feasible, use [ReversibleEnergyStorage] to handle aux power demand
     #[default]
@@ -456,7 +456,7 @@ pub enum HEVAuxControls {
     AuxOnFcPriority,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, IsVariant)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, IsVariant, From, TryInto)]
 pub enum HEVPowertrainControls {
     /// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
     /// and discharge power inside of static min and max SOC range.  Also, includes

@@ -34,6 +34,7 @@ const TOL: f64 = 1e-3;
 
     // TODO: decide on way to deal with `side_effect` coming after optional arg and uncomment
     #[pyo3(name = "set_mass")]
+    #[pyo3(signature = (mass_kg=None, side_effect=None))]
     fn set_mass_py(&mut self, mass_kg: Option<f64>, side_effect: Option<String>) -> anyhow::Result<()> {
         let side_effect = side_effect.unwrap_or_else(|| "Intensive".into());
         self.set_mass(
@@ -605,6 +606,7 @@ impl Init for ReversibleEnergyStorage {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 /// Controls which parameter to update when setting specific energy
 pub enum SpecificEnergySideEffect {
     /// update mass
@@ -701,7 +703,7 @@ impl Default for ReversibleEnergyStorageState {
 impl Init for ReversibleEnergyStorageState {}
 impl SerdeAPI for ReversibleEnergyStorageState {}
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum RESThermalOption {
     /// Basic thermal plant for [ReversibleEnergyStorage]
     RESLumpedThermal(Box<RESLumpedThermal>),

@@ -9,7 +9,7 @@ pub use pyo3::prelude::*;
 pub use pyo3::types::PyType;
 
 #[pymodule]
-fn fastsim(_py: Python, m: &PyModule) -> PyResult<()> {
+fn fastsim(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<Air>()?;
     m.add_class::<FuelConverter>()?;
     m.add_class::<FuelConverterState>()?;

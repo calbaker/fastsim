@@ -5,7 +5,7 @@ use crate::resources;
 pub mod fastsim2_interface;
 
 /// Possible aux load power sources
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum AuxSource {
     /// Aux load power provided by ReversibleEnergyStorage with help from FuelConverter, if present
     /// and needed
@@ -536,10 +536,22 @@ impl Vehicle {
 
     fn from_f2_file(file: PathBuf) -> anyhow::Result<Self> {
         use fastsim_2::traits::SerdeAPI;
-        let f2veh =
-            fastsim_2::vehicle::RustVehicle::from_file(file).with_context(|| format_dbg!())?;
+        let f2veh = fastsim_2::vehicle::RustVehicle::from_file(file, false)
+            .with_context(|| format_dbg!())?;
         Self::try_from(f2veh)
     }
+
+    // #[cfg(feature = "pyo3")]
+    // fn pt_type(&self, py: Python) -> PyResult<PyAny> {
+    //     let pt_type = match self.pt_type {
+    //         PowertrainType::ConventionalVehicle(conv) => {
+    //             PyCell::new(py, **conv.clone().to_object(py))
+    //         }
+    //         PowertrainType::HybridElectricVehicle(hev) => hev.to_object(py),
+    //         PowertrainType::BatteryElectricVehicle(bev) => bev.to_object(py),
+    //     };
+    //     Ok(pt_type)
+    // }
 }
 
 /// Vehicle state for current time step
@@ -666,7 +678,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2012_Ford_Fusion.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };
@@ -682,7 +694,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2016_TOYOTA_Prius_Two.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };
@@ -698,7 +710,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2022_Renault_Zoe_ZE50_R135.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };

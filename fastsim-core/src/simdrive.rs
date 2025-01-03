@@ -39,6 +39,7 @@ impl Default for SimParams {
 
 #[fastsim_api(
     #[new]
+    #[pyo3(signature = (veh, cyc, sim_params=None))]
     fn __new__(veh: Vehicle, cyc: Cycle, sim_params: Option<SimParams>) -> anyhow::Result<Self> {
         Ok(SimDrive::new(
             veh,
@@ -519,7 +520,7 @@ impl Default for TraceMissTolerance {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
@@ -601,7 +602,7 @@ mod tests {
             let filename = path.file_name().unwrap();
             if !skip_files.iter().any(|&name| filename == name) {
                 // println!("{path:?}");
-                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path).unwrap();
+                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path, false).unwrap();
                 let f3_veh = Vehicle::try_from(f2_veh).unwrap();
                 f3_veh.to_file(output_dir.join(filename)).unwrap();
             }

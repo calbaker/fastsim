@@ -2,7 +2,7 @@ use super::*;
 // TODO: add parameters and/or cabin model variant for solar heat load
 
 /// Options for handling cabin thermal model
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum CabinOption {
     /// Basic single thermal capacitance cabin thermal model, including HVAC
     /// system and controls
