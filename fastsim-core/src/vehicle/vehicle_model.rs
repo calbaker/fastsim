@@ -124,7 +124,6 @@ pub struct Vehicle {
     /// Year manufactured
     year: u32,
     #[has_state]
-    #[api(skip_get, skip_set)]
     /// type of vehicle powertrain including contained type-specific parameters and variables
     pub pt_type: PowertrainType,
 
@@ -133,16 +132,13 @@ pub struct Vehicle {
 
     /// Cabin thermal model
     #[serde(default, skip_serializing_if = "CabinOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub cabin: CabinOption,
 
     /// HVAC model
     #[serde(default, skip_serializing_if = "HVACOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub hvac: HVACOption,
 
     /// Total vehicle mass
-    #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
@@ -156,8 +152,6 @@ pub struct Vehicle {
     pub trans_eff: si::Ratio,
 
     /// time step interval at which `state` is saved into `history`
-    #[api(skip_set, skip_get)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     save_interval: Option<usize>,
     /// current state of vehicle
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -540,18 +534,6 @@ impl Vehicle {
             .with_context(|| format_dbg!())?;
         Self::try_from(f2veh)
     }
-
-    // #[cfg(feature = "pyo3")]
-    // fn pt_type(&self, py: Python) -> PyResult<PyAny> {
-    //     let pt_type = match self.pt_type {
-    //         PowertrainType::ConventionalVehicle(conv) => {
-    //             PyCell::new(py, **conv.clone().to_object(py))
-    //         }
-    //         PowertrainType::HybridElectricVehicle(hev) => hev.to_object(py),
-    //         PowertrainType::BatteryElectricVehicle(bev) => bev.to_object(py),
-    //     };
-    //     Ok(pt_type)
-    // }
 }
 
 /// Vehicle state for current time step

@@ -10,7 +10,7 @@ pub(crate) fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut ast = syn::parse_macro_input!(item as syn::ItemStruct);
     let ident = &ast.ident;
     if let syn::Fields::Named(syn::FieldsNamed { named, .. }) = &mut ast.fields {
-        process_named_field_struct(named, &mut py_impl_block);
+        process_named_field_struct(named);
     } else if let syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) = &mut ast.fields {
         process_tuple_struct(unnamed, &mut py_impl_block, &mut impl_block, ident);
     } else {
@@ -312,78 +312,9 @@ fn process_tuple_struct(
 
 fn process_named_field_struct(
     named: &mut syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
-    py_impl_block: &mut TokenStream2,
 ) {
     // struct with named fields
     for field in named.iter_mut() {
-        // if attr.tokens.to_string().contains("skip_get"){
-        // for (i, idx_del) in idxs_del.into_iter().enumerate() {
-        //     attr_vec.remove(*idx_del - i);
-        // }
-
-        // this is my quick and dirty attempt at emulating:
-        // https://github.com/PyO3/pyo3/blob/48690525e19b87818b59f99be83f1e0eb203c7d4/pyo3-macros-backend/src/pyclass.rs#L220
-
-        let mut opts = FieldOptions::default();
-        let keep: Vec<bool> = field
-            .attrs
-            .iter()
-            .map(|attr| {
-                if let Meta::List(ml) = &attr.meta {
-                    // catch the `api` in `#[api(skip_get)]`
-                    if ml.path.is_ident("api") {
-                        let opt_str = ml.tokens.to_string();
-                        let opt_split = opt_str.as_str().split(",");
-                        let mut opt_vec = opt_split.map(|opt| opt.trim()).collect::<Vec<&str>>();
-
-                        // find the `skip_get` option
-                        let mut idx_skip_get: Option<usize> = None;
-                        opt_vec.iter().enumerate().for_each(|(i, opt)| {
-                            if *opt == "skip_get" {
-                                idx_skip_get = Some(i);
-                                opts.skip_get = true;
-                            }
-                        });
-                        if let Some(idx_skip_get) = idx_skip_get {
-                            let _ = opt_vec.remove(idx_skip_get);
-                        }
-
-                        // find the `skip_set` option
-                        let mut idx_skip_set: Option<usize> = None;
-                        opt_vec.iter().enumerate().for_each(|(i, opt)| {
-                            if *opt == "skip_set" {
-                                idx_skip_set = Some(i);
-                                opts.skip_set = true;
-                            }
-                        });
-                        if let Some(idx_skip_set) = idx_skip_set {
-                            let _ = opt_vec.remove(idx_skip_set);
-                        }
-
-                        // make sure there were no invalid options passed and raise warning
-                        if !opt_vec.is_empty() {
-                            emit_error!(
-                                ml.span(),
-                                "Invalid option(s): {:?}. 
-Expected options matching field names in: `{:?}`.",
-                                opt_vec,
-                                FieldOptions::default()
-                            );
-                        }
-                        false // this attribute should not be retained because it is handled solely by this proc macro
-                    } else {
-                        true
-                    }
-                } else {
-                    true
-                }
-            })
-            .collect();
-        // println!("options {:?}", opts);
-        let mut iter = keep.iter();
-        // this drops attrs with api, removing the field attribute from the struct def
-        field.attrs.retain(|_| *iter.next().unwrap());
-
-        impl_getters_and_setters(py_impl_block, field, &opts);
+        impl_getters_and_setters(field);
     }
 }

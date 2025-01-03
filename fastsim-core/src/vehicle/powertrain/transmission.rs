@@ -6,16 +6,13 @@ use super::*;
 pub struct Transmission {
     /// Transmission mass
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     pub(crate) mass: Option<si::Mass>,
 
     /// interpolator for calculating [Self] efficiency as a function of the following variants:  
     /// - 0d -- constant
-    #[api(skip_get, skip_set)]
     pub eff_interp: Interpolator,
 
     /// time step interval between saves. 1 is a good option. If None, no saving occurs.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]

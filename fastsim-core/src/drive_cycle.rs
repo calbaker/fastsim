@@ -35,7 +35,6 @@ pub struct Cycle {
     #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: either write or automate generation of getter and setter for this
     // TODO: put the above TODO in github issue for all fields with `Option<...>` type
-    #[api(skip_get, skip_set)]
     /// inital elevation
     pub init_elev: Option<si::Length>,
     /// simulation time
@@ -47,24 +46,19 @@ pub struct Cycle {
     /// calculated prescribed distance based on RHS integral of time and speed
     pub dist: Vec<si::Length>,
     /// road grade (expressed as a decimal, not percent)
-    #[api(skip_get, skip_set)]
     pub grade: Vec<si::Ratio>,
     // TODO: consider trapezoidal integration scheme
     // TODO: @mokeefe, please check out how elevation is handled
     /// calculated prescribed elevation based on RHS integral distance and grade
     pub elev: Vec<si::Length>,
     /// road charging/discharing capacity
-    #[api(skip_get, skip_set)]
     pub pwr_max_chrg: Vec<si::Power>,
     /// grade interpolator
-    #[api(skip_get, skip_set)]
     pub grade_interp: Option<Interpolator>,
     /// elevation interpolator
-    #[api(skip_get, skip_set)]
     pub elev_interp: Option<Interpolator>,
     /// ambient air temperature w.r.t. to time (rather than spatial position)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[api(skip_get, skip_set)]
     pub temp_amb_air: Vec<si::Temperature>,
 }
 
@@ -459,17 +453,14 @@ pub struct CycleElement {
     pub speed: si::Velocity,
     // `dist` is not included here because it is derived in `Init::init`
     // TODO: make `fastsim_api` handle Option or write custom getter/setter
-    #[api(skip_get, skip_set)]
     /// road grade
     #[serde(skip_serializing_if = "Option::is_none", alias = "cycGrade")]
     pub grade: Option<si::Ratio>,
     // `elev` is not included here because it is derived in `Init::init`
-    #[api(skip_get, skip_set)]
     /// road charging/discharing capacity
     pub pwr_max_charge: Option<si::Power>,
     // TODO: make sure all fields in cycle are represented here, as appropriate
     /// ambient air temperature w.r.t. to time (rather than spatial position)
-    #[api(skip_get, skip_set)]
     pub temp_amb_air: Option<si::Temperature>,
 }
 

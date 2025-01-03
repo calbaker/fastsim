@@ -80,14 +80,11 @@ const TOL: f64 = 1e-3;
 pub struct ReversibleEnergyStorage {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "RESThermalOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub thrml: RESThermalOption,
     /// ReversibleEnergyStorage mass
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
     /// ReversibleEnergyStorage specific energy
-    #[api(skip_get, skip_set)]
     pub(in super::super) specific_energy: Option<si::SpecificEnergy>,
     /// Max output (and input) power battery can produce (accept)
     pub pwr_out_max: si::Power,
@@ -100,7 +97,6 @@ pub struct ReversibleEnergyStorage {
     /// - 1d -- linear w.r.t. power
     /// - 2d -- linear w.r.t. power and SOC
     /// - 3d -- linear w.r.t. power, SOC, and temperature
-    #[api(skip_get, skip_set)]
     pub eff_interp: Interpolator,
 
     /// Hard limit on minimum SOC, e.g. 0.05
@@ -109,7 +105,6 @@ pub struct ReversibleEnergyStorage {
     pub max_soc: si::Ratio,
 
     /// Time step interval at which history is saved
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]

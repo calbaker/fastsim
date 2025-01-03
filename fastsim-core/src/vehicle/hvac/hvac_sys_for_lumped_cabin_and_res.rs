@@ -42,13 +42,10 @@ pub struct HVACSystemForLumpedCabinAndRES {
     /// coefficient of performance (COP)
     pub frac_of_ideal_cop: f64,
     /// cabin heat source
-    #[api(skip_get, skip_set)]
     pub cabin_heat_source: CabinHeatSource,
     /// res heat source
-    #[api(skip_get, skip_set)]
     pub res_heat_source: RESHeatSource,
     /// res cooling source
-    #[api(skip_get, skip_set)]
     pub res_cooling_source: RESCoolingSource,
     /// max allowed aux load
     pub pwr_aux_for_hvac_max: si::Power,

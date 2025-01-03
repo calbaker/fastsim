@@ -358,7 +358,6 @@ pub struct HEVState {
     /// time step index
     pub i: usize,
     /// Vector of posssible reasons the fc is forced on
-    #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
@@ -717,7 +716,6 @@ pub struct RGWDBState {
     /// time step index
     pub i: usize,
     /// Vector of posssible reasons the fc is forced on
-    #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)

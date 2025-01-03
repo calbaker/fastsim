@@ -55,14 +55,11 @@ use std::f64::consts::PI;
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub thrml: FuelConverterThermalOption,
     /// [Self] mass
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
     /// FuelConverter specific power
-    #[api(skip_get, skip_set)]
     pub(in super::super) specific_pwr: Option<si::SpecificPower>,
     /// max rated brake output power
     pub pwr_out_max: si::Power,
@@ -73,7 +70,6 @@ pub struct FuelConverter {
     /// lag time for ramp up
     pub pwr_ramp_lag: si::Time,
     /// interpolator for calculating [Self] efficiency as a function of output power
-    #[api(skip_get, skip_set)]
     pub eff_interp_from_pwr_out: Interpolator,
     /// power at which peak efficiency occurs
     #[serde(skip)]
@@ -81,7 +77,6 @@ pub struct FuelConverter {
     /// idle fuel power to overcome internal friction (not including aux load) \[W\]
     pub pwr_idle_fuel: si::Power,
     /// time step interval between saves. 1 is a good option. If None, no saving occurs.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -492,19 +487,15 @@ pub struct FuelConverterThermal {
     /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
     pub max_frac_from_comb: si::Ratio,
     /// parameter for temperature at which thermostat starts to open
-    #[api(skip_get, skip_set)]
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
-    #[api(skip_get, skip_set)]
     pub tstat_te_delta: Option<si::Temperature>,
     #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
-    #[api(skip_get, skip_set)]
     pub tstat_interp: Interp1D,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
     pub radiator_effectiveness: si::Ratio,
     /// Model for [FuelConverter] dependence on efficiency
-    #[api(skip_get, skip_set)]
     pub fc_eff_model: FCTempEffModel,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]

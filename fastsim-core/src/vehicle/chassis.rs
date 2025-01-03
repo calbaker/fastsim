@@ -34,36 +34,30 @@ pub struct Chassis {
     /// Wheel radius
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[api(skip_get, skip_set)]
     pub wheel_radius: Option<si::Length>,
     /// Tire code (optional method of calculating wheel radius)
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[api(skip_get, skip_set)]
     pub tire_code: Option<String>,
     /// Vehicle center of mass height
     pub cg_height: si::Length,
     /// Wheel coefficient of friction
     pub wheel_fric_coef: si::Ratio,
-    #[api(skip_get, skip_set)]
-    /// TODO: make getters and setters for this.
+
     /// Drive wheel configuration
     pub drive_type: DriveTypes,
     /// Fraction of vehicle weight on drive action when stationary
     pub drive_axle_weight_frac: si::Ratio,
     /// Wheel base length
     pub wheel_base: si::Length,
-    #[api(skip_get, skip_set)]
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) mass: Option<si::Mass>,
     /// Vehicle mass excluding cargo, passengers, and powertrain components
-    // TODO: make sure setter and getter get written
-    #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) glider_mass: Option<si::Mass>,
     /// Cargo mass including passengers
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cargo_mass: Option<si::Mass>,
 }

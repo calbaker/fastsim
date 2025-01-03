@@ -13,9 +13,9 @@ pub struct SimParams {
     pub ach_speed_max_iter: u32,
     pub ach_speed_tol: si::Ratio,
     pub ach_speed_solver_gain: f64,
-    #[api(skip_get, skip_set)]
+    
     pub trace_miss_tol: TraceMissTolerance,
-    #[api(skip_get, skip_set)]
+    
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
     pub f2_const_air_density: bool,
