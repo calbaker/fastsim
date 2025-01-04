@@ -202,9 +202,9 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
         #[staticmethod]
         #[pyo3(name = "from_msg_pack")]
         #[pyo3(signature = (msg_pack, skip_init=None))]
-        pub fn from_msg_pack_py(msg_pack: &Bound<PyBytes>, skip_init: Option<bool>) -> PyResult<Self> {
+        pub fn from_msg_pack_py(msg_pack: &[u8], skip_init: Option<bool>) -> PyResult<Self> {
             Self::from_msg_pack(
-                msg_pack.as_bytes(), 
+                msg_pack, 
                 skip_init.unwrap_or_default()
             ).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
