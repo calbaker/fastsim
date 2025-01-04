@@ -16,8 +16,6 @@ import fastsim as fsim
 sns.set_theme()
 
 
-# if enivronment var `DEBUG_LOG=true` is set, turns on debug logging
-DEBUG_LOG = os.environ.get("DEBUG_LOG", "false").lower() == "true"
 # if environment var `SHOW_PLOTS=false` is set, no plots are shown
 SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"
 # if environment var `SAVE_FIGS=true` is set, save plots
