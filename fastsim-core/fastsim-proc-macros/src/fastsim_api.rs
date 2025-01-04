@@ -185,6 +185,30 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
             Self::from_json(json_str, skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
+        /// Write (serialize) an object to a JSON string
+        #[cfg(feature = "msgpack")]
+        #[pyo3(name = "to_msg_pack")]
+        pub fn to_msg_pack_py(&self) -> PyResult<Vec<u8>> {
+            self.to_msg_pack().map_err(|e| PyIOError::new_err(format!("{:?}", e)))
+        }
+
+        /// Read (deserialize) an object to a JSON string
+        ///
+        /// # Arguments
+        ///
+        /// * `msg_pack`: message pack
+        ///
+        #[cfg(feature = "msgpack")]
+        #[staticmethod]
+        #[pyo3(name = "from_msg_pack")]
+        #[pyo3(signature = (msg_pack, skip_init=None))]
+        pub fn from_msg_pack_py(msg_pack: &Bound<PyBytes>, skip_init: Option<bool>) -> PyResult<Self> {
+            Self::from_msg_pack(
+                msg_pack.as_bytes(), 
+                skip_init.unwrap_or_default()
+            ).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
+        }
+
         /// Write (serialize) an object to a TOML string
         #[cfg(feature = "toml")]
         #[pyo3(name = "to_toml")]

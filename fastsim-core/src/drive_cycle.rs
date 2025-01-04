@@ -5,23 +5,9 @@ use crate::resources;
 use fastsim_2::cycle::RustCycle as Cycle2;
 
 #[fastsim_api(
-    fn __len__(&self) -> anyhow::Result<usize> {
-        self.len()
-    }
-
-    #[setter("__grade")]
-    fn set_grade_py(&mut self, grade: Vec<f64>) {
-        self.grade = grade.iter().map(|x| *x * uc::R).collect();
-    }
-
-    #[getter]
-    fn get_grade_py(&self) -> Vec<f64> {
-        self.grade.iter().map(|x|x.get::<si::ratio>()).collect()
-    }
-
     #[pyo3(name = "list_resources")]
     /// list available cycle resources
-    pub fn list_resources_py(&self) -> Vec<String> {
+    fn list_resources_py(&self) -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
 )]
