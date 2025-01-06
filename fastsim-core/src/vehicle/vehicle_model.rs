@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 use super::{hev::HEVPowertrainControls, *};
-use crate::resources;
 pub mod fastsim2_interface;
 
 /// Possible aux load power sources
@@ -707,11 +706,12 @@ pub(crate) mod tests {
     #[test]
     #[cfg(feature = "yaml")]
     pub(crate) fn test_conv_veh_init() {
+        use pretty_assertions::assert_eq;
         let veh = mock_conv_veh();
         let mut veh1 = veh.clone();
-        assert!(veh == veh1);
+        assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
         veh1.init().unwrap();
-        assert!(veh == veh1);
+        assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
     }
 
     #[test]
