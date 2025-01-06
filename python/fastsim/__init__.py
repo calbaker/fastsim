@@ -8,6 +8,7 @@ import re
 import inspect
 import pandas as pd
 import polars as pl
+from enum import Enum, auto
 
 from .fastsim import *
 from . import utils
@@ -221,20 +222,33 @@ def history_path_list(self, element_as_list: bool = False) -> List[str]:
 
 setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
 
+class PyDictDataFmt(Enum): 
+    """
+    Data formats for `to_pydict` and `from_pydict`
+    """
+    YAML = auto()
+    MsgPack = auto()
+    
 
-def to_pydict(self, flatten: bool=True) -> Dict:
+def to_pydict(self, flatten: bool=True, data_fmt: PyDictDataFmt=PyDictDataFmt.MsgPack) -> Dict:
     """
     Returns self converted to pure python dictionary with no nested Rust objects
     # Arguments
     - `flatten`: if True, returns dict without any hierarchy
+    - `data_fmt`: data format for intermediate conversion step
     """
-    from yaml import load
-    try:
-        from yaml import CLoader as Loader
-    except ImportError:
-        from yaml import Loader
+    match data_fmt:
+        case PyDictDataFmt.MsgPack:
+            import msgpack
+            pydict = msgpack.loads(self.to_msg_pack())
+        case PyDictDataFmt.YAML:
+            from yaml import load
+            try:
+                from yaml import CLoader as Loader
+            except ImportError:
+                from yaml import Loader
+            pydict = load(self.to_yaml(), Loader=Loader)
 
-    pydict = load(self.to_yaml(), Loader=Loader)
     if not flatten:
         return pydict
     else:
@@ -242,12 +256,22 @@ def to_pydict(self, flatten: bool=True) -> Dict:
 
 
 @classmethod
-def from_pydict(cls, pydict: Dict) -> Self:
+def from_pydict(cls, pydict: Dict, data_fmt: PyDictDataFmt=PyDictDataFmt.MsgPack) -> Self:
     """
     Instantiates Self from pure python dictionary 
+    # Arguments
+    - `pydict`: dictionary to be converted to FASTSim object
+    - `data_fmt`: data format for intermediate conversion step
     """
-    import yaml
-    return cls.from_yaml(yaml.dump(pydict), skip_init=False)
+    match data_fmt:
+        case PyDictDataFmt.YAML:
+            import yaml
+            obj = cls.from_yaml(yaml.dump(pydict), skip_init=False)
+        case PyDictDataFmt.MsgPack: 
+            import msgpack
+            obj = cls.from_msg_pack(msgpack.packb(pydict))
+            
+    return obj
 
 
 def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Union[pd.DataFrame, pl.DataFrame]:

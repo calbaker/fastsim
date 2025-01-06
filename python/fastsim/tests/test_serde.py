@@ -7,27 +7,40 @@ import os
 from typing import Tuple
 import fastsim as fsim
 
-# load 2012 Ford Fusion from file
-veh = fsim.Vehicle.from_resource("2022_Renault_Zoe_ZE50_R135.yaml")
+def get_solved_sd():
+    # load 2012 Ford Fusion from file
+    veh = fsim.Vehicle.from_resource("2022_Renault_Zoe_ZE50_R135.yaml")
 
-# Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states
-fsim.set_param_from_path(veh, "save_interval" , 1)
+    # Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states
+    fsim.set_param_from_path(veh, "save_interval" , 1)
 
-# load cycle from file
-cyc = fsim.Cycle.from_resource("udds.csv")
+    # load cycle from file
+    cyc = fsim.Cycle.from_resource("udds.csv")
 
-# instantiate SimDrive 
-sd = fsim.SimDrive(veh, cyc)
+    # instantiate SimDrive 
+    sd = fsim.SimDrive(veh, cyc)
 
-# simulation start time
-# run simulation
-sd.walk()
-# simulation end time
+    # run simulation
+    sd.walk()
 
-# TODO: make performmance benchmarks comparing full circle (de)serialization
-# with different formats (e.g. message pack, json, yaml, ...)
+    return sd
 
-def test_msg_pack():
-    sd_dict = msgpack.loads(sd.to_msg_pack())
-    assert sd.to_msg_pack() == msgpack.packb(sd_dict)
-    fsim.SimDrive.from_msg_pack(msgpack.packb(sd_dict))
+def test_pydict():
+    from fastsim import PyDictDataFmt
+    sd = get_solved_sd()
+
+    t0 = time.perf_counter_ns()
+    sd_dict_msg = sd.to_pydict(flatten=False, data_fmt=PyDictDataFmt.MsgPack)            
+    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt=PyDictDataFmt.MsgPack)
+    t1 = time.perf_counter_ns()
+    t_msg = t1 - t0
+    print(f"\nElapsed time for MessagePack: {t_msg:.3e} ns ")
+
+    t0 = time.perf_counter_ns()
+    sd_dict_yaml = sd.to_pydict(flatten=False, data_fmt=PyDictDataFmt.YAML)            
+    sd_yaml = fsim.SimDrive.from_pydict(sd_dict_yaml, data_fmt=PyDictDataFmt.YAML)
+    t1 = time.perf_counter_ns()
+    t_yaml = t1 - t0
+    print(f"Elapsed time for YAML: {t_yaml:.3e} ns ")
+
+    print(f"YAML time per MessagePack time: {(t_yaml / t_msg):.3e} ")

@@ -63,11 +63,11 @@ fn process_pyclass_generic(
     let mut final_output = TokenStream2::default();
     if subclass {
         final_output.extend::<TokenStream2>(quote! {
-            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", subclass))]
+            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", subclass, eq))]
         });
     } else {
         final_output.extend::<TokenStream2>(quote! {
-            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", eq, eq_int))]
+            #[cfg_attr(feature="pyo3", pyclass(module = "fastsim", eq))]
         });
     }
     output.extend(impl_block);
