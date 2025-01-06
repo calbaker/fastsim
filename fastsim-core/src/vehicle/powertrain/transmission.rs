@@ -83,6 +83,7 @@ impl Mass for Transmission {
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct TransmissionState {
     /// time step index
     pub i: usize,

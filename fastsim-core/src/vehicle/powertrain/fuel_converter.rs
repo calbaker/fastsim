@@ -363,6 +363,7 @@ impl FuelConverter {
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
 #[non_exhaustive]
+#[serde(default)]
 pub struct FuelConverterState {
     /// time step index
     pub i: usize,
@@ -632,7 +633,12 @@ impl FuelConverterThermal {
                 slope_per_kelvin: slope,
                 minimum,
             }) => minimum.max(
-                (offset + slope * uc::R / uc::KELVIN * self.state.temperature).min(1.0 * uc::R),
+                {
+                    let calc_unbound: si::Ratio =
+                        offset + slope * uc::R / uc::KELVIN * self.state.temperature;
+                    calc_unbound
+                }
+                .min(1.0 * uc::R),
             ),
             FCTempEffModel::Exponential(FCTempEffModelExponential {
                 offset,
@@ -697,6 +703,7 @@ impl Default for FuelConverterThermal {
 
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 pub struct FuelConverterThermalState {
     /// time step index
     pub i: usize,

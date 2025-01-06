@@ -632,6 +632,7 @@ impl ElectricMachine {
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
 #[non_exhaustive]
+#[serde(default)]
 pub struct ElectricMachineState {
     /// time step index
     pub i: usize,

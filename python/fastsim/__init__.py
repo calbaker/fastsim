@@ -159,19 +159,19 @@ def variable_path_list_from_py_objs(
 
     elif isinstance(obj, list):
         for key, val in enumerate(obj):
+            key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
             # check for nested dicts and call recursively
             if isinstance(val, dict):
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
             # check for lists or other iterables that do not contain numeric data
             elif ("__iter__" in dir(val)) and (len(val) > 0) and (
                     not (isinstance(val[0], float) or isinstance(val[0], int))):
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
+            elif key == "fc_on_causes":
+                continue
             else:
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
                 key_paths.append(key_path)
 
     if element_as_list:

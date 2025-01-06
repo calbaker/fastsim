@@ -441,6 +441,7 @@ impl HVACSystemForLumpedCabinAndRES {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[serde(default)]
 pub struct HVACSystemForLumpedCabinAndRESState {
     /// time step counter
     pub i: u32,

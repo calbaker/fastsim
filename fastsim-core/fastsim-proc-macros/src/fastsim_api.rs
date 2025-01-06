@@ -10,7 +10,7 @@ pub(crate) fn fastsim_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut ast = syn::parse_macro_input!(item as syn::ItemStruct);
     let ident = &ast.ident;
     if let syn::Fields::Named(syn::FieldsNamed { named, .. }) = &mut ast.fields {
-        process_named_field_struct(named);
+        process_named_field_struct(named, &mut py_impl_block);
     } else if let syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) = &mut ast.fields {
         process_tuple_struct(unnamed, &mut py_impl_block, &mut impl_block, ident);
     } else {
@@ -336,7 +336,14 @@ fn process_tuple_struct(
 
 fn process_named_field_struct(
     named: &mut syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
+    py_impl_block: &mut TokenStream2,
 ) {
+    py_impl_block.extend(quote! {
+        fn __repr__(&self) -> String {
+            format!("{self:?}")
+        }
+    });
+    
     // struct with named fields
     for field in named.iter_mut() {
         impl_getters_and_setters(field);

@@ -136,6 +136,7 @@ impl LumpedCabin {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[serde(default)]
 pub struct LumpedCabinState {
     /// time step counter
     pub i: u32,

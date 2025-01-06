@@ -354,6 +354,7 @@ impl FCOnCauses {
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct HEVState {
     /// time step index
     pub i: usize,
@@ -709,6 +710,7 @@ impl Init for RESGreedyWithDynamicBuffers {
 
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 /// State for [RESGreedyWithDynamicBuffers ]
 pub struct RGWDBState {
     /// time step index

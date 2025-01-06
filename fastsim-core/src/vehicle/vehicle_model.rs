@@ -540,6 +540,7 @@ impl Vehicle {
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct VehicleState {
     /// time step index
     pub i: usize,
@@ -598,10 +599,9 @@ pub struct VehicleState {
     /// current grade
     pub grade_curr: si::Ratio,
     /// current grade
-    #[serde(skip_deserializing, default)]
+    // will be overridden during simulation anyway
     pub elev_curr: si::Length,
     /// current air density
-    #[serde(skip_serializing, default)]
     pub air_density: si::MassDensity,
     /// current mass
     // TODO: make sure this gets updated appropriately
@@ -637,9 +637,10 @@ impl Default for VehicleState {
             cyc_met_overall: true,
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
+            // note that this value will be overwritten
             grade_curr: si::Ratio::ZERO,
             // note that this value will be overwritten
-            elev_curr: f64::NAN * uc::M,
+            elev_curr: *H_STD,
             air_density: Air::get_density(None, None),
             mass: uc::KG * f64::NAN,
         }

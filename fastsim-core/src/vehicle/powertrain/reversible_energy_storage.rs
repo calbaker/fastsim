@@ -613,7 +613,7 @@ pub enum SpecificEnergySideEffect {
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
-// component limits
+#[serde(default)]
 /// ReversibleEnergyStorage state variables
 pub struct ReversibleEnergyStorageState {
     // limits
@@ -809,6 +809,7 @@ impl RESLumpedThermal {
 
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 pub struct RESLumpedThermalState {
     /// time step index
     pub i: usize,

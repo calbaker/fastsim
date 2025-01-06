@@ -257,6 +257,7 @@ impl SerdeAPI for CabinHeatSource {}
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[serde(default)]
 pub struct HVACSystemForLumpedCabinState {
     /// time step counter
     pub i: u32,

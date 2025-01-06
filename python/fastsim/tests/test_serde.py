@@ -46,7 +46,8 @@ def test_pydict():
 
     import deepdiff
     sd_diff = '{\'type_changes\': {"root[\'sim_params\'][\'ach_speed_tol\']": {\'old_type\': <class \'float\'>, \'new_type\': <class \'str\'>, \'old_value\': 1e-09, \'new_value\': \'1e-9\'}}}'
-    # assert deepdiff.DeepDiff(sd_dict_msg, sd_dict_yaml) == sd_diff
-    print(deepdiff.DeepDiff(sd_dict_msg, sd_dict_yaml))
     assert sd_msg == sd
     assert sd_yaml == sd
+
+def test_dataframe():
+    get_solved_sd().to_dataframe()

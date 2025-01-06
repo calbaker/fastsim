@@ -13,9 +13,9 @@ pub struct SimParams {
     pub ach_speed_max_iter: u32,
     pub ach_speed_tol: si::Ratio,
     pub ach_speed_solver_gain: f64,
-    
+
     pub trace_miss_tol: TraceMissTolerance,
-    
+
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
     pub f2_const_air_density: bool,
@@ -66,7 +66,6 @@ impl Default for SimParams {
     fn to_fastsim2_py(&self) -> anyhow::Result<fastsim_2::simdrive::RustSimDrive> {
         self.to_fastsim2()
     }
-
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
