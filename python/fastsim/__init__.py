@@ -236,7 +236,7 @@ data_formats = [
     'yaml',
     'msg_pack',
     # 'toml',
-    # 'json',
+    'json',
 ]
 
 
@@ -260,6 +260,9 @@ def to_pydict(self, flatten: bool = False, data_fmt: str = "msg_pack") -> Dict:
             except ImportError:
                 from yaml import Loader
             pydict = load(self.to_yaml(), Loader=Loader)
+        case "json":
+            from json import loads
+            pydict = loads(self.to_json())
 
     if not flatten:
         return pydict
@@ -289,6 +292,9 @@ def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack") -> Self:
                 print(
                     f"{err}\nThis is a known bug in interactive python sessions.  Reverting to YAML.")
                 obj = cls.from_pydict(pydict, data_fmt="yaml")
+        case "json":
+            from json import dumps
+            obj = cls.from_json(dumps(pydict))
 
     return obj
 

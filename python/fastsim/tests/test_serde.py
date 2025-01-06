@@ -41,11 +41,20 @@ def test_pydict():
     t1 = time.perf_counter_ns()
     t_yaml = t1 - t0
     print(f"Elapsed time for YAML: {t_yaml:.3e} ns ")
-
     print(f"YAML time per MessagePack time: {(t_yaml / t_msg):.3e} ")
+
+    t0 = time.perf_counter_ns()
+    sd_dict_json = sd.to_pydict(flatten=False, data_fmt="json")            
+    sd_json = fsim.SimDrive.from_pydict(sd_dict_json, data_fmt="json")
+    t1 = time.perf_counter_ns()
+    t_json = t1 - t0
+    print(f"Elapsed time for json: {t_json:.3e} ns ")
+    print(f"JSON time per MessagePack time: {(t_json / t_msg):.3e} ")
 
     assert sd_msg == sd
     assert sd_yaml == sd
+    # TODO: uncomment and investigate
+    # assert sd_json == sd  
 
 def test_dataframe():
     get_solved_sd().to_dataframe()
