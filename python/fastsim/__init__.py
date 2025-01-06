@@ -222,7 +222,13 @@ def history_path_list(self, element_as_list: bool = False) -> List[str]:
 
 setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
 
-py_dict_formats = ['yaml', 'msg_pack']
+# TODO connect to crate features
+data_formats = [
+    'yaml', 
+    'msg_pack', 
+    # 'toml', 
+    # 'json',
+]
 
 def to_pydict(self, flatten: bool=False, data_fmt: str="msg_pack") -> Dict:
     """
@@ -231,8 +237,9 @@ def to_pydict(self, flatten: bool=False, data_fmt: str="msg_pack") -> Dict:
     - `flatten`: if True, returns dict without any hierarchy
     - `data_fmt`: data format for intermediate conversion step
     """
-    assert data_fmt in py_dict_formats, f"`data_fmt` must be one of {py_dict_formats}" 
-    match data_fmt:
+    data_fmt = data_fmt.lower()
+    assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
+    match :
         case "msg_pack":
             import msgpack
             pydict = msgpack.loads(self.to_msg_pack())
@@ -258,7 +265,8 @@ def from_pydict(cls, pydict: Dict, data_fmt: str="msg_pack") -> Self:
     - `pydict`: dictionary to be converted to FASTSim object
     - `data_fmt`: data format for intermediate conversion step
     """
-    match data_fmt:
+    assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
+    match data_fmt.lower():
         case "yaml":
             import yaml
             obj = cls.from_yaml(yaml.dump(pydict), skip_init=False)

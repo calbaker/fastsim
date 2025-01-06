@@ -81,8 +81,6 @@ pub trait SerdeAPI: Serialize + for<'a> Deserialize<'a> + Init {
         "json",
         #[cfg(feature = "toml")]
         "toml",
-        #[cfg(feature = "msgpack")]
-        "msgpack",
     ];
     const ACCEPTED_STR_FORMATS: &'static [&'static str] = &[
         #[cfg(feature = "yaml")]
