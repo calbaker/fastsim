@@ -29,8 +29,8 @@ def test_pydict():
     sd = get_solved_sd()
 
     t0 = time.perf_counter_ns()
-    sd_dict_msg = sd.to_pydict(flatten=False, data_fmt="yaml")            
-    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt="yaml")
+    sd_dict_msg = sd.to_pydict(flatten=False, data_fmt="msg_pack")            
+    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt="msg_pack")
     t1 = time.perf_counter_ns()
     t_msg = t1 - t0
     print(f"\nElapsed time for MessagePack: {t_msg:.3e} ns ")
@@ -43,3 +43,10 @@ def test_pydict():
     print(f"Elapsed time for YAML: {t_yaml:.3e} ns ")
 
     print(f"YAML time per MessagePack time: {(t_yaml / t_msg):.3e} ")
+
+    import deepdiff
+    sd_diff = '{\'type_changes\': {"root[\'sim_params\'][\'ach_speed_tol\']": {\'old_type\': <class \'float\'>, \'new_type\': <class \'str\'>, \'old_value\': 1e-09, \'new_value\': \'1e-9\'}}}'
+    # assert deepdiff.DeepDiff(sd_dict_msg, sd_dict_yaml) == sd_diff
+    print(deepdiff.DeepDiff(sd_dict_msg, sd_dict_yaml))
+    assert sd_msg == sd
+    assert sd_yaml == sd

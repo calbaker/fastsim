@@ -326,7 +326,7 @@ impl Mass for HybridElectricVehicle {
 }
 
 #[fastsim_api]
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[non_exhaustive]
 pub struct FCOnCauses(Vec<FCOnCause>);
 impl Init for FCOnCauses {}
@@ -367,30 +367,28 @@ pub struct HEVState {
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
 
-// TODO: implement `Deserialize`
-
-// Custom serialization
-impl Serialize for FCOnCauses {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let joined = self
-            .0
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<String>>()
-            .join(", ");
-        serializer.serialize_str(&format!("\"[{}]\"", joined))
-    }
-}
-impl std::fmt::Display for FCOnCauses {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-        // or, alternatively:
-        // fmt::Debug::fmt(self, f)
-    }
-}
+// // Custom serialization
+// impl Serialize for FCOnCauses {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         let joined = self
+//             .0
+//             .iter()
+//             .map(ToString::to_string)
+//             .collect::<Vec<String>>()
+//             .join(", ");
+//         serializer.serialize_str(&format!("\"[{}]\"", joined))
+//     }
+// }
+// impl std::fmt::Display for FCOnCauses {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "{:?}", self)
+//         // or, alternatively:
+//         // fmt::Debug::fmt(self, f)
+//     }
+// }
 
 #[fastsim_enum_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
