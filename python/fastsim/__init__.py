@@ -222,26 +222,21 @@ def history_path_list(self, element_as_list: bool = False) -> List[str]:
 
 setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
 
-class PyDictDataFmt(Enum): 
-    """
-    Data formats for `to_pydict` and `from_pydict`
-    """
-    YAML = auto()
-    MsgPack = auto()
-    
+py_dict_formats = ['yaml', 'msg_pack']
 
-def to_pydict(self, flatten: bool=True, data_fmt: PyDictDataFmt=PyDictDataFmt.MsgPack) -> Dict:
+def to_pydict(self, flatten: bool=False, data_fmt: str="msg_pack") -> Dict:
     """
     Returns self converted to pure python dictionary with no nested Rust objects
     # Arguments
     - `flatten`: if True, returns dict without any hierarchy
     - `data_fmt`: data format for intermediate conversion step
     """
+    assert data_fmt in py_dict_formats, f"`data_fmt` must be one of {py_dict_formats}" 
     match data_fmt:
-        case PyDictDataFmt.MsgPack:
+        case "msg_pack":
             import msgpack
             pydict = msgpack.loads(self.to_msg_pack())
-        case PyDictDataFmt.YAML:
+        case "yaml":
             from yaml import load
             try:
                 from yaml import CLoader as Loader
@@ -256,7 +251,7 @@ def to_pydict(self, flatten: bool=True, data_fmt: PyDictDataFmt=PyDictDataFmt.Ms
 
 
 @classmethod
-def from_pydict(cls, pydict: Dict, data_fmt: PyDictDataFmt=PyDictDataFmt.MsgPack) -> Self:
+def from_pydict(cls, pydict: Dict, data_fmt: str="msg_pack") -> Self:
     """
     Instantiates Self from pure python dictionary 
     # Arguments
@@ -264,12 +259,16 @@ def from_pydict(cls, pydict: Dict, data_fmt: PyDictDataFmt=PyDictDataFmt.MsgPack
     - `data_fmt`: data format for intermediate conversion step
     """
     match data_fmt:
-        case PyDictDataFmt.YAML:
+        case "yaml":
             import yaml
             obj = cls.from_yaml(yaml.dump(pydict), skip_init=False)
-        case PyDictDataFmt.MsgPack: 
+        case "msg_pack": 
             import msgpack
-            obj = cls.from_msg_pack(msgpack.packb(pydict))
+            try:
+                obj = cls.from_msg_pack(msgpack.packb(pydict))
+            except Exception as err:
+                print(f"{err}\nThis is a known bug in interactive python sessions.  Reverting to YAML.")
+                obj = cls.from_pydict(pydict, data_fmt="yaml")
             
     return obj
 

@@ -26,19 +26,18 @@ def get_solved_sd():
     return sd
 
 def test_pydict():
-    from fastsim import PyDictDataFmt
     sd = get_solved_sd()
 
     t0 = time.perf_counter_ns()
-    sd_dict_msg = sd.to_pydict(flatten=False, data_fmt=PyDictDataFmt.MsgPack)            
-    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt=PyDictDataFmt.MsgPack)
+    sd_dict_msg = sd.to_pydict(flatten=False, data_fmt="yaml")            
+    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt="yaml")
     t1 = time.perf_counter_ns()
     t_msg = t1 - t0
     print(f"\nElapsed time for MessagePack: {t_msg:.3e} ns ")
 
     t0 = time.perf_counter_ns()
-    sd_dict_yaml = sd.to_pydict(flatten=False, data_fmt=PyDictDataFmt.YAML)            
-    sd_yaml = fsim.SimDrive.from_pydict(sd_dict_yaml, data_fmt=PyDictDataFmt.YAML)
+    sd_dict_yaml = sd.to_pydict(flatten=False, data_fmt="yaml")            
+    sd_yaml = fsim.SimDrive.from_pydict(sd_dict_yaml, data_fmt="yaml")
     t1 = time.perf_counter_ns()
     t_yaml = t1 - t0
     print(f"Elapsed time for YAML: {t_yaml:.3e} ns ")
