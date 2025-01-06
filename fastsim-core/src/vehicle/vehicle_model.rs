@@ -1,4 +1,6 @@
 use crate::prelude::*;
+#[cfg(feature = "resources")]
+use crate::resources;
 
 use super::{hev::HEVPowertrainControls, *};
 pub mod fastsim2_interface;
@@ -101,6 +103,7 @@ impl Init for AuxSource {}
         self.pt_type.to_str("json")
     }
 
+    #[cfg(feature = "resources")]
     #[pyo3(name = "list_resources")]
     /// list available vehicle resources
     fn list_resources_py(&self) -> Vec<String> {
@@ -709,6 +712,8 @@ pub(crate) mod tests {
         use pretty_assertions::assert_eq;
         let veh = mock_conv_veh();
         let mut veh1 = veh.clone();
+        // NOTE: eventually figure out why the following assertions fail if
+        // `.to_yaml().uwrap()` is removed.  It's probably related to f64::NAN
         assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
         veh1.init().unwrap();
         assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
