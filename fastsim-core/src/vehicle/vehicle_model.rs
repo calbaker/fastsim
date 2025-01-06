@@ -704,17 +704,15 @@ pub(crate) mod tests {
         veh
     }
 
-    /// tests that vehicle can be initialized and that repeating has no net effect
-    // TODO: fix this test from the python side.  Use `deepdiff` or some such
-    // #[test]
-    // #[cfg(feature = "yaml")]
-    // pub(crate) fn test_conv_veh_init() {
-    //     let veh = mock_conv_veh();
-    //     let mut veh1 = veh.clone();
-    //     assert!(veh == veh1);
-    //     veh1.init().unwrap();
-    //     assert!(veh == veh1);
-    // }
+    #[test]
+    #[cfg(feature = "yaml")]
+    pub(crate) fn test_conv_veh_init() {
+        let veh = mock_conv_veh();
+        let mut veh1 = veh.clone();
+        assert!(veh == veh1);
+        veh1.init().unwrap();
+        assert!(veh == veh1);
+    }
 
     #[test]
     #[cfg(all(feature = "csv", feature = "resources"))]

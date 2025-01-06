@@ -339,7 +339,7 @@ fn process_named_field_struct(
     py_impl_block: &mut TokenStream2,
 ) {
     py_impl_block.extend(quote! {
-        fn __repr__(&self) -> String {
+        fn __str__(&self) -> String {
             format!("{self:?}")
         }
     });

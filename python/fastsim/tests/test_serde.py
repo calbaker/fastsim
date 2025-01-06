@@ -44,8 +44,6 @@ def test_pydict():
 
     print(f"YAML time per MessagePack time: {(t_yaml / t_msg):.3e} ")
 
-    import deepdiff
-    sd_diff = '{\'type_changes\': {"root[\'sim_params\'][\'ach_speed_tol\']": {\'old_type\': <class \'float\'>, \'new_type\': <class \'str\'>, \'old_value\': 1e-09, \'new_value\': \'1e-9\'}}}'
     assert sd_msg == sd
     assert sd_yaml == sd
 
