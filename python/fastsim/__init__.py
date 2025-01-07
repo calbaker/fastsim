@@ -148,10 +148,6 @@ def variable_path_list_from_py_objs(
             if isinstance(val, dict):
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
-            # check for fc_on_causes
-            elif key == "fc_on_causes":
-                # NOTE: we may want to do something more elegant for this check
-                continue
             # check for lists or other iterables that do not contain float data
             elif ("__iter__" in dir(val)) and (len(val) > 0) and (
                     not (isinstance(val[0], float) or isinstance(val[0], int))):
@@ -167,10 +163,6 @@ def variable_path_list_from_py_objs(
             if isinstance(val, dict):
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
-            # check for fc_on_causes
-            elif key == "fc_on_causes":
-                # NOTE: we may want to do something more elegant for this check
-                continue
             # check for lists or other iterables that do not contain numeric data
             elif ("__iter__" in dir(val)) and (len(val) > 0) and (
                     not (isinstance(val[0], float) or isinstance(val[0], int))):

@@ -326,7 +326,7 @@ impl Mass for HybridElectricVehicle {
 }
 
 #[fastsim_api]
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct FCOnCauses(Vec<FCOnCause>);
 impl Init for FCOnCauses {}
@@ -368,31 +368,81 @@ pub struct HEVState {
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
 
-// // Custom serialization
-// impl Serialize for FCOnCauses {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         let joined = self
-//             .0
-//             .iter()
-//             .map(ToString::to_string)
-//             .collect::<Vec<String>>()
-//             .join(", ");
-//         serializer.serialize_str(&format!("\"[{}]\"", joined))
-//     }
-// }
-// impl std::fmt::Display for FCOnCauses {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{:?}", self)
-//         // or, alternatively:
-//         // fmt::Debug::fmt(self, f)
-//     }
-// }
+// Custom serialization
+impl Serialize for FCOnCauses {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let joined = self
+            .0
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ");
+        serializer.serialize_str(&format!("\"[{}]\"", joined))
+    }
+}
+
+use serde::de::{self, Visitor};
+struct FCOnCausesVisitor;
+impl<'de> Visitor<'de> for FCOnCausesVisitor {
+    type Value = FCOnCauses;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(
+            "String form of `FCOnCauses`, e.g. `\"[VehicleSpeedTooHigh, FCTemperatureTooLow]\"`",
+        )
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let inner: String = v
+            .strip_prefix("[")
+            .ok_or_else(|| "Missing leading `[`")
+            .map_err(|err| de::Error::custom(err))?
+            .strip_suffix("]")
+            .ok_or_else(|| "Missing trailing`]`")
+            .map_err(|err| de::Error::custom(err))?
+            .to_string();
+        let fc_on_causes_unchecked = inner
+            .split(",")
+            .map(|x| FromStr::from_str(x.trim()))
+            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
+        let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
+        for fc_on_cause_unchecked in fc_on_causes_unchecked {
+            fc_on_causes
+                .0
+                .push(fc_on_cause_unchecked.map_err(|err| de::Error::custom(err))?)
+        }
+        Ok(fc_on_causes)
+    }
+}
+
+// Custom deserialization
+impl<'de> Deserialize<'de> for FCOnCauses {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(FCOnCausesVisitor)
+    }
+}
+
+impl std::fmt::Display for FCOnCauses {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
+    }
+}
 
 #[fastsim_enum_api]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto, FromStr,
+)]
 pub enum FCOnCause {
     /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,

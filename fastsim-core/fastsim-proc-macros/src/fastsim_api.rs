@@ -161,7 +161,7 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
         #[pyo3(name = "from_str")]
         #[pyo3(signature = (contents, format, skip_init=None))]
         pub fn from_str_py(contents: &str, format: &str, skip_init: Option<bool>) -> PyResult<Self> {
-            Self::from_str(contents, format, skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
+            SerdeAPI::from_str(contents, format, skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
         /// Write (serialize) an object to a JSON string
