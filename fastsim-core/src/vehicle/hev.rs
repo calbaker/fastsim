@@ -407,7 +407,7 @@ impl Visitor<'_> for FCOnCausesVisitor {
         E: de::Error,
     {
         let inner: String = v
-            .replace("\"", "")
+            .replace("\"", "") // this solves a problem in interactive mode
             .strip_prefix("[")
             .ok_or("Missing leading `[`")
             .map_err(|err| de::Error::custom(err))?
