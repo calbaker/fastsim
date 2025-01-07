@@ -384,6 +384,10 @@ impl Serialize for FCOnCauses {
     }
 }
 
+lazy_static! {
+    static ref FC_ON_CAUSES_REGEX: Regex = Regex::new("\\[([A-Z]\\w+(,){0,1})*\\]").unwrap();
+}
+
 use serde::de::{self, Visitor};
 struct FCOnCausesVisitor;
 impl Visitor<'_> for FCOnCausesVisitor {
@@ -399,43 +403,27 @@ impl Visitor<'_> for FCOnCausesVisitor {
     where
         E: de::Error,
     {
-        let inner: String = v
-            .strip_prefix("[")
-            .ok_or("Missing leading `[`")
-            .map_err(|err| de::Error::custom(err))?
-            .strip_suffix("]")
-            .ok_or("Missing trailing`]`")
-            .map_err(|err| de::Error::custom(err))?
-            .to_string();
-        let fc_on_causes_unchecked = inner
-            .split(",")
-            .map(|x| FromStr::from_str(x.trim()))
-            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
-        let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
-        for fc_on_cause_unchecked in fc_on_causes_unchecked {
-            fc_on_causes
-                .0
-                .push(fc_on_cause_unchecked.map_err(|err| de::Error::custom(err))?)
-        }
-        Ok(fc_on_causes)
+        Self::visit_str(self, &v)
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        let inner: String = v
-            .strip_prefix("[")
-            .ok_or("Missing leading `[`")
-            .map_err(|err| de::Error::custom(err))?
-            .strip_suffix("]")
-            .ok_or("Missing trailing`]`")
-            .map_err(|err| de::Error::custom(err))?
-            .to_string();
-        let fc_on_causes_unchecked = inner
-            .split(",")
-            .map(|x| FromStr::from_str(x.trim()))
-            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
+        let captures = FC_ON_CAUSES_REGEX
+            .captures(v)
+            .ok_or("invalid format")
+            .map_err(|err| de::Error::custom(err))?;
+        let fc_on_causes_unchecked: Vec<Result<FCOnCause, derive_more::FromStrError>> =
+            if captures.len() > 1 {
+                captures
+                    .iter()
+                    .skip(1)
+                    .map(|x| FromStr::from_str(x.unwrap().as_str()))
+                    .collect()
+            } else {
+                vec![]
+            };
         let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
         for fc_on_cause_unchecked in fc_on_causes_unchecked {
             fc_on_causes
@@ -508,7 +496,6 @@ pub struct HEVSimulationParams {
     /// Whether to save each SOC balance iteration    
     pub save_soc_bal_iters: bool,
 }
-
 impl Default for HEVSimulationParams {
     fn default() -> Self {
         Self {

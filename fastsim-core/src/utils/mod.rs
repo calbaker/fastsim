@@ -1,6 +1,5 @@
 use crate::imports::*;
 use paste::paste;
-use regex::Regex;
 
 impl Init for ninterp::Interpolator {}
 impl SerdeAPI for ninterp::Interpolator {
