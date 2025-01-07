@@ -386,7 +386,7 @@ impl Serialize for FCOnCauses {
 
 use serde::de::{self, Visitor};
 struct FCOnCausesVisitor;
-impl<'de> Visitor<'de> for FCOnCausesVisitor {
+impl Visitor<'_> for FCOnCausesVisitor {
     type Value = FCOnCauses;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -401,10 +401,35 @@ impl<'de> Visitor<'de> for FCOnCausesVisitor {
     {
         let inner: String = v
             .strip_prefix("[")
-            .ok_or_else(|| "Missing leading `[`")
+            .ok_or("Missing leading `[`")
             .map_err(|err| de::Error::custom(err))?
             .strip_suffix("]")
-            .ok_or_else(|| "Missing trailing`]`")
+            .ok_or("Missing trailing`]`")
+            .map_err(|err| de::Error::custom(err))?
+            .to_string();
+        let fc_on_causes_unchecked = inner
+            .split(",")
+            .map(|x| FromStr::from_str(x.trim()))
+            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
+        let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
+        for fc_on_cause_unchecked in fc_on_causes_unchecked {
+            fc_on_causes
+                .0
+                .push(fc_on_cause_unchecked.map_err(|err| de::Error::custom(err))?)
+        }
+        Ok(fc_on_causes)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let inner: String = v
+            .strip_prefix("[")
+            .ok_or("Missing leading `[`")
+            .map_err(|err| de::Error::custom(err))?
+            .strip_suffix("]")
+            .ok_or("Missing trailing`]`")
             .map_err(|err| de::Error::custom(err))?
             .to_string();
         let fc_on_causes_unchecked = inner
