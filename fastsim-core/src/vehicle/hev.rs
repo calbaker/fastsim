@@ -399,25 +399,7 @@ impl Visitor<'_> for FCOnCausesVisitor {
     where
         E: de::Error,
     {
-        let inner: String = v
-            .strip_prefix("[")
-            .ok_or("Missing leading `[`")
-            .map_err(|err| de::Error::custom(err))?
-            .strip_suffix("]")
-            .ok_or("Missing trailing`]`")
-            .map_err(|err| de::Error::custom(err))?
-            .to_string();
-        let fc_on_causes_unchecked = inner
-            .split(",")
-            .map(|x| FromStr::from_str(x.trim()))
-            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
-        let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
-        for fc_on_cause_unchecked in fc_on_causes_unchecked {
-            fc_on_causes
-                .0
-                .push(fc_on_cause_unchecked.map_err(|err| de::Error::custom(err))?)
-        }
-        Ok(fc_on_causes)
+        Self::visit_str(self, &v)
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -425,6 +407,7 @@ impl Visitor<'_> for FCOnCausesVisitor {
         E: de::Error,
     {
         let inner: String = v
+            .replace("\"", "")
             .strip_prefix("[")
             .ok_or("Missing leading `[`")
             .map_err(|err| de::Error::custom(err))?
@@ -432,15 +415,29 @@ impl Visitor<'_> for FCOnCausesVisitor {
             .ok_or("Missing trailing`]`")
             .map_err(|err| de::Error::custom(err))?
             .to_string();
-        let fc_on_causes_unchecked = inner
-            .split(",")
-            .map(|x| FromStr::from_str(x.trim()))
-            .collect::<Vec<Result<FCOnCause, derive_more::FromStrError>>>();
+        let fc_on_causes_str = inner.split(",").map(|x| x.trim()).collect::<Vec<&str>>();
+        let fc_on_causes_unchecked = fc_on_causes_str
+            .iter()
+            .map(|x| {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(FromStr::from_str(x))
+                }
+            })
+            .collect::<Vec<Option<Result<FCOnCause, derive_more::FromStrError>>>>();
         let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
-        for fc_on_cause_unchecked in fc_on_causes_unchecked {
-            fc_on_causes
-                .0
-                .push(fc_on_cause_unchecked.map_err(|err| de::Error::custom(err))?)
+        for (fc_on_cause_unchecked, fc_on_cause_str) in
+            fc_on_causes_unchecked.into_iter().zip(fc_on_causes_str)
+        {
+            if let Some(fc_on_cause_unchecked) = fc_on_cause_unchecked {
+                fc_on_causes.0.push(fc_on_cause_unchecked.map_err(|err| {
+                    de::Error::custom(format!(
+                        "{}\nfc_on_cause_unchecked: {:?}\nfc_on_cause_str: {}",
+                        err, fc_on_cause_unchecked, fc_on_cause_str
+                    ))
+                })?)
+            }
         }
         Ok(fc_on_causes)
     }

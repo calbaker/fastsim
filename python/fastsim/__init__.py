@@ -282,7 +282,7 @@ def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack") -> Self:
                 obj = cls.from_msg_pack(msgpack.packb(pydict))
             except Exception as err:
                 print(
-                    f"{err}\nThis is a known bug in interactive python sessions.  Reverting to YAML.")
+                    f"{err}\nFalling back to YAML.")
                 obj = cls.from_pydict(pydict, data_fmt="yaml")
         case "json":
             from json import dumps
