@@ -5,7 +5,6 @@
 //!    the `Init` trait to initialize structs that implement this macro
 //! - `#[fastsim_api]` -- used to expose the struct to python and provides assorted other features related to usability
 
-#![allow(non_local_definitions)] // see https://github.com/PyO3/pyo3/discussions/4083 as this is a `pyo3` problem
 #![allow(clippy::field_reassign_with_default)]
 // TODO: uncomment when docs are somewhat mature to check for missing docs
 // #![warn(missing_docs)]

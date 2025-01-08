@@ -62,5 +62,5 @@ json = ["dep:serde_json"]
 toml = ["dep:toml"]
 ## Enables yaml serialization and deserialization
 yaml = ["dep:serde_yaml"]
-## Enables message pack serialization and deserialization
+## Enables message pack serialization and deserialization via `rmp-serde`
 msgpack = ["dep:rmp-serde"]
