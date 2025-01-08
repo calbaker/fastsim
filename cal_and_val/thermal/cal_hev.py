@@ -35,6 +35,7 @@ cyc_files = [
     # TODO: Chad needs to populate this list after careful review
     # cyc_folder_path / "some_file.txt",
 ]
+assert len(cyc_files) > 0
 
 # TODO: use random selection to retain ~70% of cycles for calibration, and
 # reserve the remaining for validation
