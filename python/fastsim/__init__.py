@@ -232,7 +232,7 @@ data_formats = [
 ]
 
 
-def to_pydict(self, flatten: bool = False, data_fmt: str = "msg_pack") -> Dict:
+def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
     """
     Returns self converted to pure python dictionary with no nested Rust objects
     # Arguments
