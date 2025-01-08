@@ -79,7 +79,7 @@ pt_type:
       eff_interp:
         Interp0D: 0.92
       save_interval: 1
-    mass: ~
+    mass_kilograms: ~
 chassis:
   drag_coef: 0.33
   frontal_area_square_meters: 2.5121646

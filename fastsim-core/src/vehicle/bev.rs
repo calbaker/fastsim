@@ -1,5 +1,6 @@
 use super::*;
 
+#[fastsim_api]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, HistoryMethods)]
 #[non_exhaustive]
 /// Battery electric vehicle
@@ -13,7 +14,6 @@ pub struct BatteryElectricVehicle {
     pub(crate) mass: Option<si::Mass>,
 }
 
-impl SerdeAPI for BatteryElectricVehicle {}
 impl Init for BatteryElectricVehicle {
     fn init(&mut self) -> anyhow::Result<()> {
         self.res.init().with_context(|| anyhow!(format_dbg!()))?;
@@ -24,6 +24,8 @@ impl Init for BatteryElectricVehicle {
         Ok(())
     }
 }
+
+impl SerdeAPI for BatteryElectricVehicle {}
 
 impl Mass for BatteryElectricVehicle {
     fn mass(&self) -> anyhow::Result<Option<si::Mass>> {

@@ -667,7 +667,7 @@ pt_type:
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 1.0
     aux_cntrl: AuxOnResPriority
-    mass: ~
+    mass_kilograms: ~
     sim_params:
       res_per_fuel_lim: 0.005
       soc_balance_iter_err: 5

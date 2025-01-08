@@ -1,6 +1,7 @@
 use super::{vehicle_model::VehicleState, *};
 use crate::prelude::ElectricMachineState;
 
+#[fastsim_api]
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, HistoryMethods)]
 #[non_exhaustive]
 /// Hybrid vehicle with both engine and reversible energy storage (aka battery)
@@ -59,6 +60,8 @@ impl Init for HybridElectricVehicle {
         Ok(())
     }
 }
+
+impl SerdeAPI for HybridElectricVehicle {}
 
 impl Powertrain for Box<HybridElectricVehicle> {
     fn set_curr_pwr_prop_out_max(
