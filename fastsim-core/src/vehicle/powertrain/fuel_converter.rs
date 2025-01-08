@@ -55,14 +55,11 @@ use std::f64::consts::PI;
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub thrml: FuelConverterThermalOption,
     /// [Self] mass
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
     /// FuelConverter specific power
-    #[api(skip_get, skip_set)]
     pub(in super::super) specific_pwr: Option<si::SpecificPower>,
     /// max rated brake output power
     pub pwr_out_max: si::Power,
@@ -73,7 +70,6 @@ pub struct FuelConverter {
     /// lag time for ramp up
     pub pwr_ramp_lag: si::Time,
     /// interpolator for calculating [Self] efficiency as a function of output power
-    #[api(skip_get, skip_set)]
     pub eff_interp_from_pwr_out: Interpolator,
     /// power at which peak efficiency occurs
     #[serde(skip)]
@@ -81,7 +77,6 @@ pub struct FuelConverter {
     /// idle fuel power to overcome internal friction (not including aux load) \[W\]
     pub pwr_idle_fuel: si::Power,
     /// time step interval between saves. 1 is a good option. If None, no saving occurs.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -199,7 +194,6 @@ impl SaveInterval for FuelConverter {
 }
 
 // non-py methods
-
 impl FuelConverter {
     /// Sets maximum possible total power [FuelConverter]
     /// can produce.
@@ -369,6 +363,7 @@ impl FuelConverter {
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
 #[non_exhaustive]
+#[serde(default)]
 pub struct FuelConverterState {
     /// time step index
     pub i: usize,
@@ -404,7 +399,7 @@ impl SerdeAPI for FuelConverterState {}
 impl Init for FuelConverterState {}
 
 /// Options for handling [FuelConverter] thermal model
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum FuelConverterThermalOption {
     /// Basic thermal plant for [FuelConverter]
     FuelConverterThermal(Box<FuelConverterThermal>),
@@ -469,7 +464,13 @@ impl FuelConverterThermalOption {
     }
 }
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 /// Struct for modeling Fuel Converter (e.g. engine, fuel cell.)
@@ -482,24 +483,20 @@ pub struct FuelConverterThermal {
     pub htc_to_amb_stop: si::HeatTransferCoeff,
 
     /// Heat transfer coefficient between adiabatic flame temperature and [FuelConverterThermal] temperature
-    pub htc_from_comb: si::ThermalConductance,
+    pub conductance_from_comb: si::ThermalConductance,
     /// Max coefficient for fraction of combustion heat that goes to [FuelConverter]
     /// (engine) thermal mass. Remainder goes to environment (e.g. via tailpipe).
     pub max_frac_from_comb: si::Ratio,
     /// parameter for temperature at which thermostat starts to open
-    #[api(skip_get, skip_set)]
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
-    #[api(skip_get, skip_set)]
     pub tstat_te_delta: Option<si::Temperature>,
-    #[serde(skip_serializing, deserialize_with = "tstat_interp_default")]
-    #[api(skip_get, skip_set)]
+    #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
     pub tstat_interp: Interp1D,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
     pub radiator_effectiveness: si::Ratio,
     /// Model for [FuelConverter] dependence on efficiency
-    #[api(skip_get, skip_set)]
     pub fc_eff_model: FCTempEffModel,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -514,18 +511,22 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
+fn tstat_interp_default_de<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
 where
     D: Deserializer<'de>,
 {
-    Ok(Interp1D::new(
+    Ok(tstat_interp_default())
+}
+
+fn tstat_interp_default() -> Interp1D {
+    Interp1D::new(
         vec![85.0, 90.0],
         vec![0.0, 1.0],
         Strategy::Linear,
         Extrapolate::Clamp,
     )
     .with_context(|| format_dbg!())
-    .unwrap())
+    .unwrap()
 }
 
 lazy_static! {
@@ -616,7 +617,7 @@ impl FuelConverterThermal {
         .with_context(|| format_dbg!())?;
         // heat that will go both to the block and out the exhaust port
         let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
-        let delta_temp: si::Temperature = (((self.htc_from_comb
+        let delta_temp: si::Temperature = (((self.conductance_from_comb
             * (self.state.te_adiabatic - self.state.temperature))
             .min(self.max_frac_from_comb * heat_gen)
             - pwr_thrml_fc_to_cab
@@ -632,7 +633,12 @@ impl FuelConverterThermal {
                 slope_per_kelvin: slope,
                 minimum,
             }) => minimum.max(
-                (offset + slope * uc::R / uc::KELVIN * self.state.temperature).min(1.0 * uc::R),
+                {
+                    let calc_unbound: si::Ratio =
+                        offset + slope * uc::R / uc::KELVIN * self.state.temperature;
+                    calc_unbound
+                }
+                .min(1.0 * uc::R),
             ),
             FCTempEffModel::Exponential(FCTempEffModelExponential {
                 offset,
@@ -674,9 +680,30 @@ impl Init for FuelConverterThermal {
         Ok(())
     }
 }
+impl Default for FuelConverterThermal {
+    fn default() -> Self {
+        let mut fct = Self {
+            heat_capacitance: Default::default(),
+            length_for_convection: Default::default(),
+            htc_to_amb_stop: Default::default(),
+            conductance_from_comb: Default::default(),
+            max_frac_from_comb: Default::default(),
+            tstat_te_sto: None,
+            tstat_te_delta: None,
+            tstat_interp: tstat_interp_default(),
+            radiator_effectiveness: Default::default(),
+            fc_eff_model: Default::default(),
+            state: Default::default(),
+            history: Default::default(),
+        };
+        fct.init().unwrap();
+        fct
+    }
+}
 
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 pub struct FuelConverterThermalState {
     /// time step index
     pub i: usize,
@@ -712,7 +739,7 @@ impl Default for FuelConverterThermalState {
 }
 
 /// Model variants for how FC efficiency depends on temperature
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 pub enum FCTempEffModel {
     /// Linear temperature dependence
     Linear(FCTempEffModelLinear),

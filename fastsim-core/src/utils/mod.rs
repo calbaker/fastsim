@@ -194,20 +194,20 @@ make_uom_cmp_fn!(almost_ge);
 make_uom_cmp_fn!(almost_le);
 
 #[fastsim_api]
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Pyo3VecBoolWrapper(pub Vec<bool>);
 impl SerdeAPI for Pyo3VecBoolWrapper {}
 impl Init for Pyo3VecBoolWrapper {}
 
 #[fastsim_api]
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pyo3VecWrapper(pub Vec<f64>);
 impl SerdeAPI for Pyo3VecWrapper {}
 impl Init for Pyo3VecWrapper {}
 
 #[allow(non_snake_case)]
 #[fastsim_api]
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Pyo3Vec2Wrapper(pub Vec<Vec<f64>>);
 impl From<Vec<Vec<f64>>> for Pyo3Vec2Wrapper {
     fn from(v: Vec<Vec<f64>>) -> Self {
@@ -228,7 +228,7 @@ impl From<Vec<Vec<Vec<f64>>>> for Pyo3Vec3Wrapper {
 impl SerdeAPI for Pyo3Vec3Wrapper {}
 impl Init for Pyo3Vec3Wrapper {}
 
-#[derive(IsVariant)]
+#[derive(IsVariant, From, TryInto)]
 pub(crate) enum InterpRange {
     ZeroThroughOne,
     NegativeOneThroughOne,

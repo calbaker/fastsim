@@ -2,7 +2,7 @@ use super::*;
 // TODO: add parameters and/or cabin model variant for solar heat load
 
 /// Options for handling cabin thermal model
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum CabinOption {
     /// Basic single thermal capacitance cabin thermal model, including HVAC
     /// system and controls
@@ -27,16 +27,22 @@ impl Init for CabinOption {
 }
 impl SerdeAPI for CabinOption {}
 
-#[fastsim_api]
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
+#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 /// Basic single thermal capacitance cabin thermal model, including HVAC
 /// system and controls
 pub struct LumpedCabin {
     /// Inverse of cabin shell thermal resistance
-    pub cab_htc_to_amb: si::HeatTransferCoeff,
-    /// parameter for heat transfer coeff from cabin to ambient during
-    /// vehicle stop
+    pub cab_shell_htc_to_amb: si::HeatTransferCoeff,
+    /// parameter for heat transfer coeff from cabin outer surface to ambient
+    /// during vehicle stop
     pub cab_htc_to_amb_stop: si::HeatTransferCoeff,
     /// cabin thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
@@ -109,11 +115,11 @@ impl LumpedCabin {
                     / (nu_l_bar
                         * Air::get_therm_cond(cab_te_film_ext).with_context(|| format_dbg!())?
                         / self.length)
-                    + 1.0 / self.cab_htc_to_amb);
+                    + 1.0 / self.cab_shell_htc_to_amb);
             (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temperature)
         } else {
             (self.length * self.width)
-                / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_htc_to_amb)
+                / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_shell_htc_to_amb)
                 * (te_amb_air - self.state.temperature)
         };
 
@@ -130,6 +136,7 @@ impl LumpedCabin {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[serde(default)]
 pub struct LumpedCabinState {
     /// time step counter
     pub i: u32,

@@ -23,7 +23,7 @@ opt-level = 3
 document-features = "0.2.10"
 fastsim-core = { path = "fastsim-core" }
 anyhow = "1.0.71"
-pyo3 = "0.19"
-numpy = "0.19"
+pyo3 = "0.23.3"
+numpy = "0.23"
 uom = { version = "0.35.0", features = ["use_serde"] }
-fastsim-2 = { package = "fastsim-core", version = "~0" }
+fastsim-2 = { package = "fastsim-core", version = "~0", features = ["pyo3", "resources"] }

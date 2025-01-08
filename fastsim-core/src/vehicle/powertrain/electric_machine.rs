@@ -58,13 +58,11 @@ use crate::pyo3::*;
 /// Struct for modeling electric machines.  This lumps performance and efficiency of motor and power
 /// electronics.
 pub struct ElectricMachine {
-    #[api(skip_set, skip_get)]
     /// Efficiency interpolator corresponding to achieved output power
     ///
     /// Note that the Extrapolate field of this variable is changed in [Self::get_pwr_in_req]
     pub eff_interp_achieved: Interpolator,
     #[serde(default)]
-    #[api(skip_set, skip_get)]
     /// Efficiency interpolator corresponding to max input power
     /// If `None`, will be set during [Self::init].
     ///
@@ -78,14 +76,11 @@ pub struct ElectricMachine {
     pub pwr_out_max: si::Power,
     /// ElectricMachine specific power
     // TODO: fix `extract_type_from_option` to allow for not having this line
-    #[api(skip_get, skip_set)]
     pub specific_pwr: Option<si::SpecificPower>,
     /// ElectricMachine mass
     // TODO: fix `extract_type_from_option` to allow for not having this line
-    #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
     /// Time step interval between saves. 1 is a good option. If None, no saving occurs.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -637,6 +632,7 @@ impl ElectricMachine {
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
 #[non_exhaustive]
+#[serde(default)]
 pub struct ElectricMachineState {
     /// time step index
     pub i: usize,

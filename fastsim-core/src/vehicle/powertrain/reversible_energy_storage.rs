@@ -34,6 +34,7 @@ const TOL: f64 = 1e-3;
 
     // TODO: decide on way to deal with `side_effect` coming after optional arg and uncomment
     #[pyo3(name = "set_mass")]
+    #[pyo3(signature = (mass_kg=None, side_effect=None))]
     fn set_mass_py(&mut self, mass_kg: Option<f64>, side_effect: Option<String>) -> anyhow::Result<()> {
         let side_effect = side_effect.unwrap_or_else(|| "Intensive".into());
         self.set_mass(
@@ -79,14 +80,11 @@ const TOL: f64 = 1e-3;
 pub struct ReversibleEnergyStorage {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "RESThermalOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub thrml: RESThermalOption,
     /// ReversibleEnergyStorage mass
     #[serde(default)]
-    #[api(skip_get, skip_set)]
     pub(in super::super) mass: Option<si::Mass>,
     /// ReversibleEnergyStorage specific energy
-    #[api(skip_get, skip_set)]
     pub(in super::super) specific_energy: Option<si::SpecificEnergy>,
     /// Max output (and input) power battery can produce (accept)
     pub pwr_out_max: si::Power,
@@ -99,7 +97,6 @@ pub struct ReversibleEnergyStorage {
     /// - 1d -- linear w.r.t. power
     /// - 2d -- linear w.r.t. power and SOC
     /// - 3d -- linear w.r.t. power, SOC, and temperature
-    #[api(skip_get, skip_set)]
     pub eff_interp: Interpolator,
 
     /// Hard limit on minimum SOC, e.g. 0.05
@@ -108,7 +105,6 @@ pub struct ReversibleEnergyStorage {
     pub max_soc: si::Ratio,
 
     /// Time step interval at which history is saved
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub save_interval: Option<usize>,
     /// struct for tracking current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -605,6 +601,7 @@ impl Init for ReversibleEnergyStorage {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 /// Controls which parameter to update when setting specific energy
 pub enum SpecificEnergySideEffect {
     /// update mass
@@ -616,7 +613,7 @@ pub enum SpecificEnergySideEffect {
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
-// component limits
+#[serde(default)]
 /// ReversibleEnergyStorage state variables
 pub struct ReversibleEnergyStorageState {
     // limits
@@ -701,7 +698,7 @@ impl Default for ReversibleEnergyStorageState {
 impl Init for ReversibleEnergyStorageState {}
 impl SerdeAPI for ReversibleEnergyStorageState {}
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum RESThermalOption {
     /// Basic thermal plant for [ReversibleEnergyStorage]
     RESLumpedThermal(Box<RESLumpedThermal>),
@@ -757,16 +754,22 @@ impl RESThermalOption {
     }
 }
 
-#[fastsim_api]
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
+#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// Struct for modeling [ReversibleEnergyStorage] (e.g. battery) thermal plant
 pub struct RESLumpedThermal {
     /// [ReversibleEnergyStorage] thermal capacitance
     pub heat_capacitance: si::HeatCapacity,
     /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to ambient
-    pub htc_to_amb: si::ThermalConductance,
+    pub conductance_to_amb: si::ThermalConductance,
     /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to cabin
-    pub htc_to_cab: si::ThermalConductance,
+    pub conductance_to_cab: si::ThermalConductance,
     /// current state
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
     pub state: RESLumpedThermalState,
@@ -791,8 +794,9 @@ impl RESLumpedThermal {
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.state.temp_prev = self.state.temperature;
-        self.state.pwr_thrml_from_cabin = self.htc_to_cab * (te_cab - self.state.temperature);
-        self.state.pwr_thrml_from_amb = self.htc_to_cab * (te_amb - self.state.temperature);
+        self.state.pwr_thrml_from_cabin =
+            self.conductance_to_cab * (te_cab - self.state.temperature);
+        self.state.pwr_thrml_from_amb = self.conductance_to_cab * (te_amb - self.state.temperature);
         self.state.temperature += (pwr_thrml_hvac_to_res
             + res_state.pwr_out_electrical * (1.0 * uc::R - res_state.eff)
             + self.state.pwr_thrml_from_cabin
@@ -805,6 +809,7 @@ impl RESLumpedThermal {
 
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 pub struct RESLumpedThermalState {
     /// time step index
     pub i: usize,

@@ -13,9 +13,9 @@ pub struct SimParams {
     pub ach_speed_max_iter: u32,
     pub ach_speed_tol: si::Ratio,
     pub ach_speed_solver_gain: f64,
-    #[api(skip_get, skip_set)]
+
     pub trace_miss_tol: TraceMissTolerance,
-    #[api(skip_get, skip_set)]
+
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
     pub f2_const_air_density: bool,
@@ -39,6 +39,7 @@ impl Default for SimParams {
 
 #[fastsim_api(
     #[new]
+    #[pyo3(signature = (veh, cyc, sim_params=None))]
     fn __new__(veh: Vehicle, cyc: Cycle, sim_params: Option<SimParams>) -> anyhow::Result<Self> {
         Ok(SimDrive::new(
             veh,
@@ -65,7 +66,6 @@ impl Default for SimParams {
     fn to_fastsim2_py(&self) -> anyhow::Result<fastsim_2::simdrive::RustSimDrive> {
         self.to_fastsim2()
     }
-
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
@@ -171,11 +171,12 @@ impl SimDrive {
 
     /// Run vehicle simulation once
     pub fn walk_once(&mut self) -> anyhow::Result<()> {
-        ensure!(self.cyc.len() >= 2, format_dbg!(self.cyc.len() < 2));
+        let len = self.cyc.len().with_context(|| format_dbg!())?;
+        ensure!(len >= 2, format_dbg!(len < 2));
         self.save_state();
         // to increment `i` to 1 everywhere
         self.step();
-        while self.veh.state.i < self.cyc.len() {
+        while self.veh.state.i < len {
             self.solve_step()
                 .with_context(|| format!("{}\ntime step: {}", format_dbg!(), self.veh.state.i))?;
             self.save_state();
@@ -518,7 +519,7 @@ impl Default for TraceMissTolerance {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
@@ -544,7 +545,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().is_none());
     }
@@ -556,7 +557,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
@@ -572,7 +573,7 @@ mod tests {
             sim_params: Default::default(),
         };
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len());
+        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
         assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
@@ -600,7 +601,7 @@ mod tests {
             let filename = path.file_name().unwrap();
             if !skip_files.iter().any(|&name| filename == name) {
                 // println!("{path:?}");
-                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path).unwrap();
+                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path, false).unwrap();
                 let f3_veh = Vehicle::try_from(f2_veh).unwrap();
                 f3_veh.to_file(output_dir.join(filename)).unwrap();
             }

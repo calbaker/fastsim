@@ -9,107 +9,36 @@ macro_rules! extract_units {
         $(
             let field_units: TokenStream2 = stringify!($field_units).parse().expect("failed to parse `field_units`");
             let unit_name = <$field_units as uom::si::Unit>::plural().replace(' ', "_");
+            // fix the UOM Kelvin atrocity
+            let unit_name = unit_name.replace("kelvins", "kelvin");
             unit_impls.push((field_units, unit_name));
         )+
         unit_impls
     }};
 }
 
-/// Determine the wrapper type for a specified vector nesting layer
-fn vec_layer_type(vec_layers: u8, span: Span) -> TokenStream2 {
-    match vec_layers {
-        0 => quote!(f64),
-        1 => quote!(Pyo3VecWrapper),
-        2 => quote!(Pyo3Vec2Wrapper),
-        3 => quote!(Pyo3Vec3Wrapper),
-        _ => abort!(span, "Invalid vector layer {vec_layers}!"),
-    }
-}
-
 /// Generates pyo3 getter and setter methods for si fields and vector elements
 ///
-/// - impl_block: output TokenStream2
 /// - field: struct field name as ident
-/// - field_type: token stream of field type (e.g. `si::Power` as a token stream)
-/// - field_units: token stream of unit type of value being set (generate using extract_units)
 /// - unit_name: plural name of units being used (generate using extract_units)
-/// - opts: FieldOptions struct instance
-/// - vec_layers: number of nested vector layers
-fn impl_get_set_si(
-    impl_block: &mut TokenStream2,
-    field: &mut syn::Field,
-    field_type: &TokenStream2,
-    field_units: &TokenStream2,
-    unit_name: &str,
-    opts: &FieldOptions,
-    vec_layers: u8,
-) {
+fn impl_serde_for_si(field: &mut syn::Field, unit_name: &str) {
     let ident = field.ident.clone().unwrap();
-    let field_name: TokenStream2 = match unit_name {
-        "" => format!("{ident}").parse().unwrap(),
+    match unit_name {
+        "" => {}
         _ => {
-            if field_has_serde_rename(field) {
+            if !field_has_serde_rename(field) {
                 // add the rename attribute for any fields that don't already have it
                 let field_name_lit_str = format!("{ident}_{unit_name}");
                 field.attrs.push(syn::parse_quote! {
                     #[serde(rename = #field_name_lit_str)]
                 })
             }
-            format!("{ident}_{unit_name}").parse().unwrap()
         }
-    };
-
-    if !opts.skip_get {
-        let get_name: TokenStream2 = format!("get_{field_name}").parse().unwrap();
-        let get_type = vec_layer_type(vec_layers, ident.span());
-        let unit_func = quote!(get::<#field_units>());
-        fn iter_map_collect_vec(inner_func: TokenStream2) -> TokenStream2 {
-            quote!(iter().map(|x| x.#inner_func).collect::<Vec<_>>())
-        }
-
-        let mut extract_val = unit_func;
-        for _ in 0..vec_layers {
-            extract_val = iter_map_collect_vec(extract_val);
-        }
-
-        let field_val = match vec_layers {
-            0 => quote!(self.#ident.#extract_val),
-            _ => quote!(#get_type::new(self.#ident.#extract_val)),
-        };
-
-        impl_block.extend::<TokenStream2>(quote! {
-            #[getter]
-            fn #get_name(&self) -> PyResult<#get_type> {
-                Ok(#field_val)
-            }
-        });
-    }
-
-    if !opts.skip_set && vec_layers == 0 {
-        let set_name: TokenStream2 = format!("set_{field_name}").parse().unwrap();
-        let set_err: TokenStream2 = format!("set_{field_name}_err").parse().unwrap();
-        let setter_rename: TokenStream2 = format!("__{field_name}").parse().unwrap();
-
-        impl_block.extend::<TokenStream2>(quote! {
-            #[setter(#setter_rename)]
-            fn #set_err(&mut self, new_val: f64) -> PyResult<()> {
-                self.#ident = #field_type::new::<#field_units>(new_val);
-                Ok(())
-            }
-        });
-
-        // Directly setting value raises error to prevent nested struct issues
-        impl_block.extend::<TokenStream2>(quote! {
-            #[setter]
-            fn #set_name(&mut self, new_val: f64) -> PyResult<()> {
-                Err(PyAttributeError::new_err(DIRECT_SET_ERR))
-            }
-        });
     }
 }
 
 fn field_has_serde_rename(field: &syn::Field) -> bool {
-    !field.attrs.iter().any(|attr| {
+    field.attrs.iter().any(|attr| {
         if let Meta::List(ml) = &attr.meta {
             // catch the `serde` in `#[serde(rename = "...")]`
             ml.path.is_ident("serde")
@@ -120,76 +49,6 @@ fn field_has_serde_rename(field: &syn::Field) -> bool {
             false
         }
     })
-}
-
-/// Generates pyo3 getter methods
-///
-/// - impl_block: TokenStream2
-/// - field: struct field
-/// - field_type: type of variable (e.g. `f64`)
-/// - opts: FieldOptions struct instance
-/// - vec_layers: number of nested vector layers
-fn impl_get_body(
-    impl_block: &mut TokenStream2,
-    field: &proc_macro2::Ident,
-    field_type: &TokenStream2,
-    opts: &FieldOptions,
-    vec_layers: u8,
-) {
-    if !opts.skip_get {
-        let get_name: TokenStream2 = format!("get_{field}").parse().unwrap();
-        let field_type = match vec_layers {
-            0 => field_type.clone(),
-            _ => vec_layer_type(vec_layers, field.span()),
-        };
-
-        let field_val = match vec_layers {
-            0 => quote!(self.#field.clone()),
-            _ => quote!(#field_type::new(self.#field.clone())),
-        };
-
-        impl_block.extend::<TokenStream2>(quote! {
-            #[getter]
-            fn #get_name(&self) -> PyResult<#field_type> {
-                Ok(#field_val)
-            }
-        });
-    }
-}
-
-/// Generates pyo3 getter methods
-///
-/// - impl_block: TokenStream2
-/// - field: struct field
-/// - field_type: type of variable (e.g. `f64`)
-/// - opts: FieldOptions struct instance
-fn impl_set_body(
-    impl_block: &mut TokenStream2,
-    field: &proc_macro2::Ident,
-    field_type: &TokenStream2,
-    opts: &FieldOptions,
-) {
-    if !opts.skip_set {
-        let set_name: TokenStream2 = format!("set_{field}").parse().unwrap();
-        let set_err: TokenStream2 = format!("set_{field}_err").parse().unwrap();
-        let setter_rename: TokenStream2 = format!("__{field}").parse().unwrap();
-
-        impl_block.extend::<TokenStream2>(quote! {
-            #[setter(#setter_rename)]
-            fn #set_err(&mut self, new_val: #field_type) -> PyResult<()> {
-                self.#field = new_val;
-                Ok(())
-            }
-        });
-
-        // Directly setting value raises error to prevent nested struct issues
-        impl_block.extend::<TokenStream2>(quote! {
-            #[setter]
-            fn #set_name(&mut self, new_val: #field_type) -> PyResult<()> {
-                Err(PyAttributeError::new_err(DIRECT_SET_ERR))
-            }
-        });
-    }
 }
 
 fn extract_type_path(ty: &syn::Type) -> Option<&syn::Path> {
@@ -291,12 +150,7 @@ fn extract_si_quantity(path: &syn::Path) -> Option<String> {
     Some(path.segments[i + 1].ident.to_string())
 }
 
-pub(crate) fn impl_getters_and_setters(
-    impl_block: &mut TokenStream2,
-    field: &mut syn::Field,
-    opts: &FieldOptions,
-) -> Option<()> {
-    let ident = field.ident.as_ref().unwrap();
+pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
     let ftype = field.ty.clone();
     let mut vec_layers: u8 = 0;
     let mut inner_type = &ftype;
@@ -316,8 +170,6 @@ pub(crate) fn impl_getters_and_setters(
     }
 
     let inner_path = extract_type_path(inner_type)?;
-    let inner_type = &inner_path.to_token_stream();
-    let field_type = extract_type_path(&ftype)?.to_token_stream();
     if let Some(quantity) = extract_si_quantity(inner_path) {
         // Make sure to use absolute paths here to avoid issues with si.rs in the main fastsim-core!
         let unit_impls = match quantity.as_str() {
@@ -351,10 +203,7 @@ pub(crate) fn impl_getters_and_setters(
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "Temperature" => extract_units!(
-                uom::si::temperature_interval::degree_celsius,
-                uom::si::temperature_interval::kelvin
-            ),
+            "Temperature" => extract_units!(uom::si::temperature_interval::kelvin),
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }
@@ -378,38 +227,9 @@ pub(crate) fn impl_getters_and_setters(
                 "Unknown si quantity! Make sure it's implemented in `impl_getters_and_setters`"
             ),
         };
-        for (field_units, unit_name) in &unit_impls {
-            impl_get_set_si(
-                impl_block,
-                field,
-                inner_type,
-                field_units,
-                unit_name,
-                opts,
-                vec_layers,
-            );
-        }
-    } else if inner_type.to_string().as_str() == "f64" {
-        impl_get_body(impl_block, ident, inner_type, opts, vec_layers);
-        impl_set_body(impl_block, ident, &field_type, opts);
-    } else {
-        impl_get_body(impl_block, ident, &field_type, opts, 0);
-        if ident != "history" {
-            impl_set_body(impl_block, ident, &field_type, opts);
+        for (_, unit_name) in &unit_impls {
+            impl_serde_for_si(field, unit_name);
         }
     }
-
     Some(())
-}
-
-#[derive(Debug, Default, Clone)]
-pub(crate) struct FieldOptions {
-    /// if true, getters are not generated for a field
-    pub skip_get: bool,
-    /// if true, setters are not generated for a field
-    pub skip_set: bool,
-    // TODO: uncomment and clean up, and then create equivalent `set_<fieldname>_from_pydict`
-    // and `<fieldname>_to_pydict` methods via `setattr`
-    // /// if true, writes methods to get and set enum via json
-    // pub enum_as_json: bool,
 }

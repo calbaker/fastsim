@@ -7,7 +7,7 @@ pub mod hvac_sys_for_lumped_cabin_and_res;
 pub use hvac_sys_for_lumped_cabin_and_res::*;
 
 /// Options for handling HVAC system
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum HVACOption {
     /// HVAC system for [LumpedCabin]
     LumpedCabin(Box<HVACSystemForLumpedCabin>),

@@ -1,11 +1,12 @@
 use crate::prelude::*;
+#[cfg(feature = "resources")]
+use crate::resources;
 
 use super::{hev::HEVPowertrainControls, *};
-use crate::resources;
 pub mod fastsim2_interface;
 
 /// Possible aux load power sources
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum AuxSource {
     /// Aux load power provided by ReversibleEnergyStorage with help from FuelConverter, if present
     /// and needed
@@ -102,10 +103,18 @@ impl Init for AuxSource {}
         self.pt_type.to_str("json")
     }
 
+    #[cfg(feature = "resources")]
     #[pyo3(name = "list_resources")]
     /// list available vehicle resources
     fn list_resources_py(&self) -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
+    }
+
+    /// Load vehicle from file saved in fastsim-2 format
+    #[pyo3(name = "from_f2_file")]
+    #[staticmethod]
+    fn from_f2_file_py(file: PathBuf) -> anyhow::Result<Self> {
+        Self::from_f2_file(file)
     }
 )]
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, HistoryMethods)]
@@ -117,7 +126,6 @@ pub struct Vehicle {
     /// Year manufactured
     year: u32,
     #[has_state]
-    #[api(skip_get, skip_set)]
     /// type of vehicle powertrain including contained type-specific parameters and variables
     pub pt_type: PowertrainType,
 
@@ -126,16 +134,13 @@ pub struct Vehicle {
 
     /// Cabin thermal model
     #[serde(default, skip_serializing_if = "CabinOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub cabin: CabinOption,
 
     /// HVAC model
     #[serde(default, skip_serializing_if = "HVACOption::is_none")]
-    #[api(skip_get, skip_set)]
     pub hvac: HVACOption,
 
     /// Total vehicle mass
-    #[api(skip_get, skip_set)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
@@ -149,8 +154,6 @@ pub struct Vehicle {
     pub trans_eff: si::Ratio,
 
     /// time step interval at which `state` is saved into `history`
-    #[api(skip_set, skip_get)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     save_interval: Option<usize>,
     /// current state of vehicle
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
@@ -526,12 +529,20 @@ impl Vehicle {
             .with_context(|| format_dbg!())?;
         Ok(())
     }
+
+    fn from_f2_file(file: PathBuf) -> anyhow::Result<Self> {
+        use fastsim_2::traits::SerdeAPI;
+        let f2veh = fastsim_2::vehicle::RustVehicle::from_file(file, false)
+            .with_context(|| format_dbg!())?;
+        Self::try_from(f2veh)
+    }
 }
 
 /// Vehicle state for current time step
 #[fastsim_api]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct VehicleState {
     /// time step index
     pub i: usize,
@@ -590,10 +601,9 @@ pub struct VehicleState {
     /// current grade
     pub grade_curr: si::Ratio,
     /// current grade
-    #[serde(skip_deserializing, default)]
+    // will be overridden during simulation anyway
     pub elev_curr: si::Length,
     /// current air density
-    #[serde(skip_serializing, default)]
     pub air_density: si::MassDensity,
     /// current mass
     // TODO: make sure this gets updated appropriately
@@ -629,9 +639,10 @@ impl Default for VehicleState {
             cyc_met_overall: true,
             speed_ach: si::Velocity::ZERO,
             dist: si::Length::ZERO,
+            // note that this value will be overwritten
             grade_curr: si::Ratio::ZERO,
             // note that this value will be overwritten
-            elev_curr: f64::NAN * uc::M,
+            elev_curr: *H_STD,
             air_density: Air::get_density(None, None),
             mass: uc::KG * f64::NAN,
         }
@@ -652,7 +663,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2012_Ford_Fusion.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };
@@ -668,7 +679,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2016_TOYOTA_Prius_Two.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };
@@ -684,7 +695,7 @@ pub(crate) mod tests {
         let file_contents = include_str!("fastsim-2_2022_Renault_Zoe_ZE50_R135.yaml");
         use fastsim_2::traits::SerdeAPI;
         let veh = {
-            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents).unwrap();
+            let f2veh = fastsim_2::vehicle::RustVehicle::from_yaml(file_contents, false).unwrap();
             let veh = Vehicle::try_from(f2veh);
             veh.unwrap()
         };
@@ -695,17 +706,18 @@ pub(crate) mod tests {
         veh
     }
 
-    /// tests that vehicle can be initialized and that repeating has no net effect
-    // TODO: fix this test from the python side.  Use `deepdiff` or some such
-    // #[test]
-    // #[cfg(feature = "yaml")]
-    // pub(crate) fn test_conv_veh_init() {
-    //     let veh = mock_conv_veh();
-    //     let mut veh1 = veh.clone();
-    //     assert!(veh == veh1);
-    //     veh1.init().unwrap();
-    //     assert!(veh == veh1);
-    // }
+    #[test]
+    #[cfg(feature = "yaml")]
+    pub(crate) fn test_conv_veh_init() {
+        use pretty_assertions::assert_eq;
+        let veh = mock_conv_veh();
+        let mut veh1 = veh.clone();
+        // NOTE: eventually figure out why the following assertions fail if
+        // `.to_yaml().uwrap()` is removed.  It's probably related to f64::NAN
+        assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
+        veh1.init().unwrap();
+        assert_eq!(veh.to_yaml().unwrap(), veh1.to_yaml().unwrap());
+    }
 
     #[test]
     #[cfg(all(feature = "csv", feature = "resources"))]

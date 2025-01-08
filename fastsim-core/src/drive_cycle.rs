@@ -5,23 +5,9 @@ use crate::resources;
 use fastsim_2::cycle::RustCycle as Cycle2;
 
 #[fastsim_api(
-    fn __len__(&self) -> usize {
-        self.len()
-    }
-
-    #[setter("__grade")]
-    fn set_grade_py(&mut self, grade: Vec<f64>) {
-        self.grade = grade.iter().map(|x| *x * uc::R).collect();
-    }
-
-    #[getter]
-    fn get_grade_py(&self) -> Vec<f64> {
-        self.grade.iter().map(|x|x.get::<si::ratio>()).collect()
-    }
-
     #[pyo3(name = "list_resources")]
     /// list available cycle resources
-    pub fn list_resources_py(&self) -> Vec<String> {
+    fn list_resources_py(&self) -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
 )]
@@ -35,7 +21,6 @@ pub struct Cycle {
     #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: either write or automate generation of getter and setter for this
     // TODO: put the above TODO in github issue for all fields with `Option<...>` type
-    #[api(skip_get, skip_set)]
     /// inital elevation
     pub init_elev: Option<si::Length>,
     /// simulation time
@@ -47,24 +32,19 @@ pub struct Cycle {
     /// calculated prescribed distance based on RHS integral of time and speed
     pub dist: Vec<si::Length>,
     /// road grade (expressed as a decimal, not percent)
-    #[api(skip_get, skip_set)]
     pub grade: Vec<si::Ratio>,
     // TODO: consider trapezoidal integration scheme
     // TODO: @mokeefe, please check out how elevation is handled
     /// calculated prescribed elevation based on RHS integral distance and grade
     pub elev: Vec<si::Length>,
     /// road charging/discharing capacity
-    #[api(skip_get, skip_set)]
     pub pwr_max_chrg: Vec<si::Power>,
     /// grade interpolator
-    #[api(skip_get, skip_set)]
     pub grade_interp: Option<Interpolator>,
     /// elevation interpolator
-    #[api(skip_get, skip_set)]
     pub elev_interp: Option<Interpolator>,
     /// ambient air temperature w.r.t. to time (rather than spatial position)
-    #[serde(default)]
-    #[api(skip_get, skip_set)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub temp_amb_air: Vec<si::Temperature>,
 }
 
@@ -77,15 +57,13 @@ impl Init for Cycle {
     /// # Assumptions
     /// - if `init_elev.is_none()`, then defaults to [static@ELEV_DEFAULT]
     fn init(&mut self) -> anyhow::Result<()> {
-        ensure!(self.time.len() == self.speed.len());
-        ensure!(self.grade.len() == self.len());
+        let _ = self.len().with_context(|| format_dbg!())?;
+
         if !self.temp_amb_air.is_empty() {
             ensure!(self.temp_amb_air.len() == self.time.len());
         } else {
             self.temp_amb_air = vec![*TE_STD_AIR; self.time.len()];
         }
-        // TODO: figure out if this should be uncommented -- probably need to use a `match`
-        // somewhere to fix this ensure!(self.pwr_max_chrg.len() == self.len());
 
         // calculate distance from RHS integral of speed and time
         self.dist = {
@@ -171,12 +149,14 @@ impl SerdeAPI for Cycle {
             #[cfg(feature = "csv")]
             "csv" => {
                 let mut wtr = csv::Writer::from_writer(wtr);
-                for i in 0..self.len() {
+                for i in 0..self.len().with_context(|| format_dbg!())? {
                     wtr.serialize(CycleElement {
+                        // unchecked indexing should be ok because of `self.len()`
                         time: self.time[i],
                         speed: self.speed[i],
                         grade: Some(self.grade[i]),
                         pwr_max_charge: Some(self.pwr_max_chrg[i]),
+                        temp_amb_air: Some(self.temp_amb_air[i]),
                     })?;
                 }
                 wtr.flush()?
@@ -299,12 +279,54 @@ impl Cycle {
             - *self.time.get(i - 1).with_context(|| format_dbg!())?)
     }
 
-    pub fn len(&self) -> usize {
-        self.time.len()
+    pub fn len(&self) -> anyhow::Result<usize> {
+        ensure!(
+            self.time.len() == self.speed.len(),
+            format!(
+                "{}\n`time` and `speed` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        ensure!(
+            self.dist.is_empty() || self.time.len() == self.dist.len(),
+            format!(
+                "{}\n`time` and `dist` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        ensure!(
+            self.grade.is_empty() || self.time.len() == self.grade.len(),
+            format!(
+                "{}\n`time` and `grade` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        ensure!(
+            self.elev.is_empty() || self.grade.len() == self.elev.len(),
+            format!(
+                "{}\n`grade` and `elev` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        ensure!(
+            self.pwr_max_chrg.is_empty() || self.time.len() == self.pwr_max_chrg.len(),
+            format!(
+                "{}\n`time` and `pwr_max_chrg` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        ensure!(
+            self.temp_amb_air.is_empty() || self.time.len() == self.temp_amb_air.len(),
+            format!(
+                "{}\n`time` and `temp_amb_air` fields do not have same `len()`",
+                format_dbg!()
+            )
+        );
+        Ok(self.time.len())
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub fn is_empty(&self) -> anyhow::Result<bool> {
+        Ok(self.len().with_context(|| format_dbg!())? == 0)
     }
 
     pub fn push(&mut self, element: CycleElement) -> anyhow::Result<()> {
@@ -354,8 +376,9 @@ impl Cycle {
 
     pub fn trim(&mut self, start_idx: Option<usize>, end_idx: Option<usize>) -> anyhow::Result<()> {
         let start_idx = start_idx.unwrap_or_default();
-        let end_idx = end_idx.unwrap_or_else(|| self.len());
-        ensure!(end_idx <= self.len(), format_dbg!(end_idx <= self.len()));
+        let len = self.len().with_context(|| format_dbg!())?;
+        let end_idx = end_idx.unwrap_or(len);
+        ensure!(end_idx <= len, format_dbg!(end_idx <= len));
 
         self.time = self.time[start_idx..end_idx].to_vec();
         self.speed = self.speed[start_idx..end_idx].to_vec();
@@ -365,7 +388,7 @@ impl Cycle {
     /// Write (serialize) cycle to a CSV string
     #[cfg(feature = "csv")]
     pub fn to_csv(&self) -> anyhow::Result<String> {
-        let mut buf = Vec::with_capacity(self.len());
+        let mut buf = Vec::with_capacity(self.len().with_context(|| format_dbg!())?);
         self.to_writer(&mut buf, "csv")?;
         Ok(String::from_utf8(buf)?)
     }
@@ -396,7 +419,7 @@ impl Cycle {
                 .collect(),
             grade: self.grade.iter().map(|g| g.get::<si::ratio>()).collect(),
             orphaned: false,
-            road_type: vec![0.; self.len()].into(),
+            road_type: vec![0.; self.len().with_context(|| format_dbg!())?].into(),
         };
 
         Ok(cyc2)
@@ -410,19 +433,21 @@ impl Cycle {
 pub struct CycleElement {
     /// simulation time \[s\]
     #[serde(alias = "cycSecs")]
-    time: si::Time,
+    pub time: si::Time,
     /// simulation power \[W\]
     #[serde(alias = "speed_mps", alias = "cycMps")]
-    speed: si::Velocity,
+    pub speed: si::Velocity,
+    // `dist` is not included here because it is derived in `Init::init`
     // TODO: make `fastsim_api` handle Option or write custom getter/setter
-    #[api(skip_get, skip_set)]
     /// road grade
     #[serde(skip_serializing_if = "Option::is_none", alias = "cycGrade")]
     pub grade: Option<si::Ratio>,
-    #[api(skip_get, skip_set)]
+    // `elev` is not included here because it is derived in `Init::init`
     /// road charging/discharing capacity
     pub pwr_max_charge: Option<si::Power>,
     // TODO: make sure all fields in cycle are represented here, as appropriate
+    /// ambient air temperature w.r.t. to time (rather than spatial position)
+    pub temp_amb_air: Option<si::Temperature>,
 }
 
 impl SerdeAPI for CycleElement {}

@@ -326,7 +326,7 @@ impl Mass for HybridElectricVehicle {
 }
 
 #[fastsim_api]
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct FCOnCauses(Vec<FCOnCause>);
 impl Init for FCOnCauses {}
@@ -354,11 +354,11 @@ impl FCOnCauses {
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct HEVState {
     /// time step index
     pub i: usize,
     /// Vector of posssible reasons the fc is forced on
-    #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)
@@ -367,8 +367,6 @@ pub struct HEVState {
 
 impl Init for HEVState {}
 impl SerdeAPI for HEVState {}
-
-// TODO: implement `Deserialize`
 
 // Custom serialization
 impl Serialize for FCOnCauses {
@@ -385,6 +383,76 @@ impl Serialize for FCOnCauses {
         serializer.serialize_str(&format!("\"[{}]\"", joined))
     }
 }
+
+use serde::de::{self, Visitor};
+struct FCOnCausesVisitor;
+impl Visitor<'_> for FCOnCausesVisitor {
+    type Value = FCOnCauses;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(
+            "String form of `FCOnCauses`, e.g. `\"[VehicleSpeedTooHigh, FCTemperatureTooLow]\"`",
+        )
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Self::visit_str(self, &v)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let inner: String = v
+            .replace("\"", "") // this solves a problem in interactive mode
+            .strip_prefix("[")
+            .ok_or("Missing leading `[`")
+            .map_err(|err| de::Error::custom(err))?
+            .strip_suffix("]")
+            .ok_or("Missing trailing`]`")
+            .map_err(|err| de::Error::custom(err))?
+            .to_string();
+        let fc_on_causes_str = inner.split(",").map(|x| x.trim()).collect::<Vec<&str>>();
+        let fc_on_causes_unchecked = fc_on_causes_str
+            .iter()
+            .map(|x| {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(FromStr::from_str(x))
+                }
+            })
+            .collect::<Vec<Option<Result<FCOnCause, derive_more::FromStrError>>>>();
+        let mut fc_on_causes: FCOnCauses = FCOnCauses(vec![]);
+        for (fc_on_cause_unchecked, fc_on_cause_str) in
+            fc_on_causes_unchecked.into_iter().zip(fc_on_causes_str)
+        {
+            if let Some(fc_on_cause_unchecked) = fc_on_cause_unchecked {
+                fc_on_causes.0.push(fc_on_cause_unchecked.map_err(|err| {
+                    de::Error::custom(format!(
+                        "{}\nfc_on_cause_unchecked: {:?}\nfc_on_cause_str: {}",
+                        err, fc_on_cause_unchecked, fc_on_cause_str
+                    ))
+                })?)
+            }
+        }
+        Ok(fc_on_causes)
+    }
+}
+
+// Custom deserialization
+impl<'de> Deserialize<'de> for FCOnCauses {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(FCOnCausesVisitor)
+    }
+}
+
 impl std::fmt::Display for FCOnCauses {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
@@ -394,7 +462,9 @@ impl std::fmt::Display for FCOnCauses {
 }
 
 #[fastsim_enum_api]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto, FromStr,
+)]
 pub enum FCOnCause {
     /// Engine must be on to self heat if thermal model is enabled
     FCTemperatureTooLow,
@@ -447,7 +517,7 @@ impl Default for HEVSimulationParams {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default, IsVariant)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default, IsVariant, From, TryInto)]
 pub enum HEVAuxControls {
     /// If feasible, use [ReversibleEnergyStorage] to handle aux power demand
     #[default]
@@ -456,9 +526,11 @@ pub enum HEVAuxControls {
     AuxOnFcPriority,
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, IsVariant, From, TryInto)]
 pub enum HEVPowertrainControls {
-    /// Controls that attempt to match fastsim-2
+    /// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
+    /// and discharge power inside of static min and max SOC range.  Also, includes
+    /// buffer for forcing [FuelConverter] to be active/on.
     RGWDB(Box<RESGreedyWithDynamicBuffers>),
     /// place holder for future variants
     Placeholder,
@@ -625,8 +697,10 @@ impl HEVPowertrainControls {
     }
 }
 
-/// Container for static controls parameters.  See [Self::init] for default
-/// values.
+/// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
+/// and discharge power inside of static min and max SOC range.  Also, includes
+/// buffer for forcing [FuelConverter] to be active/on. See [Self::init] for
+/// default values.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 #[non_exhaustive]
 pub struct RESGreedyWithDynamicBuffers {
@@ -708,12 +782,12 @@ impl Init for RESGreedyWithDynamicBuffers {
 
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
+#[serde(default)]
 /// State for [RESGreedyWithDynamicBuffers ]
 pub struct RGWDBState {
     /// time step index
     pub i: usize,
     /// Vector of posssible reasons the fc is forced on
-    #[api(skip_get, skip_set)]
     pub fc_on_causes: FCOnCauses,
     /// Number of `walk` iterations required to achieve SOC balance (i.e. SOC
     /// ends at same starting value, ensuring no net [ReversibleEnergyStorage] usage)

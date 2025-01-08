@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IsVariant, From, TryInto)]
 pub enum PowertrainType {
     ConventionalVehicle(Box<ConventionalVehicle>),
     HybridElectricVehicle(Box<HybridElectricVehicle>),

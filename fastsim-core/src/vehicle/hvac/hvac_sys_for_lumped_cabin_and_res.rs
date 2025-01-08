@@ -1,13 +1,19 @@
 use super::*;
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Default::default()
+    }
+)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin] and [ReversibleEnergyStorage::thrml]
 pub struct HVACSystemForLumpedCabinAndRES {
     /// set point temperature
     pub te_set: si::Temperature,
-    /// deadband range.  any cabin temperature within this range of
-    /// `te_set` results in no HVAC power draw
+    /// Deadband range.  Any cabin temperature within this range of `te_set`
+    /// results in no HVAC power draw
     pub te_deadband: si::Temperature,
     /// HVAC proportional gain for cabin
     pub p_cabin: si::ThermalConductance,
@@ -36,13 +42,10 @@ pub struct HVACSystemForLumpedCabinAndRES {
     /// coefficient of performance (COP)
     pub frac_of_ideal_cop: f64,
     /// cabin heat source
-    #[api(skip_get, skip_set)]
     pub cabin_heat_source: CabinHeatSource,
     /// res heat source
-    #[api(skip_get, skip_set)]
     pub res_heat_source: RESHeatSource,
     /// res cooling source
-    #[api(skip_get, skip_set)]
     pub res_cooling_source: RESCoolingSource,
     /// max allowed aux load
     pub pwr_aux_for_hvac_max: si::Power,
@@ -54,6 +57,30 @@ pub struct HVACSystemForLumpedCabinAndRES {
         skip_serializing_if = "HVACSystemForLumpedCabinAndRESStateHistoryVec::is_empty"
     )]
     pub history: HVACSystemForLumpedCabinAndRESStateHistoryVec,
+}
+impl Default for HVACSystemForLumpedCabinAndRES {
+    fn default() -> Self {
+        Self {
+            te_set: *TE_STD_AIR,
+            te_deadband: 1.5 * uc::KELVIN,
+            p_cabin: Default::default(),
+            i_cabin: Default::default(),
+            d_cabin: Default::default(),
+            pwr_i_max_cabin: 5. * uc::KW,
+            p_res: Default::default(),
+            i_res: Default::default(),
+            d_res: Default::default(),
+            pwr_i_max_res: 5. * uc::KW,
+            pwr_thermal_max: 10. * uc::KW,
+            frac_of_ideal_cop: 0.15,
+            cabin_heat_source: CabinHeatSource::ResistanceHeater,
+            res_heat_source: RESHeatSource::ResistanceHeater,
+            res_cooling_source: RESCoolingSource::HVAC,
+            pwr_aux_for_hvac_max: uc::KW * 5.,
+            state: Default::default(),
+            history: Default::default(),
+        }
+    }
 }
 impl Init for HVACSystemForLumpedCabinAndRES {}
 impl SerdeAPI for HVACSystemForLumpedCabinAndRES {}
@@ -82,13 +109,15 @@ impl HVACSystemForLumpedCabinAndRES {
         dt: si::Time,
     ) -> anyhow::Result<(si::Power, si::Power, si::Power)> {
         let (res_temp, res_temp_prev) = res_temps;
+        ensure!(!res_temp.is_nan(), format_dbg!(res_temp));
+        ensure!(!res_temp_prev.is_nan(), format_dbg!(res_temp_prev));
         let mut pwr_thrml_hvac_to_cabin = self
             .solve_for_cabin(te_fc, cab_state, cab_heat_cap, dt)
             .with_context(|| format_dbg!())?;
         let mut pwr_thrml_hvac_to_res: si::Power = self
             .solve_for_res(res_temp, res_temp_prev, dt)
             .with_context(|| format_dbg!())?;
-        let cop_ideal: si::Ratio =
+        let (cop_ideal, te_ref) =
             if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin > si::Power::ZERO {
                 // heating mode
                 // TODO: account for cabin and battery heat sources in COP calculation!!!!
@@ -121,9 +150,9 @@ impl HVACSystemForLumpedCabinAndRES {
                 if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
                     // cabin is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
-                    te_ref / (5.0 * uc::KELVIN)
+                    (te_ref / (5.0 * uc::KELVIN), te_ref)
                 } else {
-                    te_ref / te_delta_vs_amb.abs()
+                    (te_ref / te_delta_vs_amb.abs(), te_ref)
                 }
             } else if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin < si::Power::ZERO {
                 // cooling mode
@@ -156,15 +185,20 @@ impl HVACSystemForLumpedCabinAndRES {
                 if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
                     // cooling-dominating component is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
-                    te_ref / (5.0 * uc::KELVIN)
+                    (te_ref / (5.0 * uc::KELVIN), te_ref)
                 } else {
-                    te_ref / te_delta_vs_amb.abs()
+                    (te_ref / te_delta_vs_amb.abs(), te_ref)
                 }
             } else {
-                si::Ratio::ZERO
+                (si::Ratio::ZERO, f64::NAN * uc::KELVIN)
             };
         self.state.cop = cop_ideal * self.frac_of_ideal_cop;
-        assert!(self.state.cop > 0.0 * uc::R);
+        ensure!(
+            self.state.cop >= 0.0 * uc::R,
+            "{}\n{}",
+            format_dbg!(cop_ideal),
+            format_dbg!(te_ref)
+        );
 
         let mut pwr_thrml_fc_to_cabin = si::Power::ZERO;
         self.state.pwr_aux_for_hvac = if pwr_thrml_hvac_to_cabin > si::Power::ZERO {
@@ -407,6 +441,7 @@ impl HVACSystemForLumpedCabinAndRES {
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
+#[serde(default)]
 pub struct HVACSystemForLumpedCabinAndRESState {
     /// time step counter
     pub i: u32,
@@ -446,7 +481,7 @@ pub struct HVACSystemForLumpedCabinAndRESState {
 impl Init for HVACSystemForLumpedCabinAndRESState {}
 impl SerdeAPI for HVACSystemForLumpedCabinAndRESState {}
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 /// Heat source for [RESLumpedThermal]
 pub enum RESHeatSource {
     /// Resistance heater provides heat for HVAC system
@@ -459,7 +494,7 @@ pub enum RESHeatSource {
 impl Init for RESHeatSource {}
 impl SerdeAPI for RESHeatSource {}
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
 /// Cooling source for [RESLumpedThermal]
 pub enum RESCoolingSource {
     /// Vapor compression system used for cabin HVAC also cools [RESLumpedThermal]

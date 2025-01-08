@@ -8,6 +8,7 @@ import re
 import inspect
 import pandas as pd
 import polars as pl
+from enum import Enum, auto
 
 from .fastsim import *
 from . import utils
@@ -33,6 +34,7 @@ def resources_root() -> Path:
     """
     path = package_root() / "resources"
     return path
+
 
 __version__ = version("fastsim")
 
@@ -141,34 +143,32 @@ def variable_path_list_from_py_objs(
     key_paths = []
     if isinstance(obj, dict):
         for key, val in obj.items():
+            key_path = f"['{key}']" if pre_path is None else pre_path + f"['{key}']"
             # check for nested dicts and call recursively
             if isinstance(val, dict):
-                key_path = f"['{key}']" if pre_path is None else pre_path + f"['{key}']"
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
-            # check for lists or other iterables that do not contain numeric data
-            elif "__iter__" in dir(val) and not (isinstance(val[0], float) or isinstance(val[0], int)):
-                key_path = f"['{key}']" if pre_path is None else pre_path + f"['{key}']"
+            # check for lists or other iterables that do not contain float data
+            elif ("__iter__" in dir(val)) and (len(val) > 0) and (
+                    not (isinstance(val[0], float) or isinstance(val[0], int))):
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
             else:
-                key_path = f"['{key}']" if pre_path is None else pre_path + f"['{key}']"
                 key_paths.append(key_path)
 
     elif isinstance(obj, list):
         for key, val in enumerate(obj):
+            key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
             # check for nested dicts and call recursively
             if isinstance(val, dict):
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
             # check for lists or other iterables that do not contain numeric data
-            elif "__iter__" in dir(val) and not (isinstance(val[0], float) or isinstance(val[0], int)):
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
+            elif ("__iter__" in dir(val)) and (len(val) > 0) and (
+                    not (isinstance(val[0], float) or isinstance(val[0], int))):
                 key_paths.extend(
                     variable_path_list_from_py_objs(val, key_path))
             else:
-                key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
                 key_paths.append(key_path)
 
     if element_as_list:
@@ -194,12 +194,14 @@ def cyc_keys() -> List[str]:
 CYC_KEYS = cyc_keys()
 
 
-def key_as_str(key): 
+def key_as_str(key):
     return key if isinstance(key, str) else ".".join(key)
 
-def is_cyc_key(key): 
+
+def is_cyc_key(key):
     return any(
         cyc_key for cyc_key in CYC_KEYS if cyc_key == key[-1]) and "cyc" in key
+
 
 def history_path_list(self, element_as_list: bool = False) -> List[str]:
     """
@@ -221,20 +223,39 @@ def history_path_list(self, element_as_list: bool = False) -> List[str]:
 
 setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
 
+# TODO connect to crate features
+data_formats = [
+    'yaml',
+    'msg_pack',
+    # 'toml',
+    'json',
+]
 
-def to_pydict(self, flatten: bool=True) -> Dict:
+
+def to_pydict(self, flatten: bool = False, data_fmt: str = "msg_pack") -> Dict:
     """
     Returns self converted to pure python dictionary with no nested Rust objects
     # Arguments
     - `flatten`: if True, returns dict without any hierarchy
+    - `data_fmt`: data format for intermediate conversion step
     """
-    from yaml import load
-    try:
-        from yaml import CLoader as Loader
-    except ImportError:
-        from yaml import Loader
+    data_fmt = data_fmt.lower()
+    assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
+    match data_fmt:
+        case "msg_pack":
+            import msgpack
+            pydict = msgpack.loads(self.to_msg_pack())
+        case "yaml":
+            from yaml import load
+            try:
+                from yaml import CLoader as Loader
+            except ImportError:
+                from yaml import Loader
+            pydict = load(self.to_yaml(), Loader=Loader)
+        case "json":
+            from json import loads
+            pydict = loads(self.to_json())
 
-    pydict = load(self.to_yaml(), Loader=Loader)
     if not flatten:
         return pydict
     else:
@@ -242,12 +263,32 @@ def to_pydict(self, flatten: bool=True) -> Dict:
 
 
 @classmethod
-def from_pydict(cls, pydict: Dict) -> Self:
+def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack") -> Self:
     """
     Instantiates Self from pure python dictionary 
+    # Arguments
+    - `pydict`: dictionary to be converted to FASTSim object
+    - `data_fmt`: data format for intermediate conversion step
     """
-    import yaml
-    return cls.from_yaml(yaml.dump(pydict), skip_init=False)
+    data_fmt = data_fmt.lower()
+    assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
+    match data_fmt.lower():
+        case "yaml":
+            import yaml
+            obj = cls.from_yaml(yaml.dump(pydict), skip_init=False)
+        case "msg_pack":
+            import msgpack
+            try:
+                obj = cls.from_msg_pack(msgpack.packb(pydict))
+            except Exception as err:
+                print(
+                    f"{err}\nFalling back to YAML.")
+                obj = cls.from_pydict(pydict, data_fmt="yaml")
+        case "json":
+            from json import dumps
+            obj = cls.from_json(dumps(pydict))
+
+    return obj
 
 
 def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Union[pd.DataFrame, pl.DataFrame]:
