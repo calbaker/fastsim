@@ -95,7 +95,7 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
             lambda df: df['TODO: find signal for test data soc']
         ),
         # TODO: add objectives for:
-        # - engine cumulative fuel usage 
+        # - engine fuel usage -- 
         # - battery temperature
         # - engine temperature
         # - cabin temperature
