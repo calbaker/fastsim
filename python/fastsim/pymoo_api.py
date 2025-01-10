@@ -63,7 +63,7 @@ class ModelObjectives(object):
     Class for calculating eco-driving objectives
 
     # Attributes/Fields
-    - `models` (Dict[str, Any]): dictionary of models to be simulated 
+    - `models` (Dict[str, Dict]): dictionary of model dicts to be simulated 
     - `dfs` (Dict[str, pd.DataFrame]): dictionary of dataframes from test data
       corresponding to `models`
     - `obj_fns` (Tuple[Callable] | Tuple[Tuple[Callable, Callable]]): 
@@ -95,13 +95,16 @@ class ModelObjectives(object):
       tuple containing functions to modify parameters and bounds for optimizer
       Example   
       ```
+      def new_peak_res_eff (sd_dict, new_peak_eff):
+          sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['peak_eff'] = new_peak_eff
+      ...
       param_fns = (
           # generally good to check that sd_dict is mutably modified, but it should work out as expected
-          lambda (sd_dict, new_val): sd_dict['veh']['pt_type']['Conventional']['fc']['pwr_out_max_watts'] = new_val,
+          new_peak_res_eff,
       )
       ``` 
     - `bounds` (Tuple[Tuple[float, float]]):
-      Tuple of (min, max) bounds corresponding to self.params -- e.g.
+      Tuple of (min, max) bounds corresponding to self.param_fns -- e.g.
       ```
       bounds=(
           (100.0, 200.0),
@@ -110,7 +113,7 @@ class ModelObjectives(object):
     - `verbose` (bool): print more stuff or not
     """
 
-    models: Dict[str, Any]
+    models: Dict[str, Dict]
     dfs: Dict[str, pd.DataFrame]
     obj_fns: Tuple[Callable] | Tuple[Tuple[Callable, Callable]]
     param_fns: Tuple[Callable]
