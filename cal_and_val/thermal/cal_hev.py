@@ -4,7 +4,7 @@ Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue
 # # TODO Calibration Tasks
 # - [x] put vehicle test data in a sharepoint folder, grant Robin access, and paste link in here
 # - [ ] develop means of skewing curves via setter or similar
-# - [ ] show what signals should be use for objectives
+# - [ ] show what signals should be used for objectives
 #     - [x] and how to access them in code
 # - [ ] have Robin flesh out and start running calibration
 # - [ ] play with things in the meantime
@@ -35,20 +35,34 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_S
 # and then copy it to the local folder below
 cyc_folder_path = Path(__file__) / "dyno_test_data/2021 Hyundai Sonata Hybrid/Extended Datasets"
 assert cyc_folder_path.exists()
+
+# See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
 cyc_files = [
-    # TODO: Someone needs to populate this list after careful review, considering:
-    # - HVAC should be on
+    # TODO: try to find 3 hot cycles, 3 room temp cycles, and 3 cold cycles.
+    # The hot and cold cycles must have HVAC active!
     # - wide range of initial and ambient temperatures
     # - good signal quality -- somewhat subjective
-    # cyc_folder_path / "some_file.txt",
+    # HWY x2, hot (M155), HVAC active (B155)
+    # TODO: check for solar load (should be around 1 kW / m^2) and implement place for this somewhere (`drive_cycle`???)
+    "62202004 Test Data.txt", 
+    # US06 x2, hot, HVAC active
+    # TODO: check for solar load (should be around 1 kW / m^2) and implement or this somewhere (`drive_cycle`???)
+    "62202005 Test Data.txt",
+    # UDDS x1, room temperature ambient
+    "62201013 Test Data.txt",
+    # HWY x2, room temperature ambient
+    "62201014 Test Data.txt",
+    # TODO: check for seat heater usage in cold cycles and account for that in model!
 ]
 assert len(cyc_files) > 0
+cyc_files = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
 
 # TODO: use random selection to retain ~70% of cycles for calibration, and
 # reserve the remaining for validation
 cyc_files_for_cal = [
     # TOOD: populate this somehow -- e.g. random split of `cyc_files`
 ]
+assert len(cyc_files_for_cal) > 0
 dfs_for_cal = {}
 for cyc_file in cyc_files_for_cal:
     cyc_file: Path
@@ -81,11 +95,44 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
 
 # Setup model objectives
 ## Parameter Functions
-def new_peak_res_eff (sd_dict, new_peak_eff):
-    # TODO: fix this dict path because Chad typed it from memory
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['peak_eff'] = new_peak_eff
-    # TODO: check that `sd_dict` is mutably modified outside the scope of this function
+def new_em_eff_peak(sd_dict, new_eff_peak):
+    """
+    Set `new_eff_peak` in `ElectricMachine`
+    """
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em.set_eff_peak(new_eff_peak)
+    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
+def new_em_eff_range(sd_dict, new_eff_range):
+    """
+    Set `new_eff_range` in `ElectricMachine`
+    """
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em.set_eff_range(new_eff_range)
+    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
+
+def new_fc_eff_peak(sd_dict, new_eff_peak):
+    """
+    Set `new_eff_peak` in `FuelConverter`
+    """
+    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
+    fc.set_eff_peak(new_eff_peak)
+    sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
+
+def new_fc_eff_range(sd_dict, new_eff_range):
+    """
+    Set `new_eff_range` in `FuelConverter`
+    """
+    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
+    fc.set_eff_range(new_eff_range)
+    sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
+
+
+## Model Objectives
 cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     models = sds_for_cal,
     dfs = dfs_for_cal,
@@ -95,17 +142,18 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
             lambda df: df['TODO: find signal for test data soc']
         ),
         # TODO: add objectives for:
-        # - engine fuel usage -- 
+        # - engine fuel usage 
         # - battery temperature
         # - engine temperature
         # - cabin temperature
+        # - HVAC power
     ),
     param_fns=(
-        new_peak_res_eff,
+        new_em_eff_peak,
+        new_em_eff_range,
+        new_fc_eff_peak,
+        new_em_eff_range,
         # TODO: make sure this has functions for modifying
-        # - battery peak efficiency
-        # - engine peak efficiency
-        # - motor peak efficiency and efficiency range
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
         #   controls for BEV)
@@ -131,4 +179,6 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
 )
 
 # Setup calibration problem
-cal_prob = fsim.pymoo_api.CalibrationProblem()
+cal_prob = fsim.pymoo_api.CalibrationProblem(
+    mod_obj=cal_mod_obj,
+)

@@ -242,7 +242,6 @@ class ModelObjectives(object):
             return objectives
     
 if PYMOO_AVAILABLE:
-    @dataclass
     class CalibrationProblem(ElementwiseProblem):
         """
         Problem for calibrating models to match test data
@@ -251,21 +250,18 @@ if PYMOO_AVAILABLE:
         def __init__(
             self,
             mod_obj: ModelObjectives,
-            param_bounds: List[Tuple[float, float]],
             elementwise_runner=LoopedElementwiseEvaluation(),
         ):
             self.mod_obj = mod_obj
-            # parameter lower and upper bounds
-            self.param_bounds = param_bounds
-            assert len(self.param_bounds) == len(
-                self.mod_obj.param_fns), f"{len(self.param_bounds)} != {len(self.mod_obj.param_fns)}"
+            assert len(self.mod_obj.param_bounds) == len(
+                self.mod_obj.param_fns), f"{len(self.mod_obj.param_bounds)} != {len(self.mod_obj.param_fns)}"
             super().__init__(
                 n_var=len(self.mod_obj.param_fns),
                 n_obj=self.mod_obj.n_obj,
                 xl=[bounds[0]
-                    for bounds in self.param_bounds],
+                    for bounds in self.mod_obj.param_bounds],
                 xu=[bounds[1]
-                    for bounds in self.param_bounds],
+                    for bounds in self.mod_obj.param_bounds],
                 elementwise_runner=elementwise_runner,
             )
 
