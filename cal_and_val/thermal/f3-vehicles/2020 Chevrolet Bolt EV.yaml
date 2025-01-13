@@ -79,7 +79,7 @@ pt_type:
             - 0.95
             - 0.94
             - 0.93
-          strategy: LeftNearest
+          strategy: Linear
           extrapolate: Error
       eff_interp_at_max_input:
         Interp1D:
@@ -107,7 +107,7 @@ pt_type:
             - 0.95
             - 0.94
             - 0.93
-          strategy: LeftNearest
+          strategy: Linear
           extrapolate: Error
       pwr_out_max_watts: 149139.974
       specific_pwr_watts_per_kilogram: ~
