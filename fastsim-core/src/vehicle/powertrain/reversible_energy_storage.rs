@@ -59,19 +59,19 @@ const TOL: f64 = 1e-3;
         self.energy_capacity_usable().get::<si::joule>()
     }
 
-    #[pyo3(name = "set_default_1d_interp")]
-    fn set_default_1d_interp_py(&mut self) -> anyhow::Result<()> {
-        self.set_default_1d_interp()
+    #[pyo3(name = "set_default_pwr_interp")]
+    fn set_default_pwr_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_pwr_interp()
     }
 
-    #[pyo3(name = "set_default_2d_interp")]
-    fn set_default_2d_interp_py(&mut self) -> anyhow::Result<()> {
-        self.set_default_2d_interp()
+    #[pyo3(name = "set_default_pwr_and_soc_interp")]
+    fn set_default_pwr_and_soc_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_pwr_and_soc_interp()
     }
 
-    #[pyo3(name = "set_default_3d_interp")]
-    fn set_default_3d_interp_py(&mut self) -> anyhow::Result<()> {
-        self.set_default_3d_interp()
+    #[pyo3(name = "set_default_pwr_soc_and_temp_interp")]
+    fn set_default_pwr_soc_and_temp_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_pwr_soc_and_temp_interp()
     }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
@@ -453,8 +453,8 @@ impl ReversibleEnergyStorage {
     /// - `f_x`: efficiency array as a function of power at constant 50% SOC and 23
     ///    °C corresponds to `eta_interp_values[0][5]` in ALTRIOS
     #[cfg(all(feature = "yaml", feature = "resources"))]
-    pub fn set_default_1d_interp(&mut self) -> anyhow::Result<()> {
-        self.eff_interp = ninterp::Interpolator::from_resource("res/default_1d.yaml", false)?;
+    pub fn set_default_pwr_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp = ninterp::Interpolator::from_resource("res/default_pwr.yaml", false)?;
         Ok(())
     }
 
@@ -470,8 +470,9 @@ impl ReversibleEnergyStorage {
     ///    that the outermost layer is now power and the innermost layer SOC (in
     ///    ALTRIOS, the outermost layer is SOC and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
-    pub fn set_default_2d_interp(&mut self) -> anyhow::Result<()> {
-        self.eff_interp = ninterp::Interpolator::from_resource("res/default_2d.yaml", false)?;
+    pub fn set_default_pwr_and_soc_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp =
+            ninterp::Interpolator::from_resource("res/default_pwr_and_soc.yaml", false)?;
         Ok(())
     }
 
@@ -489,8 +490,9 @@ impl ReversibleEnergyStorage {
     ///    outermost layer is now power, and the innermost layer temperature (in
     ///    ALTRIOS, the outermost layer is temperature and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
-    pub fn set_default_3d_interp(&mut self) -> anyhow::Result<()> {
-        self.eff_interp = ninterp::Interpolator::from_resource("res/default_3d.yaml", false)?;
+    pub fn set_default_pwr_soc_and_temp_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp =
+            ninterp::Interpolator::from_resource("res/default_pwr_soc_and_temp.yaml", false)?;
         Ok(())
     }
 

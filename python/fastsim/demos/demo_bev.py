@@ -286,9 +286,9 @@ if SHOW_PLOTS:
     fig, ax = plot_road_loads()
 
 # %%
-# example for how to use set_default_1d_interp() method for veh.res
+# example for how to use set_default_pwr_interp() method for veh.res
 res = veh.res
-res.set_default_1d_interp()
+res.set_default_pwr_interp()
 fsim.set_param_from_path(veh, 'res', res)
 print(veh.res.to_pydict())
 

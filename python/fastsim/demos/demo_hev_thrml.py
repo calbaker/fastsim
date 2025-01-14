@@ -1,4 +1,5 @@
 # %%
+from plot_utils import *
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,7 +15,7 @@ import fastsim as fsim
 
 sns.set_theme()
 
-from plot_utils  import *
+
 
 # if environment var `SHOW_PLOTS=false` is set, no plots are shown
 SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"     
@@ -24,9 +25,9 @@ SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 # `fastsim3` -- load vehicle and cycle, build simulation, and run 
 # %%
 
-# load 2020 Chevrolet Bolt BEV from file
+# load 2021 Hyundai Sonata HEV from file
 veh = fsim.Vehicle.from_file(
-    fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml"
+    fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml"
 )
 
 # Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states

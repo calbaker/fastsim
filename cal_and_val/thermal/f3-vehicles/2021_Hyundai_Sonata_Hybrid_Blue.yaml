@@ -37,9 +37,12 @@ pt_type:
     res:
       thrml: 
         RESLumpedThermal:
-          heat_capacitance_joules_per_kelvin: 0.0
-          htc_to_amb_watts_per_kelvin: 0.0
-          htc_to_cab_watts_per_kelvin: 0.0
+          # 200,000 is Chad's uncalibrated estimate
+          heat_capacitance_joules_per_kelvin: 200000
+          # 0.1 is Chad's uncalibrated estimate
+          conductance_to_amb_watts_per_kelvin: 0.1
+          # 0.5 is Chad's uncalibrated estimate
+          conductance_to_cab_watts_per_kelvin: 0.5
       mass_kilograms: ~
       specific_energy_joules_per_kilogram: ~
       pwr_out_max_watts: 50000.0
@@ -56,11 +59,11 @@ pt_type:
     fc:
       thrml: 
         FuelConverterThermal:
-          heat_capacitance_joules_per_kelvin: 0.0
-          length_for_convection_meters: 0.0
-          htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.0
-          conductance_from_comb_watts_per_kelvin: 0.0
-          max_frac_from_comb: 0.0
+          heat_capacitance_joules_per_kelvin: 200000
+          length_for_convection_meters: 1.0
+          htc_to_amb_stop_watts_per_square_meter_degree_celsius: 50.0
+          conductance_from_comb_watts_per_kelvin: 5.0
+          max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
           tstat_te_delta_kelvin: 5.0
           radiator_effectiveness: 0.0

@@ -6,7 +6,6 @@ Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue
 # - [ ] develop means of skewing curves via setter or similar
 # - [ ] show what signals should be used for objectives
 #     - [x] and how to access them in code
-# - [ ] have Robin flesh out and start running calibration
 # - [ ] play with things in the meantime
 
 # critical import
@@ -26,7 +25,8 @@ sns.set()
 
 # TODO: Kyle or Robin:
 # - [ ] in the `./f3-vehicles`, reduce all ~100 element arrays to just the ~10
-#       element arrays, and make sure linear interpolation is used
+#       element arrays,
+# - [x] and make sure linear interpolation is used
 # - [ ] make sure temp- and current/c-rate-dependent battery efficiency interp is being used
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 
@@ -146,13 +146,13 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
         # - battery temperature
         # - engine temperature
         # - cabin temperature
-        # - HVAC power
+        # - HVAC power, if available
     ),
     param_fns=(
         new_em_eff_peak,
         new_em_eff_range,
         new_fc_eff_peak,
-        new_em_eff_range,
+        # new_fc_eff_range, # not sure I want to include this one
         # TODO: make sure this has functions for modifying
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
@@ -173,7 +173,10 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     ),
     # must match order and length of `params_fns`
     bounds=(
-        (0.85, 0.99,),
+        (0.80, 0.99),
+        (0.1, 0.6),
+        (0.32, 0.45),
+        # (...) # not sure I want to include `new_fc_eff_range`
     ),
     
 )

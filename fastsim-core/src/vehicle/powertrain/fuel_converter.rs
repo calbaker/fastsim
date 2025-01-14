@@ -491,7 +491,7 @@ pub struct FuelConverterThermal {
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
     pub tstat_te_delta: Option<si::Temperature>,
-    #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
+    #[serde(skip, deserialize_with = "tstat_interp_default_de")]
     pub tstat_interp: Interp1D,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1

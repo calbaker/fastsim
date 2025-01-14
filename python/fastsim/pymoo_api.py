@@ -240,6 +240,12 @@ class ModelObjectives(object):
             return objectives, solved_mods
         else:
             return objectives
+
+    def params_and_bounds(self):
+        return [
+            (param_fn, bound_set) for (param_fn, bound_set) in zip(self.param_fns, self.bounds)
+        ]
+        
     
 if PYMOO_AVAILABLE:
     class CalibrationProblem(ElementwiseProblem):
