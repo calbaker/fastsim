@@ -46,8 +46,7 @@ impl Min for Vec<&f64> {
 }
 impl Min for &[Vec<f64>] {
     fn min(&self) -> anyhow::Result<f64> {
-        self
-            .iter()
+        self.iter()
             .map(|v| v.min())
             .try_fold(f64::INFINITY, |acc, x| Ok(acc.min(x?)))
     }
@@ -69,11 +68,6 @@ impl Min for Vec<Vec<Vec<f64>>> {
         self.as_slice().min()
     }
 }
-impl Min for &ArrayD<f64> {
-    fn min(&self) -> anyhow::Result<f64> {
-        Ok(self.iter().fold(f64::INFINITY, |acc, x| acc.min(*x)))
-    }
-}
 impl Min for Interpolator {
     fn min(&self) -> anyhow::Result<f64> {
         match self {
@@ -81,7 +75,10 @@ impl Min for Interpolator {
             Interpolator::Interp1D(interp) => interp.f_x().min(),
             Interpolator::Interp2D(interp) => interp.f_xy().min(),
             Interpolator::Interp3D(interp) => interp.f_xyz().min(),
-            Interpolator::InterpND(interp) => interp.values().min(),
+            Interpolator::InterpND(interp) => Ok(interp
+                .values()
+                .iter()
+                .fold(f64::INFINITY, |acc, x| acc.min(*x))),
         }
     }
 }
@@ -115,8 +112,7 @@ impl Max for Vec<&f64> {
 }
 impl Max for &[Vec<f64>] {
     fn max(&self) -> anyhow::Result<f64> {
-        self
-            .iter()
+        self.iter()
             .map(|v| v.max())
             .try_fold(f64::NEG_INFINITY, |acc, x| Ok(acc.max(x?)))
     }
@@ -138,11 +134,6 @@ impl Max for Vec<Vec<Vec<f64>>> {
         self.as_slice().max()
     }
 }
-impl Max for &ArrayD<f64> {
-    fn max(&self) -> anyhow::Result<f64> {
-        Ok(self.iter().fold(f64::NEG_INFINITY, |acc, x| acc.max(*x)))
-    }
-}
 impl Max for Interpolator {
     fn max(&self) -> anyhow::Result<f64> {
         match self {
@@ -150,7 +141,10 @@ impl Max for Interpolator {
             Interpolator::Interp1D(interp) => interp.f_x().max(),
             Interpolator::Interp2D(interp) => interp.f_xy().max(),
             Interpolator::Interp3D(interp) => interp.f_xyz().max(),
-            Interpolator::InterpND(interp) => interp.values().max(),
+            Interpolator::InterpND(interp) => Ok(interp
+                .values()
+                .iter()
+                .fold(f64::NEG_INFINITY, |acc, x| acc.max(*x))),
         }
     }
 }
