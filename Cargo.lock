@@ -564,7 +564,7 @@ dependencies = [
  "include_dir",
  "itertools 0.12.1",
  "lazy_static",
- "ndarray 0.15.6",
+ "ndarray 0.16.1",
  "ninterp",
  "nohash-hasher",
  "numpy",
