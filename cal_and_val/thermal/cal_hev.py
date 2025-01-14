@@ -3,10 +3,9 @@ Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue
 """
 # # TODO Calibration Tasks
 # - [x] put vehicle test data in a sharepoint folder, grant Robin access, and paste link in here
-# - [ ] develop means of skewing curves via setter or similar
+# - [ ] develop means of skewing curves via setter or similar -- Kyle is doing this
 # - [ ] show what signals should be used for objectives
 #     - [x] and how to access them in code
-# - [ ] play with things in the meantime
 
 # critical import
 from pathlib import Path
@@ -26,6 +25,7 @@ sns.set()
 # TODO: Kyle or Robin:
 # - [ ] in the `./f3-vehicles`, reduce all ~100 element arrays to just the ~10
 #       element arrays,
+#     - [ ] for FC, grab Atkinson efficiency map from fastsim-2
 # - [x] and make sure linear interpolation is used
 # - [ ] make sure temp- and current/c-rate-dependent battery efficiency interp is being used
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
@@ -95,9 +95,9 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
 
 # Setup model objectives
 ## Parameter Functions
-def new_em_eff_peak(sd_dict, new_eff_peak):
+def new_em_eff_max(sd_dict, new_eff_peak):
     """
-    Set `new_eff_peak` in `ElectricMachine`
+    Set `new_eff_max` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
     em.set_eff_peak(new_eff_peak)
@@ -113,9 +113,9 @@ def new_em_eff_range(sd_dict, new_eff_range):
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
     # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
-def new_fc_eff_peak(sd_dict, new_eff_peak):
+def new_fc_eff_max(sd_dict, new_eff_peak):
     """
-    Set `new_eff_peak` in `FuelConverter`
+    Set `new_eff_max` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.set_eff_peak(new_eff_peak)
@@ -149,9 +149,9 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
         # - HVAC power, if available
     ),
     param_fns=(
-        new_em_eff_peak,
+        new_em_eff_max,
         new_em_eff_range,
-        new_fc_eff_peak,
+        new_fc_eff_max,
         # new_fc_eff_range, # not sure I want to include this one
         # TODO: make sure this has functions for modifying
         # - HVAC PID controls for cabin (not for battery because Sonata has
