@@ -476,6 +476,17 @@ impl ReversibleEnergyStorage {
         Ok(())
     }
 
+    /// - `f_xy`: efficiency array as a function of power and temperature at
+    ///    constant 50% SOC, corresponds to `eta_interp_values[0]` in ALTRIOS,
+    ///    transposed so that the outermost layer is now power and the innermost
+    ///    layer SOC (in ALTRIOS, the outermost layer is SOC and innermost is
+    ///    power)
+    #[cfg(all(feature = "yaml", feature = "resources"))]
+    pub fn set_default_pwr_and_temp_interp(&mut self) -> anyhow::Result<()> {
+        todo!("Robin, please populate this and expose to python");
+        Ok(())
+    }
+
     /// Sets the ReversibleEnergyStorage eff_interp Interpolator to be a 3D
     /// interpolator with the default x, y, z, and f_xyz arrays  
     /// # Source of default efficiency values  
