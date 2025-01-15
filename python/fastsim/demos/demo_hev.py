@@ -67,7 +67,7 @@ print(
 # df = sd.to_dataframe()[plt_slice]
 df = sd.to_dataframe()
 plt_slice = slice(0, len(df))
-sd_dict = sd.to_pydict()
+sd_dict = sd.to_pydict(flatten=True)
 
 
 # instantiate `SimDrive` simulation object
@@ -341,8 +341,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="fuel",
         linestyle=baselinestyles[1]
     )
-    ax[1].set_ylim((-sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["state"]["energy_fuel_joules"] * 1e-6 * 0.1,
-                    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["state"]["energy_fuel_joules"] * 1e-6 * 0.1))
+    ax[1].set_ylim((-sd_dict["veh.pt_type.HybridElectricVehicle.fc.state.energy_fuel_joules"] * 1e-6 * 0.1,
+                    sd_dict["veh.pt_type.HybridElectricVehicle.fc.state.energy_fuel_joules"] * 1e-6 * 0.1))
     ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]\n+/- 10% Range")
     ax[1].legend()
 

@@ -613,8 +613,9 @@ impl HEVPowertrainControls {
                         _ => {
                             bail!(
                                 "{}\n`fc.temperature()`, `fc.temp_prev()`, `rgwdb.temp_fc_forced_on`, and 
-`rgwdb.temp_fc_allowed_off` must all be `None` or `Some`", 
-                                format_dbg!()
+`rgwdb.temp_fc_allowed_off` must all be `None` or `Some` because these controls are necessary
+for an HEV equipped with thermal models or superfluous otherwise", 
+                                format_dbg!((fc.temperature(), fc.temp_prev(), rgwdb.temp_fc_forced_on, rgwdb.temp_fc_allowed_off))
                             );
                         }
                     }
@@ -704,6 +705,7 @@ impl HEVPowertrainControls {
 /// and discharge power inside of static min and max SOC range.  Also, includes
 /// buffer for forcing [FuelConverter] to be active/on. See [Self::init] for
 /// default values.
+#[fastsim_api]
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 #[non_exhaustive]
 pub struct RESGreedyWithDynamicBuffers {
@@ -782,6 +784,7 @@ impl Init for RESGreedyWithDynamicBuffers {
         Ok(())
     }
 }
+impl SerdeAPI for RESGreedyWithDynamicBuffers {}
 
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]

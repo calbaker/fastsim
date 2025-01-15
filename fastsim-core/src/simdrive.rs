@@ -28,7 +28,7 @@ impl Default for SimParams {
     fn default() -> Self {
         Self {
             ach_speed_max_iter: 3,
-            ach_speed_tol: 1e-9 * uc::R,
+            ach_speed_tol: 1.0e-9 * uc::R,
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),

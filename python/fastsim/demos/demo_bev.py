@@ -48,6 +48,7 @@ t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0
 print(f"fastsim-3 `sd.walk()` elapsed time with `save_interval` of 1:\n{t_fsim3_si1:.2e} s")
 df = sd.to_dataframe()
+sd_dict = sd.to_pydict(flatten=True)
 
 # instantiate `SimDrive` simulation object
 sd_no_save = fsim.SimDrive(veh_no_save, cyc)
@@ -168,8 +169,8 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
         label="electrical out",
     )
     ax[1].set_ylim(
-       -np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1,
-        np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1
+       -np.max(np.abs(sd_dict["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"])) * 1e-3 * 0.1,
+        np.max(np.abs(sd_dict["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"])) * 1e-3 * 0.1
     )
     ax[1].set_ylabel("RES Energy\nDelta (f3-f2) [kJ]\n+/- 10% Range")
     ax[1].legend()
@@ -177,7 +178,8 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     ax[2].set_prop_cycle(get_paired_cycler())
     ax[2].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] - (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
+        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] -
+            (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
         label="f3 soc",
     )
     ax[2].plot(
@@ -216,8 +218,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_drag_watts) / 1e3,
+        np.array(df["cyc.time_seconds"])[::veh.save_interval],
+        np.array(df["veh.history.pwr_drag_watts"]) / 1e3,
         label="f3 drag",
     )
     ax[0].plot(
@@ -226,8 +228,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         label="f2 drag",
     )
     ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_rr_watts) / 1e3,
+        np.array(df["cyc.time_seconds"])[::veh.save_interval],
+        np.array(df["veh.history.pwr_rr_watts"]) / 1e3,
         label="f3 rr",
     )
     ax[0].plot(
@@ -240,15 +242,15 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
 
     ax[1].set_prop_cycle(get_uni_cycler())
     ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_drag_watts) /
+        np.array(df["cyc.time_seconds"])[::veh.save_interval],
+        np.array(df["veh.history.pwr_drag_watts"]) /
         1e3 - np.array(sd2.drag_kw.tolist()),
         label="drag",
         linestyle=BASE_LINE_STYLES[0],
     )
     ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_rr_watts) /
+        np.array(df["cyc.time_seconds"])[::veh.save_interval],
+        np.array(df["veh.history.pwr_rr_watts"]) /
         1e3 - np.array(sd2.rr_kw.tolist()),
         label="rr",
         linestyle=BASE_LINE_STYLES[1],
@@ -260,8 +262,8 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
 
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.speed_ach_meters_per_second),
+        np.array(df["cyc.time_seconds"])[::veh.save_interval],
+        np.array(df["veh.history.speed_ach_meters_per_second"]),
         label="f3",
     )
     ax[-1].plot(
@@ -287,9 +289,7 @@ if SHOW_PLOTS:
 
 # %%
 # example for how to use set_default_pwr_interp() method for veh.res
-res = veh.res
+res = fsim.ReversibleEnergyStorage.from_pydict(sd.to_pydict()['veh']['pt_type']['BatteryElectricVehicle']['res'])
 res.set_default_pwr_interp()
-fsim.set_param_from_path(veh, 'res', res)
-print(veh.res.to_pydict())
 
 # %%

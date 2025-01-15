@@ -105,8 +105,9 @@ impl Init for AuxSource {}
 
     #[cfg(feature = "resources")]
     #[pyo3(name = "list_resources")]
+    #[staticmethod]
     /// list available vehicle resources
-    fn list_resources_py(&self) -> Vec<String> {
+    fn list_resources_py() -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
 

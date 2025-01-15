@@ -62,7 +62,6 @@ pub struct ElectricMachine {
     ///
     /// Note that the Extrapolate field of this variable is changed in [Self::get_pwr_in_req]
     pub eff_interp_achieved: Interpolator,
-    #[serde(skip_deserializing)]
     /// Efficiency interpolator corresponding to max input power
     /// If `None`, will be set during [Self::init].
     ///

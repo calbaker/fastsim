@@ -6,8 +6,9 @@ use fastsim_2::cycle::RustCycle as Cycle2;
 
 #[fastsim_api(
     #[pyo3(name = "list_resources")]
+    #[staticmethod]
     /// list available cycle resources
-    fn list_resources_py(&self) -> Vec<String> {
+    fn list_resources_py() -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
 

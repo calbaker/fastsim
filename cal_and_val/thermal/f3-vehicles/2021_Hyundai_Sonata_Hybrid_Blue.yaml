@@ -1,47 +1,13 @@
-# https://www.anl.gov/taps/d3-2021-hyundai-sonata-hybrid
 ---
 name: 2021 Hyundai Sonata Hybrid Blue
 year: 2021
-cabin: 
-  LumpedCabin:
-    # 0.05 is Chad's uncalibrated estimate
-    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
-    # 0.05 is Chad's uncalibrated estimate
-    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
-    # 200,000 is Chad's uncalibrated estimate
-    heat_capacitance_joules_per_kelvin: 200000
-    # TODO: get actual vehicle length, but calibrate this later
-    length_meters: 2.5
-    # TODO: get actual vehicle width, but calibrate this later
-    width_meters: 2
-hvac: 
-  LumpedCabinAndRES:
-    te_set_kelvin: 295.15
-    te_deadband_kelvin: 1.5
-    p_cabin_watts_per_kelvin: 0.0
-    i_cabin: 0.0
-    pwr_i_max_cabin_watts: 5000.0
-    d_cabin: 0.0
-    p_res_watts_per_kelvin: 0.0
-    i_res: 0.0
-    pwr_i_max_res_watts: 0.0
-    d_res: 0.0
-    pwr_thermal_max_watts: 10000.0
-    frac_of_ideal_cop: 0.15
-    cabin_heat_source: FuelConverter
-    res_heat_source: None
-    res_cooling_source: None
-    pwr_aux_for_hvac_max_watts: 5000.0
 pt_type:
   HybridElectricVehicle:
     res:
-      thrml: 
+      thrml:
         RESLumpedThermal:
-          # 200,000 is Chad's uncalibrated estimate
-          heat_capacitance_joules_per_kelvin: 200000
-          # 0.1 is Chad's uncalibrated estimate
+          heat_capacitance_joules_per_kelvin: 200000.0
           conductance_to_amb_watts_per_kelvin: 0.1
-          # 0.5 is Chad's uncalibrated estimate
           conductance_to_cab_watts_per_kelvin: 0.5
       mass_kilograms: ~
       specific_energy_joules_per_kilogram: ~
@@ -56,20 +22,33 @@ pt_type:
       pwr_out_max_watts: 2000000.0
       pwr_ramp_lag_seconds: 1.1
       energy_capacity_joules: 1601424000.0
+      specific_energy_joules_per_kilogram: ~
+      mass_kilograms: ~
     fc:
-      thrml: 
+      thrml:
         FuelConverterThermal:
-          heat_capacitance_joules_per_kelvin: 200000
+          heat_capacitance_joules_per_kelvin: 200000.0
           length_for_convection_meters: 1.0
           htc_to_amb_stop_watts_per_square_meter_degree_celsius: 50.0
           conductance_from_comb_watts_per_kelvin: 5.0
           max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
           tstat_te_delta_kelvin: 5.0
+          tstat_interp:
+            x:
+              - 358.15
+              - 363.15
+            f_x:
+              - 0.0
+              - 1.0
+            strategy: Linear
+            extrapolate: Clamp
           radiator_effectiveness: 0.0
-          fc_eff_model.Exponential.offset: 273.15
-          fc_eff_model.Exponential.lag: 25.0
-          fc_eff_model.Exponential.minimum: 0.2     
+          fc_eff_model:
+            Exponential:
+              offset: 273.15
+              lag: 25.0
+              minimum: 0.2
       mass_kilograms: ~
       specific_pwr_watts_per_kilogram: ~
       pwr_out_max_watts: 112000.0
@@ -706,20 +685,22 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       RGWDB:
-        speed_soc_disch_buffer: 17.8816
+        speed_soc_disch_buffer_meters_per_second: 17.8816
         speed_soc_disch_buffer_coeff: 1.0
-        speed_soc_fc_on_buffer: 19.66976
+        speed_soc_fc_on_buffer_meters_per_second: 19.66976
         speed_soc_fc_on_buffer_coeff: 1.0
-        speed_soc_regen_buffer: 13.4112
+        speed_soc_regen_buffer_meters_per_second: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
-        fc_min_time_on: 5.0
-        speed_fc_forced_on: 37.9984
+        fc_min_time_on_seconds: 5.0
+        speed_fc_forced_on_meters_per_second: 33.528
         frac_pwr_demand_fc_forced_on: 0.46357615894039733
         frac_of_most_eff_pwr_to_run_fc: 1.0
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 1.0
+        temp_fc_forced_on_kelvin: 335.15
+        temp_fc_allowed_off_kelvin: 338.15
     aux_cntrl: AuxOnResPriority
-    mass: ~
+    mass_kilograms: ~
     sim_params:
       res_per_fuel_lim: 0.005
       soc_balance_iter_err: 5
@@ -732,11 +713,40 @@ chassis:
   wheel_inertia_kilogram_square_meters: 0.815
   num_wheels: 4
   wheel_radius_meters: 0.33645
+  tire_code: ~
   cg_height_meters: 0.53
   wheel_fric_coef: 0.7
   drive_type: FWD
   drive_axle_weight_frac: 0.59
   wheel_base_meters: 2.83972
+  mass_kilograms: ~
+  glider_mass_kilograms: ~
+  cargo_mass_kilograms: ~
+cabin:
+  LumpedCabin:
+    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
+    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
+    heat_capacitance_joules_per_kelvin: 200000.0
+    length_meters: 2.5
+    width_meters: 2.0
+hvac:
+  LumpedCabinAndRES:
+    te_set_kelvin: 295.15
+    te_deadband_kelvin: 1.5
+    p_cabin_watts_per_kelvin: 0.0
+    i_cabin: 0.0
+    pwr_i_max_cabin_watts: 5000.0
+    d_cabin: 0.0
+    p_res_watts_per_kelvin: 0.0
+    i_res: 0.0
+    pwr_i_max_res_watts: 0.0
+    d_res: 0.0
+    pwr_thermal_max_watts: 10000.0
+    frac_of_ideal_cop: 0.15
+    cabin_heat_source: FuelConverter
+    res_heat_source: None
+    res_cooling_source: None
+    pwr_aux_for_hvac_max_watts: 5000.0
 mass_kilograms: 1508.195
 pwr_aux_base_watts: 500.0
 trans_eff: 0.98
@@ -768,4 +778,5 @@ state:
   dist_meters: 0.0
   grade_curr: 0.0
   elev_curr_meters: .nan
+  air_density_kilograms_per_cubic_meter: 1.172
   mass_kilograms: .nan
