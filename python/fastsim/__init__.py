@@ -308,10 +308,10 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
         for elem in hp:
             try:
                 obj = obj[elem]
-            except:
+            except Exception:
                 try:
                     obj = obj[int(elem)]
-                except Error as err:
+                except Exception as err:
                     raise err
         vals.append(obj)
     if allow_partial:
