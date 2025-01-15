@@ -1,6 +1,5 @@
 use super::*;
 use crate::prelude::*;
-use serde::Deserializer;
 use std::f64::consts::PI;
 
 // TODO: think about how to incorporate life modeling for Fuel Cells and other tech
@@ -491,7 +490,7 @@ pub struct FuelConverterThermal {
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
     pub tstat_te_delta: Option<si::Temperature>,
-    #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
+    #[serde(default = "tstat_interp_default")]
     pub tstat_interp: Interp1D,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
@@ -511,13 +510,6 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default_de<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(tstat_interp_default())
-}
-
 fn tstat_interp_default() -> Interp1D {
     Interp1D::new(
         vec![85.0, 90.0],

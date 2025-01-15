@@ -141,7 +141,6 @@ pub struct Vehicle {
     pub hvac: HVACOption,
 
     /// Total vehicle mass
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
     /// Baseline power required by auxilliary systems

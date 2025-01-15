@@ -33,11 +33,9 @@ pub struct Chassis {
     pub num_wheels: u8,
     /// Wheel radius
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub wheel_radius: Option<si::Length>,
     /// Tire code (optional method of calculating wheel radius)
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub tire_code: Option<String>,
     /// Vehicle center of mass height
     pub cg_height: si::Length,
@@ -51,14 +49,11 @@ pub struct Chassis {
     /// Wheel base length
     pub wheel_base: si::Length,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) mass: Option<si::Mass>,
     /// Vehicle mass excluding cargo, passengers, and powertrain components
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) glider_mass: Option<si::Mass>,
     /// Cargo mass including passengers
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub cargo_mass: Option<si::Mass>,
 }
 

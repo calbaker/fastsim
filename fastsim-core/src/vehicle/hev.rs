@@ -748,10 +748,10 @@ pub struct RESGreedyWithDynamicBuffers {
     /// engine efficiently.
     pub frac_res_dschrg_for_fc: si::Ratio,
     /// temperature at which engine is forced on to warm up
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub temp_fc_forced_on: Option<si::Temperature>,
     /// temperature at which engine is allowed to turn off due to being sufficiently warm
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub temp_fc_allowed_off: Option<si::Temperature>,
     /// current state of control variables
     #[serde(default, skip_serializing_if = "EqDefault::eq_default")]

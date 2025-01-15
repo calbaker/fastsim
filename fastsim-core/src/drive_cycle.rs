@@ -10,6 +10,11 @@ use fastsim_2::cycle::RustCycle as Cycle2;
     fn list_resources_py(&self) -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
+
+    #[pyo3(name = "len")]
+    fn len_py(&self) -> PyResult<u32> {
+       Ok(self.len().map(|l| l as u32)?)
+    }
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 #[non_exhaustive]
@@ -18,7 +23,6 @@ pub struct Cycle {
     /// Name of cycle (can be left empty)
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: either write or automate generation of getter and setter for this
     // TODO: put the above TODO in github issue for all fields with `Option<...>` type
     /// inital elevation
@@ -440,7 +444,7 @@ pub struct CycleElement {
     // `dist` is not included here because it is derived in `Init::init`
     // TODO: make `fastsim_api` handle Option or write custom getter/setter
     /// road grade
-    #[serde(skip_serializing_if = "Option::is_none", alias = "cycGrade")]
+    #[serde(alias = "cycGrade")]
     pub grade: Option<si::Ratio>,
     // `elev` is not included here because it is derived in `Init::init`
     /// road charging/discharing capacity

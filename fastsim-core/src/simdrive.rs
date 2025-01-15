@@ -577,34 +577,4 @@ mod tests {
         assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
-
-    #[test]
-    fn delete_me() {
-        use fastsim_2::traits::SerdeAPI;
-
-        let dir = Path::new("../cal_and_val/f2-vehicles");
-        let output_dir = Path::new("../cal_and_val/f3-vehicles");
-        if !output_dir.exists() {
-            std::fs::create_dir(output_dir).unwrap();
-        }
-        let skip_files = [
-            "2016 CHEVROLET Volt.yaml",
-            "2016 BMW i3 REx PHEV.yaml",
-            "2016 FORD C-MAX (PHEV).yaml",
-            "2017 Prius Prime.yaml",
-            "2016 HYUNDAI Sonata PHEV.yaml",
-        ];
-        assert!(dir.exists());
-        for filepath in std::fs::read_dir(dir).unwrap() {
-            let path = filepath.unwrap().path();
-            assert!(path.exists());
-            let filename = path.file_name().unwrap();
-            if !skip_files.iter().any(|&name| filename == name) {
-                // println!("{path:?}");
-                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path, false).unwrap();
-                let f3_veh = Vehicle::try_from(f2_veh).unwrap();
-                f3_veh.to_file(output_dir.join(filename)).unwrap();
-            }
-        }
-    }
 }

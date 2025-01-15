@@ -305,7 +305,11 @@ impl Init for ElectricMachine {
         let _ = self.mass().with_context(|| anyhow!(format_dbg!()))?;
         let _ = check_interp_frac_data(self.eff_interp_achieved.x()?, InterpRange::Either)
             .with_context(||
-                "Invalid values for `ElectricMachine::pwr_out_frac_interp`; must range from [-1..1] or [0..1].")?;
+                format!(
+                    "{}\nInvalid values for `ElectricMachine::pwr_out_frac_interp`; must range from [-1..1] or [0..1].",
+                    format_dbg!()
+                )
+             )?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
         // TODO: make use of `use fastsim_2::params::{LARGE_BASELINE_EFF, LARGE_MOTOR_POWER_KW, SMALL_BASELINE_EFF,SMALL_MOTOR_POWER_KW};`
         // to set
@@ -332,8 +336,10 @@ impl Init for ElectricMachine {
             )?;
             self.eff_interp_at_max_input = Some(Interpolator::Interp1D(eff_interp_at_max_input));
         } else {
-            // This should be impossible to reach
-            bail!("`ReversibleEnergyStorage::eff_interp_at_max_input` is not `None`")
+            println!(
+                "`eff_interp_at_max_input` is being overwritten by {}",
+                format_dbg!()
+            )
         }
         Ok(())
     }
