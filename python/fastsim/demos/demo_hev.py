@@ -341,8 +341,8 @@ def plot_fc_energy() -> Tuple[Figure, Axes]:
         label="fuel",
         linestyle=baselinestyles[1]
     )
-    ax[1].set_ylim((-sd.veh.fc.state.energy_fuel_joules * 1e-6 * 0.1,
-                    sd.veh.fc.state.energy_fuel_joules * 1e-6 * 0.1))
+    ax[1].set_ylim((-sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["state"]["energy_fuel_joules"] * 1e-6 * 0.1,
+                    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["state"]["energy_fuel_joules"] * 1e-6 * 0.1))
     ax[1].set_ylabel("FC Energy\nDelta (f3-f2) [MJ]\n+/- 10% Range")
     ax[1].legend()
 
