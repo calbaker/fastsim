@@ -56,8 +56,8 @@ def set_param_from_path(
         if list_match is not None:
             list_name = list_match.group(1)
             index = int(list_match.group(2))
-            l = container.__getattribute__(list_name).tolist()
-            return l, list_name, index
+            lst = container.__getattribute__(list_name).tolist()
+            return lst, list_name, index
         else:
             return None, None, None
 
