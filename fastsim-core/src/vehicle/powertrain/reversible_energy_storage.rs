@@ -69,6 +69,11 @@ const TOL: f64 = 1e-3;
         self.set_default_pwr_and_soc_interp()
     }
 
+    #[pyo3(name = "set_default_pwr_and_temp_interp")]
+    fn set_default_pwr_and_temp_interp_py(&mut self) -> anyhow::Result<()> {
+        self.set_default_pwr_and_temp_interp()
+    }
+
     #[pyo3(name = "set_default_pwr_soc_and_temp_interp")]
     fn set_default_pwr_soc_and_temp_interp_py(&mut self) -> anyhow::Result<()> {
         self.set_default_pwr_soc_and_temp_interp()
@@ -477,13 +482,11 @@ impl ReversibleEnergyStorage {
     }
 
     /// - `f_xy`: efficiency array as a function of power and temperature at
-    ///    constant 50% SOC, corresponds to `eta_interp_values[0]` in ALTRIOS,
-    ///    transposed so that the outermost layer is now power and the innermost
-    ///    layer SOC (in ALTRIOS, the outermost layer is SOC and innermost is
-    ///    power)
+    ///    constant 50% SOC
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_pwr_and_temp_interp(&mut self) -> anyhow::Result<()> {
-        todo!("Robin, please populate this and expose to python");
+        self.eff_interp =
+            ninterp::Interpolator::from_resource("res/default_pwr_and_temp.yaml", false)?;
         Ok(())
     }
 

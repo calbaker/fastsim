@@ -8,10 +8,14 @@ pub trait InterpolatorMethods {
 }
 
 impl InterpolatorMethods for Interpolator {
+    #[allow(unused)]
     fn set_min(&mut self, min: f64) -> anyhow::Result<()> {
         let old_min = self.min()?;
         match self {
-            Interpolator::Interp0D(value) => Ok(*value = min),
+            Interpolator::Interp0D(value) => {
+                *value = min;
+                Ok(())
+            }
             Interpolator::Interp1D(interp) => {
                 todo!()
             }
@@ -30,7 +34,10 @@ impl InterpolatorMethods for Interpolator {
     fn set_max(&mut self, max: f64) -> anyhow::Result<()> {
         let old_max = self.max()?;
         match self {
-            Interpolator::Interp0D(value) => Ok(*value = max),
+            Interpolator::Interp0D(value) => {
+                *value = max;
+                Ok(())
+            }
             Interpolator::Interp1D(interp) => {
                 Ok(interp.set_f_x(interp.f_x().iter().map(|x| x * max / old_max).collect())?)
             }
