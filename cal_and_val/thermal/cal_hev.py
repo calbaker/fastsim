@@ -6,6 +6,8 @@ Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue
 # - [ ] develop means of skewing curves via setter or similar -- Kyle is doing this
 # - [ ] show what signals should be used for objectives
 #     - [x] and how to access them in code
+# - [ ] make a version of this that calibrates against a fully warmed up vehicle
+#       with room temp ambient, no climate control, and no thermal parameters
 
 # critical import
 from pathlib import Path
