@@ -135,6 +135,7 @@ pub struct Vehicle {
 
     /// Cabin thermal model
     #[serde(default, skip_serializing_if = "CabinOption::is_none")]
+    #[has_state]
     pub cabin: CabinOption,
 
     /// HVAC model

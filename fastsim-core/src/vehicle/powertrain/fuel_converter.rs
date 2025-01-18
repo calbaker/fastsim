@@ -54,6 +54,7 @@ use std::f64::consts::PI;
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
+    #[has_state]
     pub thrml: FuelConverterThermalOption,
     /// [Self] mass
     #[serde(default)]
@@ -407,6 +408,22 @@ pub enum FuelConverterThermalOption {
     None,
 }
 
+impl SaveState for FuelConverterThermalOption {
+    fn save_state(&mut self) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.save_state(),
+            Self::None => {}
+        }
+    }
+}
+impl Step for FuelConverterThermalOption {
+    fn step(&mut self) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.step(),
+            Self::None => {}
+        }
+    }
+}
 impl Init for FuelConverterThermalOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {

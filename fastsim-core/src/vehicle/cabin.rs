@@ -13,6 +13,28 @@ pub enum CabinOption {
     #[default]
     None,
 }
+impl SaveState for CabinOption {
+    fn save_state(&mut self) {
+        match self {
+            Self::LumpedCabin(lc) => lc.save_state(),
+            Self::LumpedCabinWithShell => {
+                todo!()
+            }
+            Self::None => {}
+        }
+    }
+}
+impl Step for CabinOption {
+    fn step(&mut self) {
+        match self {
+            Self::LumpedCabin(lc) => lc.step(),
+            Self::LumpedCabinWithShell => {
+                todo!()
+            }
+            Self::None => {}
+        }
+    }
+}
 impl Init for CabinOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
@@ -133,9 +155,7 @@ impl LumpedCabin {
 }
 
 #[fastsim_api]
-#[derive(
-    Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
-)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[serde(default)]
 pub struct LumpedCabinState {
     /// time step counter
@@ -161,5 +181,19 @@ pub struct LumpedCabinState {
     pub reynolds_for_plate: si::Ratio,
 }
 
+impl Default for LumpedCabinState {
+    fn default() -> Self {
+        Self {
+            i: Default::default(),
+            temperature: *TE_STD_AIR,
+            temp_prev: *TE_STD_AIR,
+            pwr_thermal_from_hvac: Default::default(),
+            energy_thermal_from_hvac: Default::default(),
+            pwr_thermal_from_amb: Default::default(),
+            energy_thermal_from_amb: Default::default(),
+            reynolds_for_plate: Default::default(),
+        }
+    }
+}
 impl Init for LumpedCabinState {}
 impl SerdeAPI for LumpedCabinState {}

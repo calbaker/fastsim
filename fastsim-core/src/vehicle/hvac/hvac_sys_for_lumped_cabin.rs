@@ -253,7 +253,13 @@ pub enum CabinHeatSource {
 impl Init for CabinHeatSource {}
 impl SerdeAPI for CabinHeatSource {}
 
-#[fastsim_api]
+#[fastsim_api(
+    #[pyo3(name = "default")]
+    #[staticmethod]
+    fn default_py() -> Self {
+        Self::default()
+    }
+)]
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]

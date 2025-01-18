@@ -603,6 +603,7 @@ impl HEVPowertrainControls {
                     handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;
                     handle_fc_on_causes_for_speed(veh_state, rgwdb, hev_state)?;
                     handle_fc_on_causes_for_low_soc(res, rgwdb, hev_state, veh_state)?;
+                    // `handle_fc_*` below here are asymmetrical for positive tractive power only
                     handle_fc_on_causes_for_pwr_demand(
                         rgwdb,
                         pwr_out_req,
@@ -618,13 +619,15 @@ impl HEVPowertrainControls {
                     // split, cannot exceed ElectricMachine max output power.
                     // Excess demand will be handled by `fc`.  Favors drawing
                     // power from `em` before engine
-                    let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
+                    let mut em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
                     let fc_pwr: si::Power = if hev_state.fc_on_causes.is_empty() {
                         // engine does not need to be on
                         si::Power::ZERO
                     } else {
                         // engine has been forced on
-                        // power demand from engine before adjusting for efficient operating point
+                        // power demand from engine such that engine handles all
+                        // power demand beyond the em capability, before adjusting for efficient operating
+                        // point
                         let mut fc_pwr_req = pwr_out_req - em_pwr;
                         // if the engine is on, load it up to get closer to peak
                         // efficiency
@@ -640,7 +643,7 @@ impl HEVPowertrainControls {
                         fc_pwr_req
                     };
                     // recalculate `em_pwr` based on `fc_pwr`
-                    let em_pwr = pwr_out_req - fc_pwr;
+                    em_pwr = pwr_out_req - fc_pwr;
 
                     ensure!(
                         fc_pwr >= si::Power::ZERO,
@@ -859,7 +862,6 @@ impl Init for RESGreedyWithDynamicBuffers {
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
             self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.75));
-        // TODO: consider changing this default
         self.frac_of_most_eff_pwr_to_run_fc =
             self.frac_of_most_eff_pwr_to_run_fc.or(Some(1.0 * uc::R));
         Ok(())

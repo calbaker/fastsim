@@ -85,6 +85,7 @@ const TOL: f64 = 1e-3;
 pub struct ReversibleEnergyStorage {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "RESThermalOption::is_none")]
+    #[has_state]
     pub thrml: RESThermalOption,
     /// ReversibleEnergyStorage mass
     #[serde(default)]
@@ -722,6 +723,22 @@ pub enum RESThermalOption {
     #[default]
     None,
 }
+impl SaveState for RESThermalOption {
+    fn save_state(&mut self) {
+        match self {
+            Self::RESLumpedThermal(rlt) => rlt.save_state(),
+            Self::None => {}
+        }
+    }
+}
+impl Step for RESThermalOption {
+    fn step(&mut self) {
+        match self {
+            Self::RESLumpedThermal(rlt) => rlt.step(),
+            Self::None => {}
+        }
+    }
+}
 impl Init for RESThermalOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
@@ -823,7 +840,13 @@ impl RESLumpedThermal {
     }
 }
 
-#[fastsim_api]
+#[fastsim_api(
+    #[pyo3(name = "default")]
+    #[staticmethod]
+    fn default_py() -> Self {
+        Self::default()
+    }
+)]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]
 #[serde(default)]
 pub struct RESLumpedThermalState {
