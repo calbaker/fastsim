@@ -170,7 +170,12 @@ impl HVACSystemForLumpedCabin {
             (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop)
         };
         self.state.cop = cop;
-        Ok((pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin))
+        self.state.pwr_thrml_hvac_to_cabin = pwr_thrml_hvac_to_cabin;
+        self.state.pwr_thrml_fc_to_cabin = pwr_thrml_fc_to_cabin;
+        Ok((
+            self.state.pwr_thrml_hvac_to_cabin,
+            self.state.pwr_thrml_fc_to_cabin,
+        ))
     }
 
     fn handle_heat_source(
@@ -289,9 +294,15 @@ pub struct HVACSystemForLumpedCabinState {
     /// Aux power demand from [Vehicle::hvac] system
     pub pwr_aux_for_hvac: si::Power,
     /// Cumulative aux energy for HVAC system
-    pub energy_aux: si::Energy,
-    /// Cumulative energy demand by HVAC system from thermal component (e.g. [FuelConverter])
-    pub energy_thermal_req: si::Energy,
+    pub energy_aux_for_hvac: si::Energy,
+    /// Thermal power from HVAC system to cabin, positive is heating the cabin
+    pub pwr_thrml_hvac_to_cabin: si::Power,
+    /// Cumulative thermal energy from HVAC system to cabin, positive is heating the cabin
+    pub energy_thrml_hvac_to_cabin: si::Energy,
+    /// Thermal power from [FuelConverter] to [Cabin]
+    pub pwr_thrml_fc_to_cabin: si::Power,
+    /// Cumulative thermal energy from [FuelConverter] to [Cabin]
+    pub energy_thrml_fc_to_cabin: si::Energy,
 }
 impl Init for HVACSystemForLumpedCabinState {}
 impl SerdeAPI for HVACSystemForLumpedCabinState {}
