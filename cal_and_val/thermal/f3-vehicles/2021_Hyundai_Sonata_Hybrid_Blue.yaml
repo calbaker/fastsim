@@ -741,7 +741,7 @@ hvac:
     i_res: 0.0
     pwr_i_max_res_watts: 0.0
     d_res: 0.0
-    pwr_thermal_max_watts: 10000.0
+    pwr_thrml_max_watts: 10000.0
     frac_of_ideal_cop: 0.15
     cabin_heat_source: FuelConverter
     res_heat_source: None

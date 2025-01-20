@@ -838,6 +838,7 @@ impl RESLumpedThermal {
         dt: si::Time,
     ) -> anyhow::Result<()> {
         self.state.temp_prev = self.state.temperature;
+        // TODO: make sure this impacts cabin temperature
         self.state.pwr_thrml_from_cabin =
             self.conductance_to_cab * (te_cab - self.state.temperature);
         self.state.pwr_thrml_from_amb = self.conductance_to_cab * (te_amb - self.state.temperature);

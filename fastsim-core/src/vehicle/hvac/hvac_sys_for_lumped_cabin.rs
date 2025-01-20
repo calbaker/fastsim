@@ -26,7 +26,7 @@ pub struct HVACSystemForLumpedCabin {
     /// NOTE: `uom` crate does not have this unit, but it may be possible to make a custom unit for this
     pub d: f64,
     /// max HVAC thermal power
-    pub pwr_thermal_max: si::Power,
+    pub pwr_thrml_max: si::Power,
     /// coefficient between 0 and 1 to calculate HVAC efficiency by multiplying by
     /// coefficient of performance (COP)
     pub frac_of_ideal_cop: f64,
@@ -52,7 +52,7 @@ impl Default for HVACSystemForLumpedCabin {
             i: Default::default(),
             d: Default::default(),
             pwr_i_max: 5. * uc::KW,
-            pwr_thermal_max: 10. * uc::KW,
+            pwr_thrml_max: 10. * uc::KW,
             frac_of_ideal_cop: 0.15,
             heat_source: CabinHeatSource::ResistanceHeater,
             pwr_aux_for_hvac_max: uc::KW * 5.,
@@ -132,7 +132,7 @@ impl HVACSystemForLumpedCabin {
                     }
                     let mut pwr_thrml_hvac_to_cab =
                         (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
-                            .max(-self.pwr_thermal_max);
+                            .max(-self.pwr_thrml_max);
 
                     if (-pwr_thrml_hvac_to_cab / self.state.cop) > self.pwr_aux_for_hvac_max {
                         self.state.pwr_aux_for_hvac = self.pwr_aux_for_hvac_max;
@@ -152,7 +152,7 @@ impl HVACSystemForLumpedCabin {
                     }
                     let mut pwr_thrml_hvac_to_cabin =
                         (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
-                            .min(self.pwr_thermal_max);
+                            .min(self.pwr_thrml_max);
 
                     // Assumes blower has negligible impact on aux load, may want to revise later
                     let (pwr_thrml_fc_to_cabin, cop) = self

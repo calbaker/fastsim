@@ -91,7 +91,7 @@ impl LumpedCabin {
     /// Arguments:
     /// - `te_amb_air`: ambient air temperature
     /// - `veh_state`: current [VehicleState]
-    /// - 'pwr_thermal_from_hvac`: power to cabin from [Vehicle::hvac] system
+    /// - 'pwr_thrml_from_hvac`: power to cabin from [Vehicle::hvac] system
     /// - `dt`: simulation time step size
     /// # Returns
     /// - `te_cab`: current cabin temperature, after solving cabin for current
@@ -100,10 +100,12 @@ impl LumpedCabin {
         &mut self,
         te_amb_air: si::Temperature,
         veh_state: &VehicleState,
-        pwr_thermal_from_hvac: si::Power,
+        pwr_thrml_from_hvac: si::Power,
+        pwr_thrml_to_res: si::Power,
         dt: si::Time,
     ) -> anyhow::Result<si::Temperature> {
-        self.state.pwr_thermal_from_hvac = pwr_thermal_from_hvac;
+        self.state.pwr_thrml_from_hvac = pwr_thrml_from_hvac;
+        self.state.pwr_thrml_to_res = pwr_thrml_to_res;
         // flat plate model for isothermal, mixed-flow from Incropera and deWitt, Fundamentals of Heat and Mass
         // Transfer, 7th Edition
         let cab_te_film_ext = 0.5 * (self.state.temperature + te_amb_air);
@@ -130,7 +132,7 @@ impl LumpedCabin {
                 * Air::get_pr(cab_te_film_ext).with_context(|| format_dbg!())?
         };
 
-        self.state.pwr_thermal_from_amb = if veh_state.speed_ach > 2.0 * uc::MPH {
+        self.state.pwr_thrml_from_amb = if veh_state.speed_ach > 2.0 * uc::MPH {
             let htc_overall_moving: si::HeatTransferCoeff = 1.0
                 / (1.0
                     / (nu_l_bar
@@ -145,8 +147,8 @@ impl LumpedCabin {
         };
 
         self.state.temp_prev = self.state.temperature;
-        self.state.temperature += (self.state.pwr_thermal_from_hvac
-            + self.state.pwr_thermal_from_amb)
+        self.state.temperature += (self.state.pwr_thrml_from_hvac + self.state.pwr_thrml_from_amb
+            - self.state.pwr_thrml_to_res)
             / self.heat_capacitance
             * dt;
         Ok(self.state.temperature)
@@ -166,16 +168,20 @@ pub struct LumpedCabinState {
     pub temp_prev: si::Temperature,
     /// Thermal power coming to cabin from [Vehicle::hvac] system.  Positive indicates
     /// heating, and negative indicates cooling.
-    pub pwr_thermal_from_hvac: si::Power,
+    pub pwr_thrml_from_hvac: si::Power,
     /// Cumulative thermal energy coming to cabin from [Vehicle::hvac] system.  Positive indicates
     /// heating, and negative indicates cooling.
-    pub energy_thermal_from_hvac: si::Energy,
+    pub energy_thrml_from_hvac: si::Energy,
     /// Thermal power coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
-    pub pwr_thermal_from_amb: si::Power,
+    pub pwr_thrml_from_amb: si::Power,
     /// Cumulative thermal energy coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
-    pub energy_thermal_from_amb: si::Energy,
+    pub energy_thrml_from_amb: si::Energy,
+    /// Thermal power flowing from [Cabin] to [ReversibleEnergyStorage] due to temperature delta
+    pub pwr_thrml_to_res: si::Power,
+    /// Cumulative thermal energy flowing from [Cabin] to [ReversibleEnergyStorage] due to temperature delta
+    pub energy_thrml_to_res: si::Energy,
     /// Reynolds number for flow over cabin, treating cabin as a flat plate
     pub reynolds_for_plate: si::Ratio,
 }
@@ -186,10 +192,12 @@ impl Default for LumpedCabinState {
             i: Default::default(),
             temperature: *TE_STD_AIR,
             temp_prev: *TE_STD_AIR,
-            pwr_thermal_from_hvac: Default::default(),
-            energy_thermal_from_hvac: Default::default(),
-            pwr_thermal_from_amb: Default::default(),
-            energy_thermal_from_amb: Default::default(),
+            pwr_thrml_from_hvac: Default::default(),
+            energy_thrml_from_hvac: Default::default(),
+            pwr_thrml_from_amb: Default::default(),
+            energy_thrml_from_amb: Default::default(),
+            pwr_thrml_to_res: Default::default(),
+            energy_thrml_to_res: Default::default(),
             reynolds_for_plate: Default::default(),
         }
     }

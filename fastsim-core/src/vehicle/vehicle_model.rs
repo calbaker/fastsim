@@ -449,6 +449,13 @@ impl Vehicle {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
         let res_temp = self.res().and_then(|res| res.temperature());
         let res_temp_prev = self.res().and_then(|res| res.temp_prev());
+        let pwr_thrml_cab_to_res: si::Power = self
+            .res()
+            .and_then(|res| match &res.thrml {
+                RESThermalOption::RESLumpedThermal(rlt) => Some(rlt.state.pwr_thrml_from_cabin),
+                RESThermalOption::None => None,
+            })
+            .unwrap_or_default();
         let (pwr_thrml_fc_to_cabin, pwr_thrml_hvac_to_res, te_cab): (
             Option<si::Power>,
             Option<si::Power>,
@@ -463,7 +470,13 @@ impl Vehicle {
                     .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
                 let te_cab = cab
-                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .solve(
+                        te_amb_air,
+                        &self.state,
+                        pwr_thrml_hvac_to_cabin,
+                        Default::default(),
+                        dt,
+                    )
                     .with_context(|| format_dbg!())?;
                 self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 (Some(pwr_thrml_fc_to_cab), None, Some(te_cab))
@@ -486,7 +499,13 @@ impl Vehicle {
                     )
                     .with_context(|| format_dbg!())?;
                 let te_cab = cab
-                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .solve(
+                        te_amb_air,
+                        &self.state,
+                        pwr_thrml_hvac_to_cabin,
+                        pwr_thrml_cab_to_res,
+                        dt,
+                    )
                     .with_context(|| format_dbg!())?;
                 self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 (
