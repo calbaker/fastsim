@@ -711,7 +711,6 @@ impl Default for ReversibleEnergyStorageState {
         }
     }
 }
-
 impl Init for ReversibleEnergyStorageState {}
 impl SerdeAPI for ReversibleEnergyStorageState {}
 
@@ -722,6 +721,14 @@ pub enum RESThermalOption {
     /// no thermal plant for [ReversibleEnergyStorage]
     #[default]
     None,
+}
+impl SetCumulative for RESThermalOption {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        match self {
+            Self::RESLumpedThermal(rlt) => rlt.set_cumulative(dt),
+            Self::None => {}
+        }
+    }
 }
 impl SaveState for RESThermalOption {
     fn save_state(&mut self) {
@@ -814,7 +821,11 @@ pub struct RESLumpedThermal {
     pub history: RESLumpedThermalStateHistoryVec,
     // TODO: add `save_interval` and associated methods
 }
-
+impl SetCumulative for RESLumpedThermal {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        self.state.set_cumulative(dt);
+    }
+}
 impl SerdeAPI for RESLumpedThermal {}
 impl Init for RESLumpedThermal {}
 impl RESLumpedThermal {

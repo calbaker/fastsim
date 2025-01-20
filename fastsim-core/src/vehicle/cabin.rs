@@ -78,14 +78,13 @@ pub struct LumpedCabin {
     pub history: LumpedCabinStateHistoryVec,
     // TODO: add `save_interval` and associated method
 }
-
-impl SerdeAPI for LumpedCabin {}
-impl Init for LumpedCabin {}
 impl SetCumulative for LumpedCabin {
     fn set_cumulative(&mut self, dt: si::Time) {
         self.state.set_cumulative(dt);
     }
 }
+impl SerdeAPI for LumpedCabin {}
+impl Init for LumpedCabin {}
 
 impl LumpedCabin {
     /// Solve temperatures, HVAC powers, and cumulative energies of cabin and HVAC system

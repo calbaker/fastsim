@@ -434,6 +434,14 @@ impl Init for FuelConverterThermalOption {
     }
 }
 impl SerdeAPI for FuelConverterThermalOption {}
+impl SetCumulative for FuelConverterThermalOption {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.set_cumulative(dt),
+            Self::None => {}
+        }
+    }
+}
 impl FuelConverterThermalOption {
     /// Solve change in temperature and other thermal effects
     /// # Arguments
@@ -669,6 +677,11 @@ impl FuelConverterThermal {
     }
 }
 impl SerdeAPI for FuelConverterThermal {}
+impl SetCumulative for FuelConverterThermal {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        self.state.set_cumulative(dt);
+    }
+}
 impl Init for FuelConverterThermal {
     fn init(&mut self) -> anyhow::Result<()> {
         self.tstat_te_sto = self
