@@ -579,6 +579,7 @@ impl FuelConverterThermal {
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
+        self.state.pwr_thrml_fc_to_cab = pwr_thrml_fc_to_cab;
         // film temperature for external convection calculations
         let te_air_film = 0.5 * (self.state.temperature + te_amb);
         // Reynolds number = density * speed * diameter / dynamic viscosity
@@ -633,11 +634,12 @@ impl FuelConverterThermal {
         )
         .with_context(|| format_dbg!())?;
         // heat that will go both to the block and out the exhaust port
-        let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
-        let delta_temp: si::Temperature = (((self.conductance_from_comb
+        self.state.pwr_fuel_as_heat = fc_state.pwr_fuel - (fc_state.pwr_prop + fc_state.pwr_aux);
+        self.state.pwr_thrml_to_tm = (self.conductance_from_comb
             * (self.state.te_adiabatic - self.state.temperature))
-            .min(self.max_frac_from_comb * heat_gen)
-            - pwr_thrml_fc_to_cab
+            .min(self.max_frac_from_comb * self.state.pwr_fuel_as_heat);
+        let delta_temp: si::Temperature = ((self.state.pwr_thrml_to_tm
+            - self.state.pwr_thrml_fc_to_cab
             - self.state.heat_to_amb)
             * dt)
             / self.heat_capacitance;
@@ -742,6 +744,18 @@ pub struct FuelConverterThermalState {
     pub heat_to_amb: si::Power,
     /// Efficency coefficient, used to modify [FuelConverter] effciency based on temperature
     pub eff_coeff: si::Ratio,
+    /// Thermal power flowing from fuel converter to cabin
+    pub pwr_thrml_fc_to_cab: si::Power,
+    /// Cumulative thermal energy flowing from fuel converter to cabin
+    pub energy_thrml_fc_to_cab: si::Energy,
+    /// Fuel power that is not converted to mechanical work
+    pub pwr_fuel_as_heat: si::Power,
+    /// Cumulative fuel energy that is not converted to mechanical work
+    pub energy_fuel_as_heat: si::Energy,
+    /// Thermal power flowing from combustion to [FuelConverter] thermal mass
+    pub pwr_thrml_to_tm: si::Power,
+    /// Cumulative thermal energy flowing from combustion to [FuelConverter] thermal mass
+    pub energy_thrml_to_tm: si::Energy,
 }
 
 impl Init for FuelConverterThermalState {}
@@ -756,6 +770,12 @@ impl Default for FuelConverterThermalState {
             htc_to_amb: Default::default(),
             heat_to_amb: Default::default(),
             eff_coeff: uc::R,
+            pwr_thrml_fc_to_cab: Default::default(),
+            energy_thrml_fc_to_cab: Default::default(),
+            pwr_fuel_as_heat: Default::default(),
+            energy_fuel_as_heat: Default::default(),
+            pwr_thrml_to_tm: Default::default(),
+            energy_thrml_to_tm: Default::default(),
         }
     }
 }

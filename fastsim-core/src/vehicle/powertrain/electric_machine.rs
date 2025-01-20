@@ -155,7 +155,7 @@ impl ElectricMachine {
                         stringify!(eff_pos)
                     )
                 })?;
-        self.state.eff_bwd_at_max_input = uc::R
+        self.state.eff_at_max_regen = uc::R
             * self
                 .eff_interp_at_max_input
                 .as_ref()
@@ -185,9 +185,9 @@ impl ElectricMachine {
             .min(pwr_in_fwd_lim * self.state.eff_fwd_at_max_input);
         // maximum power in backward direction is minimum of component `pwr_out_max` parameter or time-varying max
         // power in bacward direction (i.e. regen) based on what the ReversibleEnergyStorage can provide
-        self.state.pwr_mech_bwd_out_max = self
+        self.state.pwr_mech_regen_max = self
             .pwr_out_max
-            .min(pwr_in_bwd_lim / self.state.eff_bwd_at_max_input);
+            .min(pwr_in_bwd_lim / self.state.eff_at_max_regen);
         Ok(())
     }
 
@@ -224,12 +224,12 @@ impl ElectricMachine {
             ),
         );
         ensure!(
-            almost_le_uom(&pwr_out_req.abs(), &self.state.pwr_mech_bwd_out_max, None),
+            almost_le_uom(&pwr_out_req.abs(), &self.state.pwr_mech_regen_max, None),
             format!(
-                "{}\nedrv required charge power ({:.6} kW) exceeds current max charge power ({:.6} kW)",
-                format_dbg!(pwr_out_req.abs() <= self.state.pwr_mech_bwd_out_max),
+                "{}\nedrv charge power ({:.6} kW) exceeds current max charge power ({:.6} kW)",
+                format_dbg!(pwr_out_req.abs() <= self.state.pwr_mech_regen_max),
                 pwr_out_req.get::<si::kilowatt>(),
-                self.state.pwr_mech_bwd_out_max.get::<si::kilowatt>()
+                self.state.pwr_mech_regen_max.get::<si::kilowatt>()
             ),
         );
 
@@ -274,7 +274,7 @@ impl ElectricMachine {
 
         // `pwr_mech_prop_out` is `pwr_out_req` unless `pwr_out_req` is more negative than `pwr_mech_regen_max`,
         // in which case, excess is handled by `pwr_mech_dyn_brake`
-        self.state.pwr_mech_prop_out = pwr_out_req.max(-self.state.pwr_mech_bwd_out_max);
+        self.state.pwr_mech_prop_out = pwr_out_req.max(-self.state.pwr_mech_regen_max);
 
         self.state.pwr_mech_dyn_brake = -(pwr_out_req - self.state.pwr_mech_prop_out);
         ensure!(
@@ -650,9 +650,9 @@ pub struct ElectricMachineState {
     /// efficiency in forward direction at max possible input power from `FuelConverter` and `ReversibleEnergyStorage`
     pub eff_fwd_at_max_input: si::Ratio,
     /// Maximum possible regeneration power going to ReversibleEnergyStorage.
-    pub pwr_mech_bwd_out_max: si::Power,
+    pub pwr_mech_regen_max: si::Power,
     /// efficiency in backward direction at max possible input power from `FuelConverter` and `ReversibleEnergyStorage`
-    pub eff_bwd_at_max_input: si::Ratio,
+    pub eff_at_max_regen: si::Ratio,
     /// max ramp-up rate
     pub pwr_rate_out_max: si::PowerRate,
 

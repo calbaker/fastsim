@@ -144,7 +144,7 @@ impl Powertrain for BatteryElectricVehicle {
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         Ok((
             self.em.state.pwr_mech_fwd_out_max,
-            self.em.state.pwr_mech_bwd_out_max,
+            self.em.state.pwr_mech_regen_max,
         ))
     }
 

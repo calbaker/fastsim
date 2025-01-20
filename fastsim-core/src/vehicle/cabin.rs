@@ -169,8 +169,8 @@ pub struct LumpedCabinState {
     /// Thermal power coming to cabin from [Vehicle::hvac] system.  Positive indicates
     /// heating, and negative indicates cooling.
     pub pwr_thrml_from_hvac: si::Power,
-    /// Cumulative thermal energy coming to cabin from [Vehicle::hvac] system.  Positive indicates
-    /// heating, and negative indicates cooling.
+    /// Cumulative thermal energy coming to cabin from [Vehicle::hvac] system.
+    /// Positive indicates heating, and negative indicates cooling.
     pub energy_thrml_from_hvac: si::Energy,
     /// Thermal power coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
@@ -178,9 +178,11 @@ pub struct LumpedCabinState {
     /// Cumulative thermal energy coming to cabin from ambient air.  Positive indicates
     /// heating, and negative indicates cooling.
     pub energy_thrml_from_amb: si::Energy,
-    /// Thermal power flowing from [Cabin] to [ReversibleEnergyStorage] due to temperature delta
+    /// Thermal power flowing from [Cabin] to [ReversibleEnergyStorage] (zero if
+    /// not equipped) due to temperature delta
     pub pwr_thrml_to_res: si::Power,
-    /// Cumulative thermal energy flowing from [Cabin] to [ReversibleEnergyStorage] due to temperature delta
+    /// Cumulative thermal energy flowing from [Cabin] to
+    /// [ReversibleEnergyStorage] due to temperature delta
     pub energy_thrml_to_res: si::Energy,
     /// Reynolds number for flow over cabin, treating cabin as a flat plate
     pub reynolds_for_plate: si::Ratio,

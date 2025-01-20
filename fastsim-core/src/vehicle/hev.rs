@@ -164,7 +164,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         Ok((
             self.em.state.pwr_mech_fwd_out_max + self.fc.state.pwr_prop_max,
-            self.em.state.pwr_mech_bwd_out_max,
+            self.em.state.pwr_mech_regen_max,
         ))
     }
 
@@ -561,7 +561,7 @@ impl HEVPowertrainControls {
     /// Determines power split between engine and electric machine
     ///
     /// # Arguments
-    /// - `pwr_out_req`: tractive power required
+    /// - `pwr_prop_req`: tractive power required
     /// - `veh_state`: vehicle state
     /// - `hev_state`: HEV powertrain state
     /// - `fc`: fuel converter
@@ -569,7 +569,7 @@ impl HEVPowertrainControls {
     /// - `res`: reversible energy storage (e.g. high voltage battery)
     fn get_pwr_fc_and_em(
         &mut self,
-        pwr_out_req: si::Power,
+        pwr_prop_req: si::Power,
         veh_state: VehicleState,
         hev_state: &mut HEVState,
         fc: &FuelConverter,
@@ -577,99 +577,99 @@ impl HEVPowertrainControls {
         res: &ReversibleEnergyStorage,
     ) -> anyhow::Result<(si::Power, si::Power)> {
         let fc_state = &fc.state;
-        if pwr_out_req >= si::Power::ZERO {
-            // positive net power *out of* the powertrain -- i.e. positive net
-            // power out of powertrain, aka regen
-            ensure!(
-                // `almost` is in case of negligible numerical precision discrepancies
-                almost_le_uom(
-                    &pwr_out_req,
-                    &(em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max),
-                    None
-                ),
-                "{}
+        ensure!(
+            // `almost` is in case of negligible numerical precision discrepancies
+            almost_le_uom(
+                &pwr_prop_req,
+                &(em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max),
+                None
+            ),
+            "{}
 `pwr_out_req`: {} kW
 `em_state.pwr_mech_fwd_out_max`: {} kW
 `fc_state.pwr_prop_max`: {} kW",
-                format_dbg!(),
-                pwr_out_req.get::<si::kilowatt>(),
-                em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
-                fc_state.pwr_prop_max.get::<si::kilowatt>()
-            );
+            format_dbg!(),
+            pwr_prop_req.get::<si::kilowatt>(),
+            em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
+            fc_state.pwr_prop_max.get::<si::kilowatt>()
+        );
 
-            // positive net power out of the powertrain
-            let (fc_pwr, em_pwr) = match self {
-                Self::RGWDB(ref mut rgwdb) => {
-                    handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;
-                    handle_fc_on_causes_for_speed(veh_state, rgwdb, hev_state)?;
-                    handle_fc_on_causes_for_low_soc(res, rgwdb, hev_state, veh_state)?;
-                    // `handle_fc_*` below here are asymmetrical for positive tractive power only
-                    handle_fc_on_causes_for_pwr_demand(
-                        rgwdb,
-                        pwr_out_req,
-                        em_state,
-                        fc_state,
-                        hev_state,
-                    )?;
+        let (fc_pwr, em_pwr) = match self {
+            Self::RGWDB(ref mut rgwdb) => {
+                handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;
+                handle_fc_on_causes_for_speed(veh_state, rgwdb, hev_state)?;
+                handle_fc_on_causes_for_low_soc(res, rgwdb, hev_state, veh_state)?;
+                // `handle_fc_*` below here are asymmetrical for positive tractive power only
+                handle_fc_on_causes_for_pwr_demand(
+                    rgwdb,
+                    pwr_prop_req,
+                    em_state,
+                    fc_state,
+                    hev_state,
+                )?;
 
-                    let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwdb
+                // Tractive power `em` must provide before deciding power
+                // split, cannot exceed ElectricMachine max output power.
+                // Excess demand will be handled by `fc`.  Favors drawing
+                // power from `em` before engine
+                let em_pwr = pwr_prop_req
+                    .min(em_state.pwr_mech_fwd_out_max)
+                    .max(-em_state.pwr_mech_regen_max);
+                // tractive power handled by fc
+                let (fc_pwr_corrected, em_pwr_corrected): (si::Power, si::Power) = if hev_state
+                    .fc_on_causes
+                    .is_empty()
+                {
+                    // engine is off
+                    (si::Power::ZERO, em_pwr)
+                } else {
+                    // engine has been forced on
+                    let frac_of_pwr_for_peak_eff: si::Ratio = rgwdb
                         .frac_of_most_eff_pwr_to_run_fc
                         .with_context(|| format_dbg!())?;
-                    // Tractive power `em` must provide before deciding power
-                    // split, cannot exceed ElectricMachine max output power.
-                    // Excess demand will be handled by `fc`.  Favors drawing
-                    // power from `em` before engine
-                    let mut em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-                    let fc_pwr: si::Power = if hev_state.fc_on_causes.is_empty() {
-                        // engine does not need to be on
-                        si::Power::ZERO
+                    let fc_pwr = if pwr_prop_req < si::Power::ZERO {
+                        // negative tractive power
+                        // max power system can receive from engine during negative traction
+                        (em_state.pwr_mech_regen_max + pwr_prop_req)
+                            .min(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
+                            .max(si::Power::ZERO)
                     } else {
-                        // engine has been forced on
-                        // power demand from engine such that engine handles all
-                        // power demand beyond the em capability, before adjusting for efficient operating
-                        // point
-                        let mut fc_pwr_req = pwr_out_req - em_pwr;
-                        // if the engine is on, load it up to get closer to peak
-                        // efficiency
-                        fc_pwr_req = fc_pwr_req
-                            // can't exceed fc power limit
-                            .min(fc.state.pwr_out_max)
-                            // operate for efficiency if demand is less than this
-                            .max(fc.pwr_for_peak_eff * frac_of_most_eff_pwr_to_run_fc);
-                        // don't over charge the battery
-                        if fc_pwr_req - pwr_out_req > em_state.pwr_mech_bwd_out_max {
-                            fc_pwr_req = pwr_out_req + em_state.pwr_mech_bwd_out_max;
+                        // positive tractive power
+                        if pwr_prop_req - em_pwr > fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff {
+                            // engine needs to run higher than peak efficiency point
+                            pwr_prop_req - em_pwr
+                        } else {
+                            // engine does not need to run higher than peak
+                            // efficiency point to make tractive demand
+
+                            // fc handles all power not covered by em
+                            (pwr_prop_req - em_pwr)
+                                // and if that's less than the
+                                // efficiency-focused value, then operate at that value
+                                .max(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
+                                // but don't exceed what what the battery can
+                                // absorb + tractive demand
+                                .min(pwr_prop_req + em_state.pwr_mech_regen_max)
                         }
-                        fc_pwr_req
-                    };
+                    }
+                    // and don't exceed what the fc can do
+                    .min(fc_state.pwr_prop_max);
+
                     // recalculate `em_pwr` based on `fc_pwr`
-                    em_pwr = pwr_out_req - fc_pwr;
+                    let em_pwr_corrected = pwr_prop_req - fc_pwr;
+                    (fc_pwr, em_pwr_corrected)
+                };
 
-                    ensure!(
-                        fc_pwr >= si::Power::ZERO,
-                        format_dbg!(fc_pwr >= si::Power::ZERO)
-                    );
-                    (fc_pwr, em_pwr)
-                }
-                Self::Placeholder => todo!(),
-            };
-
-            Ok((fc_pwr, em_pwr))
-        } else {
-            match self {
-                Self::RGWDB(rgwdb) => {
-                    handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;
-                    handle_fc_on_causes_for_speed(veh_state, rgwdb, hev_state)?;
-                    handle_fc_on_causes_for_low_soc(res, rgwdb, hev_state, veh_state)?;
-                }
-                Self::Placeholder => todo!(),
+                ensure!(
+                    fc_pwr_corrected >= si::Power::ZERO,
+                    format_dbg!(fc_pwr_corrected >= si::Power::ZERO)
+                );
+                (fc_pwr_corrected, em_pwr_corrected)
             }
-            // negative net power out of the powertrain -- i.e. positive net
-            // power *into* powertrain, aka regen
-            // if `em_pwr` is less than magnitude of `pwr_out_req`, friction brakes can handle excess
-            let em_pwr = -em_state.pwr_mech_bwd_out_max.min(-pwr_out_req);
-            Ok((0. * uc::W, em_pwr))
-        }
+            Self::Placeholder => todo!(),
+        };
+
+        Ok((fc_pwr, em_pwr))
     }
 }
 

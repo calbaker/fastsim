@@ -841,9 +841,12 @@ impl RESLumpedThermal {
         // TODO: make sure this impacts cabin temperature
         self.state.pwr_thrml_from_cabin =
             self.conductance_to_cab * (te_cab - self.state.temperature);
+        self.state.pwr_thrml_hvac_to_res = pwr_thrml_hvac_to_res;
         self.state.pwr_thrml_from_amb = self.conductance_to_cab * (te_amb - self.state.temperature);
-        self.state.temperature += (pwr_thrml_hvac_to_res
-            + res_state.pwr_out_electrical * (1.0 * uc::R - res_state.eff)
+        self.state.pwr_thrml_loss =
+            res_state.pwr_out_electrical.abs() * (1.0 * uc::R - res_state.eff);
+        self.state.temperature += (self.state.pwr_thrml_hvac_to_res
+            + self.state.pwr_thrml_loss
             + self.state.pwr_thrml_from_cabin
             + self.state.pwr_thrml_from_amb)
             / self.heat_capacitance
@@ -870,12 +873,20 @@ pub struct RESLumpedThermalState {
     pub temp_prev: si::Temperature,
     /// Thermal power flow to [RESLumpedThermal] from cabin
     pub pwr_thrml_from_cabin: si::Power,
+    /// Cumulative thermal energy flow to [RESLumpedThermal] from cabin
+    pub energy_thrml_from_cabin: si::Energy,
     /// Thermal power flow to [RESLumpedThermal] from ambient
     pub pwr_thrml_from_amb: si::Power,
-    /// Cumulatev thermal energy flow to [RESLumpedThermal] from cabin
-    pub energy_thrml_from_cabin: si::Energy,
-    /// Cumulatev thermal energy flow to [RESLumpedThermal] from ambient
+    /// Cumulative thermal energy flow to [RESLumpedThermal] from ambient
     pub energy_thrml_from_amb: si::Energy,
+    /// Thermal power flow to [RESLumpedThermal] from HVAC
+    pub pwr_thrml_hvac_to_res: si::Power,
+    /// Cumulative thermal energy flow to [RESLumpedThermal] from HVAC
+    pub energy_thrml_hvac_to_res: si::Energy,
+    /// Thermal generation due to losses
+    pub pwr_thrml_loss: si::Power,
+    /// Cumulative thermal energy generation due to losses
+    pub energy_thrml_loss: si::Energy,
 }
 
 impl Init for RESLumpedThermalState {}
@@ -890,6 +901,10 @@ impl Default for RESLumpedThermalState {
             energy_thrml_from_cabin: Default::default(),
             pwr_thrml_from_amb: Default::default(),
             energy_thrml_from_amb: Default::default(),
+            pwr_thrml_hvac_to_res: Default::default(),
+            energy_thrml_hvac_to_res: Default::default(),
+            pwr_thrml_loss: Default::default(),
+            energy_thrml_loss: Default::default(),
         }
     }
 }
