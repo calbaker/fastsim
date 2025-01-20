@@ -61,6 +61,11 @@ impl Default for HVACSystemForLumpedCabin {
         }
     }
 }
+impl SetCumulative for HVACSystemForLumpedCabin {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        self.state.set_cumulative(dt);
+    }
+}
 impl Init for HVACSystemForLumpedCabin {}
 impl SerdeAPI for HVACSystemForLumpedCabin {}
 impl HVACSystemForLumpedCabin {
