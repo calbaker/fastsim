@@ -312,6 +312,11 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
         df["veh.history.pwr_rr_watts"] / 1e3,
         label="rr",
     )
+    ax[0].plot(
+        df["cyc.time_seconds"][::veh.save_interval],
+        df["veh.history.pwr_tractive_watts"] / 1e3,
+        label="total",
+    )
     ax[0].set_ylabel("Power [kW]")
     ax[0].legend()
 
@@ -338,7 +343,7 @@ if SHOW_PLOTS:
     fig_res_pwr, ax_res_pwr = plot_res_pwr()
     fig_res_energy, ax_res_energy = plot_res_energy()
     fig_temps, ax_temps = plot_temperatures()
-    # fig, ax = plot_road_loads()
+    fig, ax = plot_road_loads()
     plt.show()
 # %%
 # example for how to use set_default_pwr_interp() method for veh.res

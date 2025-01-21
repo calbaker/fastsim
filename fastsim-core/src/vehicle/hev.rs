@@ -207,11 +207,12 @@ impl Powertrain for Box<HybridElectricVehicle> {
         Ok(())
     }
 
+    /// Regen braking power, positive means braking is happening
     fn pwr_regen(&self) -> si::Power {
         // When `pwr_mech_prop_out` is negative, regen is happening.  First, clip it at 0, and then negate it.
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d
         // for example
-        -self.em.state.pwr_mech_prop_out.min(0. * uc::W)
+        -(self.em.state.pwr_mech_prop_out.max(si::Power::ZERO))
     }
 }
 
@@ -616,11 +617,8 @@ impl HEVPowertrainControls {
                     .min(em_state.pwr_mech_fwd_out_max)
                     .max(-em_state.pwr_mech_regen_max);
                 // tractive power handled by fc
-                let (fc_pwr_corrected, em_pwr_corrected): (si::Power, si::Power) = if hev_state
-                    .fc_on_causes
-                    .is_empty()
-                {
-                    // engine is off
+                if hev_state.fc_on_causes.is_empty() {
+                    // engine is off, and `em_pwr` has already been limited within bounds
                     (si::Power::ZERO, em_pwr)
                 } else {
                     // engine has been forced on
@@ -631,7 +629,9 @@ impl HEVPowertrainControls {
                         // negative tractive power
                         // max power system can receive from engine during negative traction
                         (em_state.pwr_mech_regen_max + pwr_prop_req)
+                            // or peak efficiency power if it's lower than above
                             .min(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
+                            // but not negative
                             .max(si::Power::ZERO)
                     } else {
                         // positive tractive power
@@ -645,7 +645,8 @@ impl HEVPowertrainControls {
                             // fc handles all power not covered by em
                             (pwr_prop_req - em_pwr)
                                 // and if that's less than the
-                                // efficiency-focused value, then operate at that value
+                                // efficiency-focused value, then operate at
+                                // that value
                                 .max(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
                                 // but don't exceed what what the battery can
                                 // absorb + tractive demand
@@ -656,15 +657,10 @@ impl HEVPowertrainControls {
                     .min(fc_state.pwr_prop_max);
 
                     // recalculate `em_pwr` based on `fc_pwr`
-                    let em_pwr_corrected = pwr_prop_req - fc_pwr;
+                    let em_pwr_corrected =
+                        (pwr_prop_req - fc_pwr).max(-em_state.pwr_mech_regen_max);
                     (fc_pwr, em_pwr_corrected)
-                };
-
-                ensure!(
-                    fc_pwr_corrected >= si::Power::ZERO,
-                    format_dbg!(fc_pwr_corrected >= si::Power::ZERO)
-                );
-                (fc_pwr_corrected, em_pwr_corrected)
+                }
             }
             Self::Placeholder => todo!(),
         };

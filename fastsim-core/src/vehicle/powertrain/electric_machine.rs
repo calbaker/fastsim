@@ -223,15 +223,17 @@ impl ElectricMachine {
                     (pwr_out_req - self.state.pwr_mech_fwd_out_max).get::<si::kilowatt>().format_eng(Some(6))
             ),
         );
-        ensure!(
-            almost_le_uom(&pwr_out_req.abs(), &self.state.pwr_mech_regen_max, None),
-            format!(
-                "{}\nedrv charge power ({:.6} kW) exceeds current max charge power ({:.6} kW)",
-                format_dbg!(pwr_out_req.abs() <= self.state.pwr_mech_regen_max),
-                pwr_out_req.get::<si::kilowatt>(),
-                self.state.pwr_mech_regen_max.get::<si::kilowatt>()
-            ),
-        );
+        if pwr_out_req < si::Power::ZERO {
+            ensure!(
+                almost_le_uom(&pwr_out_req.abs(), &self.state.pwr_mech_regen_max, None),
+                format!(
+                    "{}\nedrv charge power ({:.6} kW) exceeds current max charge power ({:.6} kW)",
+                    format_dbg!(),
+                    -pwr_out_req.get::<si::kilowatt>(),
+                    self.state.pwr_mech_regen_max.get::<si::kilowatt>()
+                ),
+            );
+        }
 
         self.state.pwr_out_req = pwr_out_req;
 
