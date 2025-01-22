@@ -516,7 +516,7 @@ pub struct FuelConverterThermal {
     /// temperature delta over which thermostat is partially open
     pub tstat_te_delta: Option<si::Temperature>,
     #[serde(default = "tstat_interp_default")]
-    pub tstat_interp: Interp1D,
+    pub tstat_interp: Interpolator,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
     pub radiator_effectiveness: si::Ratio,
@@ -591,12 +591,11 @@ impl FuelConverterThermal {
         // calculate heat transfer coeff. from engine to ambient [W / (m ** 2 * K)]
         self.state.htc_to_amb = if veh_speed < 1.0 * uc::MPS {
             // if stopped, scale based on thermostat opening and constant convection
-            (uc::R
-                + self
-                    .tstat_interp
-                    .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                    .with_context(|| format_dbg!())?
-                    * self.radiator_effectiveness)
+            self.state.tstat_open_frac = self
+                .tstat_interp
+                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
+                .with_context(|| format_dbg!())?;
+            (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
                 * self.htc_to_amb_stop
         } else {
             // Calculate heat transfer coefficient for sphere,
@@ -611,13 +610,14 @@ impl FuelConverterThermal {
                 * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
                 / self.length_for_convection;
             // if stopped, scale based on thermostat opening and constant convection
-            self.tstat_interp
+            self.state.tstat_open_frac = self
+                .tstat_interp
                 .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                .with_context(|| format_dbg!())?
-                * htc_to_amb_sphere
+                .with_context(|| format_dbg!())?;
+            self.state.tstat_open_frac * htc_to_amb_sphere
         };
 
-        self.state.heat_to_amb =
+        self.state.pwr_thrml_to_amb =
             self.state.htc_to_amb * PI * self.length_for_convection.powi(typenum::P2::new()) / 4.0
                 * (self.state.temperature - te_amb);
 
@@ -640,7 +640,7 @@ impl FuelConverterThermal {
             .min(self.max_frac_from_comb * self.state.pwr_fuel_as_heat);
         let delta_temp: si::Temperature = ((self.state.pwr_thrml_to_tm
             - self.state.pwr_thrml_fc_to_cab
-            - self.state.heat_to_amb)
+            - self.state.pwr_thrml_to_amb)
             * dt)
             / self.heat_capacitance;
         self.state.temp_prev = self.state.temperature;
@@ -692,9 +692,9 @@ impl Init for FuelConverterThermal {
         self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
         self.tstat_interp = Interp1D::new(
             vec![
-                self.tstat_te_sto.unwrap().get::<si::degree_celsius>(),
-                self.tstat_te_sto.unwrap().get::<si::degree_celsius>()
-                    + self.tstat_te_delta.unwrap().get::<si::degree_celsius>(),
+                self.tstat_te_sto.unwrap().get::<si::kelvin>(),
+                self.tstat_te_sto.unwrap().get::<si::kelvin>()
+                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
             ],
             vec![0.0, 1.0],
             Strategy::Linear,
@@ -738,10 +738,14 @@ pub struct FuelConverterThermalState {
     pub temperature: si::Temperature,
     /// Engine thermal mass temperature (lumped engine block and coolant) at previous time step
     pub temp_prev: si::Temperature,
+    /// thermostat open fraction (1 = fully open, 0 = fully closed)
+    pub tstat_open_frac: f64,
     /// Current heat transfer coefficient from [FuelConverter] to ambient
     pub htc_to_amb: si::HeatTransferCoeff,
-    /// Current heat transfer to ambient
-    pub heat_to_amb: si::Power,
+    /// Current heat transfer power to ambient
+    pub pwr_thrml_to_amb: si::Power,
+    /// Cumulative heat transfer energy to ambient
+    pub energy_thrml_to_amb: si::Energy,
     /// Efficency coefficient, used to modify [FuelConverter] effciency based on temperature
     pub eff_coeff: si::Ratio,
     /// Thermal power flowing from fuel converter to cabin
@@ -767,11 +771,13 @@ impl Default for FuelConverterThermalState {
             te_adiabatic: *TE_ADIABATIC_STD,
             temperature: *TE_STD_AIR,
             temp_prev: *TE_STD_AIR,
+            tstat_open_frac: Default::default(),
             htc_to_amb: Default::default(),
-            heat_to_amb: Default::default(),
             eff_coeff: uc::R,
             pwr_thrml_fc_to_cab: Default::default(),
             energy_thrml_fc_to_cab: Default::default(),
+            pwr_thrml_to_amb: Default::default(),
+            energy_thrml_to_amb: Default::default(),
             pwr_fuel_as_heat: Default::default(),
             energy_fuel_as_heat: Default::default(),
             pwr_thrml_to_tm: Default::default(),

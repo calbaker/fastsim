@@ -34,15 +34,6 @@ pt_type:
           max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
           tstat_te_delta_kelvin: 5.0
-          tstat_interp:
-            x:
-              - 358.15
-              - 363.15
-            f_x:
-              - 0.0
-              - 1.0
-            strategy: Linear
-            extrapolate: Clamp
           radiator_effectiveness: 0.0
           fc_eff_model:
             Exponential:

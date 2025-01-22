@@ -301,7 +301,7 @@ def plot_road_loads() -> Tuple[Figure, Axes]:
     fig, ax = plt.subplots(2, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Road Loads")
 
-    ax[0].set_prop_cycle(get_paired_cycler())
+    ax[0].set_prop_cycle(get_uni_cycler())
     ax[0].plot(
         df["cyc.time_seconds"][::veh.save_interval],
         df["veh.history.pwr_drag_watts"] / 1e3,
@@ -345,6 +345,8 @@ if SHOW_PLOTS:
     fig_temps, ax_temps = plot_temperatures()
     fig, ax = plot_road_loads()
     plt.show()
+# %%
+
 # %%
 # example for how to use set_default_pwr_interp() method for veh.res
 res = fsim.ReversibleEnergyStorage.from_pydict(
