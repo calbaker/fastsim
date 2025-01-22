@@ -10,6 +10,7 @@ pt_type:
       energy_capacity_joules: 196776000.0
       eff_interp:
         Interp0D: 0.9848857801796105
+      eff_interp_inputs: Constant
       min_soc: 0.029
       max_soc: 0.98
       save_interval: 1

@@ -1,3 +1,5 @@
+use powertrain::reversible_energy_storage::RESEffInterpInputs;
+
 use super::*;
 
 impl TryFrom<fastsim_2::vehicle::RustVehicle> for Vehicle {
@@ -168,6 +170,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         pwr_out_max: f2veh.ess_max_kw * uc::KW,
                         energy_capacity: f2veh.ess_max_kwh * uc::KWH,
                         eff_interp: Interpolator::Interp0D(f2veh.ess_round_trip_eff.sqrt()),
+                        eff_interp_inputs: RESEffInterpInputs::Constant,
                         min_soc: f2veh.min_soc * uc::R,
                         max_soc: f2veh.max_soc * uc::R,
                         save_interval: Some(1),
@@ -218,6 +221,7 @@ impl TryFrom<&fastsim_2::vehicle::RustVehicle> for PowertrainType {
                         pwr_out_max: f2veh.ess_max_kw * uc::KW,
                         energy_capacity: f2veh.ess_max_kwh * uc::KWH,
                         eff_interp: Interpolator::Interp0D(f2veh.ess_round_trip_eff.sqrt()),
+                        eff_interp_inputs: RESEffInterpInputs::Constant,
                         min_soc: f2veh.min_soc * uc::R,
                         max_soc: f2veh.max_soc * uc::R,
                         save_interval: Some(1),
