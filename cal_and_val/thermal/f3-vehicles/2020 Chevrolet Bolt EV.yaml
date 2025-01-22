@@ -146,6 +146,7 @@ pt_type:
             - 0.92
           strategy: Linear
           extrapolate: Error
+      pwr_out_max_watts: 149139.974
       specific_pwr_watts_per_kilogram: ~
       mass_kilograms: ~
       save_interval: 1

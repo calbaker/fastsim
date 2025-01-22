@@ -202,27 +202,31 @@ impl ReversibleEnergyStorage {
                 )
             );
         }
+
         state.eff = match (&self.eff_interp, &self.eff_interp_inputs) {
             (Interpolator::Interp0D(eff), RESEffInterpInputs::Constant) => *eff * uc::R,
-            (Interpolator::Interp1D(interp1d) , RESEffInterpInputs::CRate)=> {
+            (Interpolator::Interp1D(interp1d), RESEffInterpInputs::CRate) => {
                 interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()
-                    / self.energy_capacity.get::<si::watt_hour>()])? * uc::R
+                    / self.energy_capacity.get::<si::watt_hour>()])?
+                    * uc::R
             }
-            (Interpolator::Interp2D(interp2d)    , RESEffInterpInputs::CRateSOC)=> {
+            (Interpolator::Interp2D(interp2d), RESEffInterpInputs::CRateSOC) => {
                 interp2d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>()
                         / self.energy_capacity.get::<si::watt_hour>(),
                     state.soc.get::<si::ratio>(),
                 ])? * uc::R
             }
-            (Interpolator::Interp2D(interp2d) , RESEffInterpInputs::CRateTemperature)=> {
+            (Interpolator::Interp2D(interp2d), RESEffInterpInputs::CRateTemperature) => {
                 interp2d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>()
                         / self.energy_capacity.get::<si::watt_hour>(),
-                    te_res.with_context(|| format_dbg!("Expected thermal model to be configured."))?.get::<si::degree_celsius>(),
+                    te_res
+                        .with_context(|| format_dbg!("Expected thermal model to be configured."))?
+                        .get::<si::degree_celsius>(),
                 ])? * uc::R
             }
-            (Interpolator::Interp3D(interp3d), RESEffInterpInputs::CRateSOCTemperature )=> {
+            (Interpolator::Interp3D(interp3d), RESEffInterpInputs::CRateSOCTemperature) => {
                 interp3d.interpolate(&[
                     state.pwr_out_electrical.get::<si::watt>()
                         / self.energy_capacity.get::<si::watt_hour>(),
@@ -232,7 +236,11 @@ impl ReversibleEnergyStorage {
                         .get::<si::degree_celsius>(),
                 ])? * uc::R
             }
-            _ => bail!("Invalid or not yet enabled interpolator config.  See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"),
+            _ => bail!(
+                "
+Invalid or not yet enabled interpolator config.
+See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"
+            ),
         };
         ensure!(
             state.eff >= 0.0 * uc::R && state.eff <= 1.0 * uc::R,

@@ -112,3 +112,19 @@ impl InterpolatorMethods for Interpolator {
         }
     }
 }
+
+impl Init for Interpolator {
+    fn init(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::Interp0D(_) => {}
+            Self::Interp1D(interp) => interp.validate()?,
+            Self::Interp2D(interp) => interp.validate()?,
+            Self::Interp3D(interp) => interp.validate()?,
+            Self::InterpND(interp) => interp.validate()?,
+        }
+        Ok(())
+    }
+}
+impl SerdeAPI for Interpolator {
+    const RESOURCE_PREFIX: &'static str = "interpolators";
+}
