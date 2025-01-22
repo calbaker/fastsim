@@ -535,15 +535,17 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default() -> Interp1D {
-    Interp1D::new(
-        vec![85.0, 90.0],
-        vec![0.0, 1.0],
-        Strategy::Linear,
-        Extrapolate::Clamp,
+fn tstat_interp_default() -> Interpolator {
+    Interpolator::Interp1D(
+        Interp1D::new(
+            vec![85.0, 90.0],
+            vec![0.0, 1.0],
+            Strategy::Linear,
+            Extrapolate::Clamp,
+        )
+        .with_context(|| format_dbg!())
+        .unwrap(),
     )
-    .with_context(|| format_dbg!())
-    .unwrap()
 }
 
 lazy_static! {
@@ -690,17 +692,19 @@ impl Init for FuelConverterThermal {
             .tstat_te_sto
             .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
         self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
-        self.tstat_interp = Interp1D::new(
-            vec![
-                self.tstat_te_sto.unwrap().get::<si::kelvin>(),
-                self.tstat_te_sto.unwrap().get::<si::kelvin>()
-                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
-            ],
-            vec![0.0, 1.0],
-            Strategy::Linear,
-            Extrapolate::Clamp,
-        )
-        .with_context(|| format_dbg!())?;
+        self.tstat_interp = Interpolator::Interp1D(
+            Interp1D::new(
+                vec![
+                    self.tstat_te_sto.unwrap().get::<si::kelvin>(),
+                    self.tstat_te_sto.unwrap().get::<si::kelvin>()
+                        + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
+                ],
+                vec![0.0, 1.0],
+                Strategy::Linear,
+                Extrapolate::Clamp,
+            )
+            .with_context(|| format_dbg!())?,
+        );
         Ok(())
     }
 }
