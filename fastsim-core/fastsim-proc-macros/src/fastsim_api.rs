@@ -204,7 +204,7 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
         #[pyo3(signature = (msg_pack, skip_init=None))]
         pub fn from_msg_pack_py(msg_pack: &Bound<PyBytes>, skip_init: Option<bool>) -> PyResult<Self> {
             Self::from_msg_pack(
-                msg_pack.as_bytes(), 
+                msg_pack.as_bytes(),
                 skip_init.unwrap_or_default()
             ).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
@@ -343,7 +343,7 @@ fn process_named_field_struct(
             format!("{self:?}")
         }
     });
-    
+
     // struct with named fields
     for field in named.iter_mut() {
         impl_getters_and_setters(field);

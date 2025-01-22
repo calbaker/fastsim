@@ -98,12 +98,11 @@ pub struct ReversibleEnergyStorage {
     /// Total energy capacity of battery of full discharge SOC of 0.0 and 1.0
     pub energy_capacity: si::Energy,
 
-    /// interpolator for calculating [Self] efficiency as a function of the following variants:  
-    /// - 0d -- constant -- handled on a round trip basis
-    /// - 1d -- linear w.r.t. power
-    /// - 2d -- linear w.r.t. power and SOC
-    /// - 3d -- linear w.r.t. power, SOC, and temperature
+    /// interpolator for calculating [Self] efficiency
     pub eff_interp: Interpolator,
+
+    /// what state variables to use in calculating efficiency
+    pub eff_interp_inputs: RESEffInterpInputs,
 
     /// Hard limit on minimum SOC, e.g. 0.05
     pub min_soc: si::Ratio,
@@ -203,27 +202,37 @@ impl ReversibleEnergyStorage {
                 )
             );
         }
-        state.eff = match &self.eff_interp {
-            Interpolator::Interp0D(eff) => *eff * uc::R,
-            Interpolator::Interp1D(interp1d) => {
-                interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()])? * uc::R
+        state.eff = match (&self.eff_interp, &self.eff_interp_inputs) {
+            (Interpolator::Interp0D(eff), RESEffInterpInputs::Constant) => *eff * uc::R,
+            (Interpolator::Interp1D(interp1d) , RESEffInterpInputs::CRate)=> {
+                interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()
+                    / self.energy_capacity.get::<si::watt_hour>()])? * uc::R
             }
-            Interpolator::Interp2D(interp2d) => {
+            (Interpolator::Interp2D(interp2d)    , RESEffInterpInputs::CRateSOC)=> {
                 interp2d.interpolate(&[
-                    state.pwr_out_electrical.get::<si::watt>(),
+                    state.pwr_out_electrical.get::<si::watt>()
+                        / self.energy_capacity.get::<si::watt_hour>(),
                     state.soc.get::<si::ratio>(),
                 ])? * uc::R
             }
-            Interpolator::Interp3D(interp3d) => {
+            (Interpolator::Interp2D(interp2d) , RESEffInterpInputs::CRateTemperature)=> {
+                interp2d.interpolate(&[
+                    state.pwr_out_electrical.get::<si::watt>()
+                        / self.energy_capacity.get::<si::watt_hour>(),
+                    te_res.with_context(|| format_dbg!("Expected thermal model to be configured."))?.get::<si::degree_celsius>(),
+                ])? * uc::R
+            }
+            (Interpolator::Interp3D(interp3d), RESEffInterpInputs::CRateSOCTemperature )=> {
                 interp3d.interpolate(&[
-                    state.pwr_out_electrical.get::<si::watt>(),
+                    state.pwr_out_electrical.get::<si::watt>()
+                        / self.energy_capacity.get::<si::watt_hour>(),
                     state.soc.get::<si::ratio>(),
                     te_res
                         .with_context(|| format_dbg!("Expected thermal model to be configured"))?
                         .get::<si::degree_celsius>(),
                 ])? * uc::R
             }
-            _ => bail!("Invalid interpolator.  See docs for `ReversibleEnergyStorage::eff_interp`"),
+            _ => bail!("Invalid or not yet enabled interpolator config.  See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"),
         };
         ensure!(
             state.eff >= 0.0 * uc::R && state.eff <= 1.0 * uc::R,
@@ -460,6 +469,7 @@ impl ReversibleEnergyStorage {
     ///    °C corresponds to `eta_interp_values[0][5]` in ALTRIOS
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_pwr_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp_inputs = RESEffInterpInputs::CRate;
         self.eff_interp = ninterp::Interpolator::from_resource("res/default_pwr.yaml", false)?;
         Ok(())
     }
@@ -477,6 +487,7 @@ impl ReversibleEnergyStorage {
     ///    ALTRIOS, the outermost layer is SOC and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_pwr_and_soc_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp_inputs = RESEffInterpInputs::CRateSOC;
         self.eff_interp =
             ninterp::Interpolator::from_resource("res/default_pwr_and_soc.yaml", false)?;
         Ok(())
@@ -486,6 +497,7 @@ impl ReversibleEnergyStorage {
     ///    constant 50% SOC
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_pwr_and_temp_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp_inputs = RESEffInterpInputs::CRateTemperature;
         self.eff_interp =
             ninterp::Interpolator::from_resource("res/default_pwr_and_temp.yaml", false)?;
         Ok(())
@@ -506,6 +518,7 @@ impl ReversibleEnergyStorage {
     ///    ALTRIOS, the outermost layer is temperature and innermost is power)
     #[cfg(all(feature = "yaml", feature = "resources"))]
     pub fn set_default_pwr_soc_and_temp_interp(&mut self) -> anyhow::Result<()> {
+        self.eff_interp_inputs = RESEffInterpInputs::CRateSOCTemperature;
         self.eff_interp =
             ninterp::Interpolator::from_resource("res/default_pwr_soc_and_temp.yaml", false)?;
         Ok(())
@@ -907,4 +920,20 @@ impl Default for RESLumpedThermalState {
             energy_thrml_loss: Default::default(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, IsVariant, From, TryInto)]
+/// Determines what [ReversibleEnergyStorage] state variables to use in calculating efficiency
+pub enum RESEffInterpInputs {
+    /// Efficiency is constant
+    Constant,
+    /// Efficiency = f(C-rate)
+    CRate,
+    /// Efficiency = f(C-rate, temperature)
+    CRateSOCTemperature,
+    /// Efficiency = f(C-rate, soc, temperature)
+    CRateTemperature,
+    /// Efficiency = f(C-rate, soc)
+    CRateSOC,
+    // TODO: finish adding possible variants
 }
