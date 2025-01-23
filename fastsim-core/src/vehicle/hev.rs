@@ -595,6 +595,12 @@ impl HEVPowertrainControls {
             fc_state.pwr_prop_max.get::<si::kilowatt>()
         );
 
+        // # Brain dump for thermal stuff
+        // TODO: engine on/off w.r.t. thermal stuff should not come into play
+        // if there is no component (e.g. cabin) demanding heat from the engine.  My 2019
+        // Hyundai Ioniq will turn the engine off if there is no heat demand regardless of
+        // the coolant temperature
+        // TODO: make sure idle fuel gets converted to heat correctly
         let (fc_pwr, em_pwr) = match self {
             Self::RGWDB(ref mut rgwdb) => {
                 handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;

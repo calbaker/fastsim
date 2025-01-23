@@ -51,6 +51,7 @@ pub struct Cycle {
     /// ambient air temperature w.r.t. to time (rather than spatial position)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub temp_amb_air: Vec<si::Temperature>,
+    // TODO: add provision for optional time-varying aux load
 }
 
 lazy_static! {
