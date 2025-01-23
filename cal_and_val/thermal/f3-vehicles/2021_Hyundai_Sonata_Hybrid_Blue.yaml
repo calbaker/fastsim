@@ -78,7 +78,7 @@ pt_type:
               - 0.921423
               - 0.919576
           strategy: Linear
-          extrapolate: Error
+          extrapolate: Clamp
       eff_interp_inputs: CRateTemperature
       min_soc: 0.5
       max_soc: 0.95

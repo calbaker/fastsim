@@ -536,16 +536,13 @@ pub struct FuelConverterThermal {
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
 fn tstat_interp_default() -> Interpolator {
-    Interpolator::Interp1D(
-        Interp1D::new(
-            vec![85.0, 90.0],
-            vec![0.0, 1.0],
-            Strategy::Linear,
-            Extrapolate::Clamp,
-        )
-        .with_context(|| format_dbg!())
-        .unwrap(),
+    Interpolator::new_1d(
+        vec![85.0, 90.0],
+        vec![0.0, 1.0],
+        Strategy::Linear,
+        Extrapolate::Clamp,
     )
+    .unwrap()
 }
 
 lazy_static! {
@@ -591,33 +588,36 @@ impl FuelConverterThermal {
                 / Air::get_dyn_visc(te_air_film).with_context(|| format_dbg!())?;
 
         // calculate heat transfer coeff. from engine to ambient [W / (m ** 2 * K)]
-        self.state.htc_to_amb = if veh_speed < 1.0 * uc::MPS {
-            // if stopped, scale based on thermostat opening and constant convection
-            self.state.tstat_open_frac = self
-                .tstat_interp
-                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                .with_context(|| format_dbg!())?;
-            (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
-                * self.htc_to_amb_stop
-        } else {
-            // Calculate heat transfer coefficient for sphere,
-            // from Incropera's Intro to Heat Transfer, 5th Ed., eq. 7.44
-            let sphere_conv_params = get_sphere_conv_params(fc_air_film_re.get::<si::ratio>());
-            let htc_to_amb_sphere: si::HeatTransferCoeff = sphere_conv_params.0
-                * fc_air_film_re.get::<si::ratio>().powf(sphere_conv_params.1)
-                * Air::get_pr(te_air_film)
-                    .with_context(|| format_dbg!())?
-                    .get::<si::ratio>()
-                    .powf(1.0 / 3.0)
-                * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
-                / self.length_for_convection;
-            // if stopped, scale based on thermostat opening and constant convection
-            self.state.tstat_open_frac = self
-                .tstat_interp
-                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                .with_context(|| format_dbg!())?;
-            self.state.tstat_open_frac * htc_to_amb_sphere
-        };
+        self.state.htc_to_amb =
+            if veh_speed < 1.0 * uc::MPS {
+                // if stopped, scale based on thermostat opening and constant convection
+                self.state.tstat_open_frac =
+                    self.tstat_interp
+                        .interpolate(&[(self.state.temperature.get::<si::kelvin>()
+                            - uc::CELSIUS_TO_KELVIN.value)])
+                        .with_context(|| format_dbg!())?;
+                (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
+                    * self.htc_to_amb_stop
+            } else {
+                // Calculate heat transfer coefficient for sphere,
+                // from Incropera's Intro to Heat Transfer, 5th Ed., eq. 7.44
+                let sphere_conv_params = get_sphere_conv_params(fc_air_film_re.get::<si::ratio>());
+                let htc_to_amb_sphere: si::HeatTransferCoeff = sphere_conv_params.0
+                    * fc_air_film_re.get::<si::ratio>().powf(sphere_conv_params.1)
+                    * Air::get_pr(te_air_film)
+                        .with_context(|| format_dbg!())?
+                        .get::<si::ratio>()
+                        .powf(1.0 / 3.0)
+                    * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
+                    / self.length_for_convection;
+                // if stopped, scale based on thermostat opening and constant convection
+                self.state.tstat_open_frac =
+                    self.tstat_interp
+                        .interpolate(&[(self.state.temperature.get::<si::kelvin>()
+                            - uc::CELSIUS_TO_KELVIN.value)])
+                        .with_context(|| format_dbg!())?;
+                self.state.tstat_open_frac * htc_to_amb_sphere
+            };
 
         self.state.pwr_thrml_to_amb =
             self.state.htc_to_amb * PI * self.length_for_convection.powi(typenum::P2::new()) / 4.0
@@ -692,19 +692,17 @@ impl Init for FuelConverterThermal {
             .tstat_te_sto
             .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
         self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
-        self.tstat_interp = Interpolator::Interp1D(
-            Interp1D::new(
-                vec![
-                    self.tstat_te_sto.unwrap().get::<si::kelvin>(),
-                    self.tstat_te_sto.unwrap().get::<si::kelvin>()
-                        + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
-                ],
-                vec![0.0, 1.0],
-                Strategy::Linear,
-                Extrapolate::Clamp,
-            )
-            .with_context(|| format_dbg!())?,
-        );
+        self.tstat_interp = Interpolator::new_1d(
+            vec![
+                self.tstat_te_sto.unwrap().get::<si::kelvin>(),
+                self.tstat_te_sto.unwrap().get::<si::kelvin>()
+                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
+            ],
+            vec![0.0, 1.0],
+            Strategy::Linear,
+            Extrapolate::Clamp,
+        )
+        .with_context(|| format_dbg!())?;
         Ok(())
     }
 }

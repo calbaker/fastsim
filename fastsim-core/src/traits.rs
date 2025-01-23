@@ -72,11 +72,11 @@ impl Min for Interpolator {
     fn min(&self) -> anyhow::Result<f64> {
         match self {
             Interpolator::Interp0D(value) => Ok(*value),
-            Interpolator::Interp1D(interp) => interp.f_x().min(),
-            Interpolator::Interp2D(interp) => interp.f_xy().min(),
-            Interpolator::Interp3D(interp) => interp.f_xyz().min(),
-            Interpolator::InterpND(interp) => Ok(interp
-                .values()
+            Interpolator::Interp1D(..) => self.f_x()?.min(),
+            Interpolator::Interp2D(..) => self.f_xy()?.min(),
+            Interpolator::Interp3D(..) => self.f_xyz()?.min(),
+            Interpolator::InterpND(..) => Ok(self
+                .values()?
                 .iter()
                 .fold(f64::INFINITY, |acc, x| acc.min(*x))),
         }
@@ -138,11 +138,11 @@ impl Max for Interpolator {
     fn max(&self) -> anyhow::Result<f64> {
         match self {
             Interpolator::Interp0D(value) => Ok(*value),
-            Interpolator::Interp1D(interp) => interp.f_x().max(),
-            Interpolator::Interp2D(interp) => interp.f_xy().max(),
-            Interpolator::Interp3D(interp) => interp.f_xyz().max(),
-            Interpolator::InterpND(interp) => Ok(interp
-                .values()
+            Interpolator::Interp1D(..) => self.f_x()?.max(),
+            Interpolator::Interp2D(..) => self.f_xy()?.max(),
+            Interpolator::Interp3D(..) => self.f_xyz()?.max(),
+            Interpolator::InterpND(..) => Ok(self
+                .values()?
                 .iter()
                 .fold(f64::NEG_INFINITY, |acc, x| acc.max(*x))),
         }
