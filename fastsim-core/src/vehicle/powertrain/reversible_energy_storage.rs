@@ -202,69 +202,39 @@ impl ReversibleEnergyStorage {
                 )
             );
         }
-        //         state.eff = match (&self.eff_interp, &self.eff_interp_inputs) {
-        //             (Interpolator::Interp0D(eff), RESEffInterpInputs::Constant) => *eff * uc::R,
-        //             (Interpolator::Interp1D(interp1d), RESEffInterpInputs::CRate) => {
-        //                 interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()
-        //                     / self.energy_capacity.get::<si::watt_hour>()])?
-        //                     * uc::R
-        //             }
-        //             (Interpolator::Interp2D(interp2d), RESEffInterpInputs::CRateSOC) => {
-        //                 interp2d.interpolate(&[
-        //                     state.pwr_out_electrical.get::<si::watt>()
-        //                         / self.energy_capacity.get::<si::watt_hour>(),
-        //                     state.soc.get::<si::ratio>(),
-        //                 ])? * uc::R
-        //             }
-        //             (Interpolator::Interp2D(interp2d), RESEffInterpInputs::CRateTemperature) => {
-        //                 interp2d.interpolate(&[
-        //                     state.pwr_out_electrical.get::<si::watt>()
-        //                         / self.energy_capacity.get::<si::watt_hour>(),
-        //                     te_res
-        //                         .with_context(|| format_dbg!("Expected thermal model to be configured."))?
-        //                         .get::<si::degree_celsius>(),
-        //                 ])? * uc::R
-        //             }
-        //             (Interpolator::Interp3D(interp3d), RESEffInterpInputs::CRateSOCTemperature) => {
-        //                 interp3d.interpolate(&[
-        //                     state.pwr_out_electrical.get::<si::watt>()
-        //                         / self.energy_capacity.get::<si::watt_hour>(),
-        //                     state.soc.get::<si::ratio>(),
-        //                     te_res
-        //                         .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-        //                         .get::<si::degree_celsius>(),
-        //                 ])? * uc::R
-        //             }
-        //             _ => bail!(
-        //                 "
-        // Invalid or not yet enabled interpolator config.
-        // See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"
-        //             ),
         let interp_pt: &[f64] = match (&self.eff_interp, &self.eff_interp_inputs) {
             (Interpolator::Interp0D(..), RESEffInterpInputs::Constant) => &[],
-            (Interpolator::Interp1D(..), RESEffInterpInputs::CRate) => &[state.pwr_out_electrical.get::<si::watt>() / self.energy_capacity.get::<si::watt_hour>()],
+            (Interpolator::Interp1D(..), RESEffInterpInputs::CRate) => {
+                &[state.pwr_out_electrical.get::<si::watt>()
+                    / self.energy_capacity.get::<si::watt_hour>()]
+            }
             (Interpolator::Interp2D(..), RESEffInterpInputs::CRateSOC) => &[
-                state.pwr_out_electrical.get::<si::watt>() / self.energy_capacity.get::<si::watt_hour>(),
+                state.pwr_out_electrical.get::<si::watt>()
+                    / self.energy_capacity.get::<si::watt_hour>(),
                 state.soc.get::<si::ratio>(),
             ],
             (Interpolator::Interp2D(..), RESEffInterpInputs::CRateTemperature) => &[
-                state.pwr_out_electrical.get::<si::watt>() / self.energy_capacity.get::<si::watt_hour>(),
+                state.pwr_out_electrical.get::<si::watt>()
+                    / self.energy_capacity.get::<si::watt_hour>(),
                 te_res
                     .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-                    .get::<si::kelvin>() - uc::CELSIUS_TO_KELVIN.value,
+                    .get::<si::kelvin>()
+                    - uc::CELSIUS_TO_KELVIN.value,
             ],
             (Interpolator::Interp3D(..), RESEffInterpInputs::CRateSOCTemperature) => &[
-                state.pwr_out_electrical.get::<si::watt>(),
+                state.pwr_out_electrical.get::<si::watt>()
+                    / self.energy_capacity.get::<si::watt_hour>(),
                 state.soc.get::<si::ratio>(),
                 te_res
                     .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-                    .get::<si::kelvin>() - uc::CELSIUS_TO_KELVIN.value,
+                    .get::<si::kelvin>()
+                    - uc::CELSIUS_TO_KELVIN.value,
             ],
-                    _ => bail!(
-                        "
-        Invalid or not yet enabled interpolator config.
-        See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"
-                    ),
+            _ => bail!(
+                "
+Invalid or not yet enabled interpolator config.
+See docs for `ReversibleEnergyStorage::eff_interp` an `ReversibleEnergyStorage::eff_interp_inputs`"
+            ),
         };
         state.eff = self.eff_interp.interpolate(interp_pt)? * uc::R;
         ensure!(

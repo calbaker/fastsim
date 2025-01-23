@@ -14,6 +14,10 @@ lazy_static! {
 }
 
 #[fastsim_api(
+    #[new]
+    fn __new__() -> Self {
+        Self{}
+    }
     /// Returns density of air \[kg/m^3\]
     /// Source: <https://www.grc.nasa.gov/WWW/K-12/rocket/atmosmet.html>  
     ///
