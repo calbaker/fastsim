@@ -321,7 +321,7 @@ impl Init for ElectricMachine {
         if self.eff_interp_at_max_input.is_none() {
             // sets eff_interp_bwd to eff_interp_fwd, but changes the x-value.
             // TODO: what should the default strategy be for eff_interp_bwd?
-            let eff_interp_at_max_input = Interp1D::new(
+            let eff_interp_at_max_input = Interpolator::new_1d(
                 self.eff_interp_achieved
                     .x()?
                     .iter()
@@ -335,7 +335,7 @@ impl Init for ElectricMachine {
                 self.eff_interp_achieved.strategy()?.to_owned(),
                 self.eff_interp_achieved.extrapolate()?.to_owned(),
             )?;
-            self.eff_interp_at_max_input = Some(Interpolator::Interp1D(eff_interp_at_max_input));
+            self.eff_interp_at_max_input = Some(eff_interp_at_max_input);
         } else {
             println!(
                 "`eff_interp_at_max_input` is being overwritten by {}",
@@ -445,9 +445,8 @@ impl ElectricMachine {
             let old_max_bwd = self.get_eff_max_bwd()?;
             let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
             match &mut self.eff_interp_achieved {
-                Interpolator::Interp1D(interp1d) => {
-                    interp1d
-                        .set_f_x(f_x_fwd.iter().map(|x| x * eff_max / old_max_fwd).collect())?;
+                interp @ Interpolator::Interp1D(..) => {
+                    interp.set_f_x(f_x_fwd.iter().map(|x| x * eff_max / old_max_fwd).collect())?;
                 }
                 _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
             }
@@ -460,9 +459,9 @@ impl ElectricMachine {
                 .f_x()?
                 .to_owned();
             match &mut self.eff_interp_at_max_input {
-                Some(Interpolator::Interp1D(interp1d)) => {
+                Some(interp @ Interpolator::Interp1D(..)) => {
                     // let old_interp = interp1d;
-                    interp1d.set_f_x(
+                    interp.set_f_x(
                         f_x_bwd
                             .iter()
                             .map(|x| x * eff_max / old_max_bwd)
@@ -556,8 +555,8 @@ impl ElectricMachine {
             }
             let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
             match &mut self.eff_interp_achieved {
-                Interpolator::Interp1D(interp1d) => {
-                    interp1d.set_f_x(
+                interp @ Interpolator::Interp1D(..) => {
+                    interp.set_f_x(
                         f_x_fwd
                             .iter()
                             .map(|x| eff_max_fwd + (x - eff_max_fwd) * eff_range / old_range)
@@ -570,8 +569,8 @@ impl ElectricMachine {
                 let x_neg = self.get_eff_min_fwd()?;
                 let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
                 match &mut self.eff_interp_achieved {
-                    Interpolator::Interp1D(interp1d) => {
-                        interp1d.set_f_x(f_x_fwd.iter().map(|x| x - x_neg).collect())?;
+                    interp @ Interpolator::Interp1D(..) => {
+                        interp.set_f_x(f_x_fwd.iter().map(|x| x - x_neg).collect())?;
                     }
                     _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
                 }

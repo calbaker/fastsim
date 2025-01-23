@@ -203,28 +203,23 @@ impl ReversibleEnergyStorage {
                 )
             );
         }
-        state.eff = match &self.eff_interp {
-            Interpolator::Interp0D(eff) => *eff * uc::R,
-            Interpolator::Interp1D(interp1d) => {
-                interp1d.interpolate(&[state.pwr_out_electrical.get::<si::watt>()])? * uc::R
-            }
-            Interpolator::Interp2D(interp2d) => {
-                interp2d.interpolate(&[
-                    state.pwr_out_electrical.get::<si::watt>(),
-                    state.soc.get::<si::ratio>(),
-                ])? * uc::R
-            }
-            Interpolator::Interp3D(interp3d) => {
-                interp3d.interpolate(&[
-                    state.pwr_out_electrical.get::<si::watt>(),
-                    state.soc.get::<si::ratio>(),
-                    te_res
-                        .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-                        .get::<si::degree_celsius>(),
-                ])? * uc::R
-            }
+        let interp_pt: &[f64] = match &self.eff_interp {
+            Interpolator::Interp0D(..) => &[],
+            Interpolator::Interp1D(..) => &[state.pwr_out_electrical.get::<si::watt>()],
+            Interpolator::Interp2D(..) => &[
+                state.pwr_out_electrical.get::<si::watt>(),
+                state.soc.get::<si::ratio>(),
+            ],
+            Interpolator::Interp3D(..) => &[
+                state.pwr_out_electrical.get::<si::watt>(),
+                state.soc.get::<si::ratio>(),
+                te_res
+                    .with_context(|| format_dbg!("Expected thermal model to be configured"))?
+                    .get::<si::degree_celsius>(),
+            ],
             _ => bail!("Invalid interpolator.  See docs for `ReversibleEnergyStorage::eff_interp`"),
         };
+        state.eff = self.eff_interp.interpolate(interp_pt)? * uc::R;
         ensure!(
             state.eff >= 0.0 * uc::R && state.eff <= 1.0 * uc::R,
             format!(

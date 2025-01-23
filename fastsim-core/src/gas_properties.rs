@@ -273,13 +273,13 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::KELVIN + *uc::CELSIUS_TO_KELVIN)
         .collect();
-        pub static ref TEMP_FROM_ENTHALPY: Interp1D = Interp1D::new(
+        pub static ref TEMP_FROM_ENTHALPY: Interpolator = Interpolator::new_1d(
             ENTHALPY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
         ).unwrap();
-        pub static ref TEMP_FROM_ENERGY: Interp1D = Interp1D::new(
+        pub static ref TEMP_FROM_ENERGY: Interpolator = Interpolator::new_1d(
             ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -316,7 +316,7 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::WATT_PER_METER_KELVIN)
         .collect();
-        pub static ref THERMAL_CONDUCTIVITY_INTERP: Interp1D = Interp1D::new(
+        pub static ref THERMAL_CONDUCTIVITY_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             THERMAL_CONDUCTIVITY_VALUES.iter().map(|x| x.get::<si::watt_per_meter_degree_celsius>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -353,7 +353,7 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::J_PER_KG_K)
         .collect();
-        pub static ref C_P_INTERP: Interp1D = Interp1D::new(
+        pub static ref C_P_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             C_P_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram_kelvin>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -389,7 +389,7 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::J_PER_KG)
         .collect();
-        pub static ref ENTHALPY_INTERP: Interp1D = Interp1D::new(
+        pub static ref ENTHALPY_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             ENTHALPY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -425,7 +425,7 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::J_PER_KG)
         .collect();
-        pub static ref ENERGY_INTERP: Interp1D = Interp1D::new(
+        pub static ref ENERGY_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -461,7 +461,7 @@ mod air_static_props {
         .iter()
         .map(|x| *x * uc::PASCAL_SECOND)
         .collect();
-        pub static ref DYN_VISC_INTERP: Interp1D = Interp1D::new(
+        pub static ref DYN_VISC_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             DYN_VISCOSITY_VALUES.iter().map(|x| x.get::<si::pascal_second>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -473,7 +473,7 @@ mod air_static_props {
             .zip(THERMAL_CONDUCTIVITY_VALUES.iter())
             .map(|((mu, c_p), k)| -> si::Ratio {*mu * *c_p / *k})
             .collect::<Vec<si::Ratio>>();
-        pub static ref PRANDTL_INTERP: Interp1D = Interp1D::new(
+        pub static ref PRANDTL_INTERP: Interpolator = Interpolator::new_1d(
             TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
             PRANDTL_VALUES.iter().map(|x| x.get::<si::ratio>()).collect::<Vec<f64>>(),
             Strategy::Linear,
@@ -551,7 +551,7 @@ mod octane_static_props {
         .iter()
         .map(|x| *x * uc::KELVIN + *uc::CELSIUS_TO_KELVIN)
         .collect();
-        pub static ref TEMP_FROM_ENERGY: Interp1D = Interp1D::new(
+        pub static ref TEMP_FROM_ENERGY: Interpolator = Interpolator::new_1d(
            ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
            Strategy::Linear,
@@ -587,7 +587,7 @@ mod octane_static_props {
         .iter()
         .map(|x| *x * uc::J_PER_KG)
         .collect();
-        pub static ref ENERGY_INTERP: Interp1D = Interp1D::new(
+        pub static ref ENERGY_INTERP: Interpolator = Interpolator::new_1d(
            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
            ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
            Strategy::Linear,

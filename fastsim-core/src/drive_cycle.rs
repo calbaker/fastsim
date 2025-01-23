@@ -100,19 +100,19 @@ impl Init for Cycle {
             )
             .collect();
         // println!("{:?}", self.dist);
-        self.grade_interp = Some(Interpolator::Interp1D(Interp1D::new(
+        self.grade_interp = Some(Interpolator::new_1d(
             self.dist.iter().map(|x| x.get::<si::meter>()).collect(),
             self.grade.iter().map(|y| y.get::<si::ratio>()).collect(),
             Strategy::Linear,
             Extrapolate::Error,
-        )?));
+        )?);
 
-        self.elev_interp = Some(Interpolator::Interp1D(Interp1D::new(
+        self.elev_interp = Some(Interpolator::new_1d(
             self.dist.iter().map(|x| x.get::<si::meter>()).collect(),
             self.elev.iter().map(|y| y.get::<si::meter>()).collect(),
             Strategy::Linear,
             Extrapolate::Error,
-        )?));
+        )?);
 
         Ok(())
     }

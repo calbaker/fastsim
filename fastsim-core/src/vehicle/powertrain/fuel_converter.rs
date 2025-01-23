@@ -535,8 +535,8 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default() -> Interp1D {
-    Interp1D::new(
+fn tstat_interp_default() -> Interpolator {
+    Interpolator::new_1d(
         vec![85.0, 90.0],
         vec![0.0, 1.0],
         Strategy::Linear,
@@ -690,7 +690,7 @@ impl Init for FuelConverterThermal {
             .tstat_te_sto
             .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
         self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
-        self.tstat_interp = Interp1D::new(
+        self.tstat_interp = Interpolator::new_1d(
             vec![
                 self.tstat_te_sto.unwrap().get::<si::kelvin>(),
                 self.tstat_te_sto.unwrap().get::<si::kelvin>()
