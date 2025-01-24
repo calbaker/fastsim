@@ -25,23 +25,24 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2020 Chevrolet
 cyc_folder_path = Path(__file__) / "dyno_test_data/2020 Chevrolet Bolt EV/Extended Datasets"
 assert cyc_folder_path.exists()
 
-# See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
+# See 2020_Chevrolet_Bolt_TestSummary_201005.xlsm for cycle-level data
 cyc_files = [
-    # TODO: try to find 3 hot cycles, 3 room temp cycles, and 3 cold cycles.
-    # The hot and cold cycles must have HVAC active!
-    # - wide range of initial and ambient temperatures
-    # - good signal quality -- somewhat subjective
-    # HWY x2, hot (M155), HVAC active (B155)
-    # TODO: check for solar load (should be around 1 kW / m^2) and implement place for this somewhere (`drive_cycle`???)
-    "62202004 Test Data.txt", 
-    # US06 x2, hot, HVAC active
-    # TODO: check for solar load (should be around 1 kW / m^2) and implement or this somewhere (`drive_cycle`???)
-    "62202005 Test Data.txt",
-    # UDDS x1, room temperature ambient
-    "62201013 Test Data.txt",
-    # HWY x2, room temperature ambient
-    "62201014 Test Data.txt",
     # TODO: check for seat heater usage in cold cycles and account for that in model!
+    # 20F (heater maybe on? Col R in test summary), UDDS + HWY + UDDS + US06
+    "62009051 Test Data.txt"
+    # 20F (heater maybe on? Col R in test summary), US06 + UDDS + HWY + UDDS
+    "62009053 Test Data.txt"
+
+    # room temperature (no HVAC), UDDS + HWY + UDDS + US06
+    "62009019 Test Data.txt",
+    # room temperature (no HVAC), US06 + UDDS + HWY + UDDS
+    "62009021 Test Data.txt",
+
+    # TODO: check for solar load (should be around 1 kW / m^2) and implement or this somewhere (`drive_cycle`???)
+    # 95F (HVAC on), UDDS + HWY + UDDS
+    "62009040 Test Data.txt"
+    # 95F (HVAC on), US06
+    "62009041 Test Data.txt"
 ]
 assert len(cyc_files) > 0
 cyc_files = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
