@@ -1043,9 +1043,9 @@ dependencies = [
 
 [[package]]
 name = "ninterp"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e60a408704882574368061cb86dba333d64027a93d8634dfe39c85da167df2a5"
+checksum = "c6ad0d5c7daec14bf8d66d66eb1025ea4e24d0e2d6b0881fe3697d17054c88fe"
 dependencies = [
  "itertools 0.13.0",
  "ndarray 0.16.1",
