@@ -88,18 +88,18 @@ def new_em_eff_max(sd_dict, new_eff_peak):
     """
     Set `new_eff_max` in `ElectricMachine`
     """
-    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['BatteryElectricVehicle']['em'])
     em.set_eff_peak(new_eff_peak)
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    sd_dict['veh']['pt_type']['BatteryElectricVehicle']['em'] = em.to_pydict()
     # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
 def new_em_eff_range(sd_dict, new_eff_range):
     """
     Set `new_eff_range` in `ElectricMachine`
     """
-    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['BatteryElectricVehicle']['em'])
     em.set_eff_range(new_eff_range)
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    sd_dict['veh']['pt_type']['BatteryElectricVehicle']['em'] = em.to_pydict()
     # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
 ## Model Objectives
@@ -108,7 +108,7 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     dfs = dfs_for_cal,
     obj_fns=(
         (
-            lambda sd_dict: np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc']),
+            lambda sd_dict: np.array(sd_dict['veh']['pt_type']['BatteryElectricVehicle']['res']['history']['soc']),
             lambda df: df['TODO: find signal for test data soc']
         ),
         # TODO: add objectives for:
