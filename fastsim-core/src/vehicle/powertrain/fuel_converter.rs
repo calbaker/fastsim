@@ -514,7 +514,7 @@ pub struct FuelConverterThermal {
     /// parameter for temperature at which thermostat starts to open
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
-    pub tstat_te_delta: Option<si::Temperature>,
+    pub tstat_te_delta: Option<si::TemperatureInterval>,
     #[serde(default = "tstat_interp_default")]
     pub tstat_interp: Interpolator,
     /// Radiator effectiveness -- ratio of active heat rejection from
@@ -695,18 +695,18 @@ impl Init for FuelConverterThermal {
         self.tstat_te_sto = self
             .tstat_te_sto
             .or(Some((85. + uc::CELSIUS_TO_KELVIN) * uc::KELVIN));
-        self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
+        self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN_INT));
         self.tstat_interp = Interpolator::new_1d(
             vec![
                 self.tstat_te_sto.unwrap().get::<si::degree_celsius>(),
                 self.tstat_te_sto.unwrap().get::<si::degree_celsius>()
-                    + self.tstat_te_delta.unwrap().get::<si::degree_celsius>(),
+                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
             ],
             vec![0.0, 1.0],
             Strategy::Linear,
             Extrapolate::Clamp,
         )
-        .with_context(|| format_dbg!())?;
+        .with_context(|| format_dbg!((self.tstat_te_sto, self.tstat_te_delta)))?;
         Ok(())
     }
 }

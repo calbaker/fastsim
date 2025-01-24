@@ -204,7 +204,7 @@ pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
             }
             "TemperatureInterval" => extract_units!(uom::si::temperature_interval::kelvin),
             "Temperature" => {
-                extract_units!(uom::si::temperature_interval::degree_celsius)
+                extract_units!(uom::si::thermodynamic_temperature::degree_celsius)
             }
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
