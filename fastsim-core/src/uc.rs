@@ -85,10 +85,8 @@ unit_const!(
     9.80
 );
 
-lazy_static::lazy_static! {
-    pub static ref CELSIUS_TO_KELVIN: crate::si::Temperature = 273.15 * KELVIN;
-}
 unit_const!(KELVIN, Temperature, 1.0);
+unit_const!(KELVIN_INT, TemperatureInterval, 1.0);
 unit_const!(J_PER_KG_K, SpecificHeatCapacity, 1.0);
 unit_const!(J_PER_K, HeatCapacity, 1.0);
 unit_const!(J_PER_KG, SpecificEnergy, 1.0);
@@ -96,3 +94,5 @@ unit_const!(PASCAL_SECOND, DynamicViscosity, 1.0);
 unit_const!(PASCAL, Pressure, 1.0);
 unit_const!(WATT_PER_METER_SQUARED_KELVIN, ThermalConductance, 1.0);
 unit_const!(WATT_PER_METER_KELVIN, ThermalConductivity, 1.0);
+
+pub const CELSIUS_TO_KELVIN: f64 = 273.15;

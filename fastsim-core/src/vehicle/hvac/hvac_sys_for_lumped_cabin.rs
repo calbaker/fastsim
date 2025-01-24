@@ -14,7 +14,7 @@ pub struct HVACSystemForLumpedCabin {
     pub te_set: si::Temperature,
     /// deadband range.  any cabin temperature within this range of
     /// `te_set` results in no HVAC power draw
-    pub te_deadband: si::Temperature,
+    pub te_deadband: si::TemperatureInterval,
     /// HVAC proportional gain
     pub p: si::ThermalConductance,
     /// HVAC integral gain [W / K / s], resets at zero crossing events
@@ -47,7 +47,7 @@ impl Default for HVACSystemForLumpedCabin {
     fn default() -> Self {
         Self {
             te_set: *TE_STD_AIR,
-            te_deadband: 1.5 * uc::KELVIN,
+            te_deadband: 1.5 * uc::KELVIN_INT,
             p: Default::default(),
             i: Default::default(),
             d: Default::default(),
@@ -98,14 +98,22 @@ impl HVACSystemForLumpedCabin {
             (si::Power::ZERO, si::Power::ZERO, f64::NAN * uc::R)
         } else {
             // outside deadband
-            let te_delta_vs_set = cab_state.temperature - self.te_set;
-            let te_delta_vs_amb: si::Temperature = cab_state.temperature - te_amb_air;
+            let te_delta_vs_set = (cab_state.temperature.get::<si::degree_celsius>()
+                - self.te_set.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
+            let te_delta_vs_amb: si::TemperatureInterval =
+                (cab_state.temperature.get::<si::degree_celsius>()
+                    - te_amb_air.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT;
 
             self.state.pwr_p = -self.p * te_delta_vs_set;
             self.state.pwr_i -= self.i * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
             self.state.pwr_i = self.state.pwr_i.max(-self.pwr_i_max).min(self.pwr_i_max);
-            self.state.pwr_d =
-                -self.d * uc::J / uc::KELVIN * ((cab_state.temperature - cab_state.temp_prev) / dt);
+            self.state.pwr_d = -self.d * uc::J / uc::KELVIN
+                * ((cab_state.temperature.get::<si::degree_celsius>()
+                    - cab_state.temp_prev.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT
+                    / dt);
 
             let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) =
                 if cab_state.temperature > self.te_set + self.te_deadband {
@@ -116,7 +124,7 @@ impl HVACSystemForLumpedCabin {
                     // cop_ideal is t_c / (t_h - t_c) for cooling
 
                     // divide-by-zero protection and realistic limit on COP
-                    let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                    let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
                         // cabin is cooler than ambient + threshold
                         // TODO: make this `5.0` not hardcoded
                         cab_state.temperature / (5.0 * uc::KELVIN)
@@ -181,7 +189,7 @@ impl HVACSystemForLumpedCabin {
     fn handle_heat_source(
         &mut self,
         te_fc: Option<si::Temperature>,
-        te_delta_vs_amb: si::Temperature,
+        te_delta_vs_amb: si::TemperatureInterval,
         pwr_thrml_hvac_to_cabin: &mut si::Power,
         cab_heat_cap: si::HeatCapacity,
         cab_state: LumpedCabinState,
@@ -199,7 +207,7 @@ impl HVACSystemForLumpedCabin {
                 *pwr_thrml_hvac_to_cabin = pwr_thrml_hvac_to_cabin
                     .min(
                         cab_heat_cap *
-                    (te_fc.unwrap() - cab_state.temperature)
+                    (te_fc.unwrap().get::<si::degree_celsius>() - cab_state.temperature.get::<si::degree_celsius>()) * uc::KELVIN_INT
                         * 0.1 // so that it's substantially less
                         / dt,
                     )
@@ -226,7 +234,7 @@ impl HVACSystemForLumpedCabin {
 
                 // divide-by-zero protection and realistic limit on COP
                 // TODO: make sure this is consist with above commented equation for heating!
-                let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
                     // cabin is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
                     cab_state.temperature / (5.0 * uc::KELVIN)

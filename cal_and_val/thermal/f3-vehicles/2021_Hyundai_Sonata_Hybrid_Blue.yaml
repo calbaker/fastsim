@@ -97,7 +97,7 @@ pt_type:
           htc_to_amb_stop_watts_per_square_meter_degree_celsius: 50.0
           conductance_from_comb_watts_per_kelvin: 5.0
           max_frac_from_comb: 0.5
-          tstat_te_sto_kelvin: 358.15
+          tstat_te_sto_kelvin: 85.0
           tstat_te_delta_kelvin: 5.0
           tstat_interp:
             Interp1D:

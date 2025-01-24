@@ -45,7 +45,7 @@ lazy_static! {
     #[pyo3(name = "get_therm_cond")]
     #[staticmethod]
     pub fn get_therm_cond_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_therm_cond(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::watt_per_meter_kelvin>())
+        Ok(Self::get_therm_cond((te_air + uc::CELSIUS_TO_KELVIN) * uc::KELVIN)?.get::<si::watt_per_meter_kelvin>())
     }
 
     /// Returns constant pressure specific heat [J/(kg*K)] of air
@@ -54,7 +54,7 @@ lazy_static! {
     #[pyo3(name = "get_specific_heat_cp")]
     #[staticmethod]
     pub fn get_specific_heat_cp_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_specific_heat_cp(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::joule_per_kilogram_kelvin>())
+        Ok(Self::get_specific_heat_cp((te_air + uc::CELSIUS_TO_KELVIN) * uc::KELVIN)?.get::<si::joule_per_kilogram_kelvin>())
     }
 
     /// Returns specific enthalpy [J/kg] of air  
@@ -63,7 +63,7 @@ lazy_static! {
     #[pyo3(name = "get_specific_enthalpy")]
     #[staticmethod]
     pub fn get_specific_enthalpy_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_specific_enthalpy(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::joule_per_kilogram>())
+        Ok(Self::get_specific_enthalpy((te_air  - uc::CELSIUS_TO_KELVIN) * uc::KELVIN)?.get::<si::joule_per_kilogram>())
     }
 
     /// Returns specific energy [J/kg] of air  
@@ -72,7 +72,7 @@ lazy_static! {
     #[pyo3(name = "get_specific_energy")]
     #[staticmethod]
     pub fn get_specific_energy_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_specific_energy(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::joule_per_kilogram>())
+        Ok(Self::get_specific_energy((te_air - uc::CELSIUS_TO_KELVIN) * uc::KELVIN)?.get::<si::joule_per_kilogram>())
     }
 
     /// Returns thermal Prandtl number of air
@@ -81,7 +81,7 @@ lazy_static! {
     #[pyo3(name = "get_pr")]
     #[staticmethod]
     pub fn get_pr_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_pr(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::ratio>())
+        Ok(Self::get_pr((te_air - uc::CELSIUS_TO_KELVIN) * uc::KELVIN )?.get::<si::ratio>())
     }
 
     /// Returns dynamic viscosity \[Pa*s\] of air
@@ -90,7 +90,7 @@ lazy_static! {
     #[pyo3(name = "get_dyn_visc")]
     #[staticmethod]
     pub fn get_dyn_visc_py(te_air: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_dyn_visc(te_air * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::pascal_second>())
+        Ok(Self::get_dyn_visc((te_air  - uc::CELSIUS_TO_KELVIN) * uc::KELVIN)?.get::<si::pascal_second>())
     }
 
     /// Returns temperature [°C] of air
@@ -99,7 +99,7 @@ lazy_static! {
     #[pyo3(name = "get_te_from_h")]
     #[staticmethod]
     pub fn get_te_from_h_py(h: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_te_from_h(h * uc::J_PER_KG)?.get::<si::kelvin>() - uc::CELSIUS_TO_KELVIN.value)
+        Ok(Self::get_te_from_h(h * uc::J_PER_KG)?.get::<si::degree_celsius>())
     }
 
     /// Returns temperature [°C] of air
@@ -108,7 +108,7 @@ lazy_static! {
     #[pyo3(name = "get_te_from_u")]
     #[staticmethod]
     pub fn get_te_from_u_py(u: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_te_from_u(u * uc::J_PER_KG)?.get::<si::kelvin>() - uc::CELSIUS_TO_KELVIN.value)
+        Ok(Self::get_te_from_u(u * uc::J_PER_KG)?.get::<si::degree_celsius>())
     }
 
 )]
@@ -151,7 +151,7 @@ impl Air {
     /// - `te_air`: temperature of air
     pub fn get_therm_cond(te_air: si::Temperature) -> anyhow::Result<si::ThermalConductivity> {
         Ok(
-            asp::THERMAL_CONDUCTIVITY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])?
+            asp::THERMAL_CONDUCTIVITY_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])?
                 * uc::WATT_PER_METER_KELVIN,
         )
     }
@@ -162,35 +162,38 @@ impl Air {
     pub fn get_specific_heat_cp(
         te_air: si::Temperature,
     ) -> anyhow::Result<si::SpecificHeatCapacity> {
-        Ok(asp::C_P_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG_K)
+        Ok(asp::C_P_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])? * uc::J_PER_KG_K)
     }
 
     /// Returns specific enthalpy of air  
     /// # Arguments  
     /// - `te_air`: temperature of air
     pub fn get_specific_enthalpy(te_air: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
-        Ok(asp::ENTHALPY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG)
+        Ok(asp::ENTHALPY_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])? * uc::J_PER_KG)
     }
 
     /// Returns specific energy of air  
     /// # Arguments  
     /// - `te_air`: temperature of air
     pub fn get_specific_energy(te_air: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
-        Ok(asp::ENERGY_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::J_PER_KG)
+        Ok(asp::ENERGY_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])? * uc::J_PER_KG)
     }
 
     /// Returns thermal Prandtl number of air
     /// # Arguments
     /// - `te_air`: temperature of air     
     pub fn get_pr(te_air: si::Temperature) -> anyhow::Result<si::Ratio> {
-        Ok(asp::PRANDTL_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::R)
+        Ok(asp::PRANDTL_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])? * uc::R)
     }
 
     /// Returns dynamic viscosity \[Pa*s\] of air
     /// # Arguments
     /// te_air: temperature of air
     pub fn get_dyn_visc(te_air: si::Temperature) -> anyhow::Result<si::DynamicViscosity> {
-        Ok(asp::DYN_VISC_INTERP.interpolate(&[te_air.get::<si::kelvin>()])? * uc::PASCAL_SECOND)
+        Ok(
+            asp::DYN_VISC_INTERP.interpolate(&[te_air.get::<si::degree_celsius>()])?
+                * uc::PASCAL_SECOND,
+        )
     }
 
     /// Returns temperature of air
@@ -247,7 +250,7 @@ mod air_static_props {
     use super::*;
     lazy_static! {
         /// Array of temperatures at which properties are evaluated
-        static ref TEMPERATURE_VALUES: Vec<si::Temperature> = [
+        static ref TEMPERATURE_DEG_C_VALUES: Vec<f64> = vec![
             -60.,
              -57.03690616,
             -53.1958198,
@@ -273,19 +276,16 @@ mod air_static_props {
             2947.10642291,
             3841.10336915,
             5000.
-        ]
-        .iter()
-        .map(|x| *x * uc::KELVIN + *uc::CELSIUS_TO_KELVIN)
-        .collect();
+        ];
         pub static ref TEMP_FROM_ENTHALPY: Interpolator = Interpolator::new_1d(
             ENTHALPY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             Strategy::Linear,
             Extrapolate::Error
         ).unwrap();
         pub static ref TEMP_FROM_ENERGY: Interpolator = Interpolator::new_1d(
             ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             Strategy::Linear,
             Extrapolate::Error
         ).unwrap();
@@ -321,7 +321,7 @@ mod air_static_props {
         .map(|x| *x * uc::WATT_PER_METER_KELVIN)
         .collect();
         pub static ref THERMAL_CONDUCTIVITY_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             THERMAL_CONDUCTIVITY_VALUES.iter().map(|x| x.get::<si::watt_per_meter_degree_celsius>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -358,7 +358,7 @@ mod air_static_props {
         .map(|x| *x * uc::J_PER_KG_K)
         .collect();
         pub static ref C_P_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             C_P_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram_kelvin>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -394,7 +394,7 @@ mod air_static_props {
         .map(|x| *x * uc::J_PER_KG)
         .collect();
         pub static ref ENTHALPY_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             ENTHALPY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -430,7 +430,7 @@ mod air_static_props {
         .map(|x| *x * uc::J_PER_KG)
         .collect();
         pub static ref ENERGY_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -466,7 +466,7 @@ mod air_static_props {
         .map(|x| *x * uc::PASCAL_SECOND)
         .collect();
         pub static ref DYN_VISC_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             DYN_VISCOSITY_VALUES.iter().map(|x| x.get::<si::pascal_second>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -478,7 +478,7 @@ mod air_static_props {
             .map(|((mu, c_p), k)| -> si::Ratio {*mu * *c_p / *k})
             .collect::<Vec<si::Ratio>>();
         pub static ref PRANDTL_INTERP: Interpolator = Interpolator::new_1d(
-            TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+            TEMPERATURE_DEG_C_VALUES.clone(),
             PRANDTL_VALUES.iter().map(|x| x.get::<si::ratio>()).collect::<Vec<f64>>(),
             Strategy::Linear,
             Extrapolate::Error
@@ -525,7 +525,7 @@ mod octane_static_props {
     use super::*;
     lazy_static! {
         /// Array of temperatures at which properties are evaluated
-        static ref TEMPERATURE_VALUES: Vec<si::Temperature> = [
+        static ref TEMPERATURE_DEG_C_VALUES: Vec<f64> = vec![
             -4.00000000e+01,
              -3.70369062e+01,
             -3.31958198e+01,
@@ -551,13 +551,10 @@ mod octane_static_props {
             2.96710642e+03,
             3.86110337e+03,
             5.02000000e+03
-        ]
-        .iter()
-        .map(|x| *x * uc::KELVIN + *uc::CELSIUS_TO_KELVIN)
-        .collect();
+        ];
         pub static ref TEMP_FROM_ENERGY: Interpolator = Interpolator::new_1d(
            ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
-           TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+           TEMPERATURE_DEG_C_VALUES.clone(),
            Strategy::Linear,
            Extrapolate::Error
         ).unwrap();
@@ -592,7 +589,7 @@ mod octane_static_props {
         .map(|x| *x * uc::J_PER_KG)
         .collect();
         pub static ref ENERGY_INTERP: Interpolator = Interpolator::new_1d(
-           TEMPERATURE_VALUES.iter().map(|x| x.get::<si::kelvin>()).collect::<Vec<f64>>(),
+           TEMPERATURE_DEG_C_VALUES.clone(),
            ENERGY_VALUES.iter().map(|x| x.get::<si::joule_per_kilogram>()).collect::<Vec<f64>>(),
            Strategy::Linear,
            Extrapolate::Error
@@ -607,7 +604,7 @@ mod octane_static_props {
     #[pyo3(name = "get_specific_energy")]
     #[staticmethod]
     pub fn get_specific_energy_py(te_octane: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_specific_energy(te_octane * uc::KELVIN - *uc::CELSIUS_TO_KELVIN)?.get::<si::joule_per_kilogram>())
+        Ok(Self::get_specific_energy((te_octane - uc::CELSIUS_TO_KELVIN) * uc::KELVIN )?.get::<si::joule_per_kilogram>())
     }
 
     /// Returns temperature [°C] of octane
@@ -616,7 +613,7 @@ mod octane_static_props {
     #[pyo3(name = "get_te_from_u")]
     #[staticmethod]
     pub fn get_te_from_u_py(u: f64) -> anyhow::Result<f64> {
-        Ok(Self::get_te_from_u(u * uc::J_PER_KG)?.get::<si::kelvin>() - uc::CELSIUS_TO_KELVIN.value)
+        Ok(Self::get_te_from_u(u * uc::J_PER_KG)?.get::<si::degree_celsius>())
     }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
@@ -629,7 +626,10 @@ impl Octane {
     /// # Arguments  
     /// - `te_octane`: temperature of octane
     pub fn get_specific_energy(te_octane: si::Temperature) -> anyhow::Result<si::SpecificEnergy> {
-        Ok(osp::ENERGY_INTERP.interpolate(&[te_octane.get::<si::kelvin>()])? * uc::J_PER_KG)
+        Ok(
+            osp::ENERGY_INTERP.interpolate(&[te_octane.get::<si::degree_celsius>()])?
+                * uc::J_PER_KG,
+        )
     }
 
     /// Returns temperature of octane

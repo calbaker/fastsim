@@ -669,8 +669,8 @@ pt_type:
         frac_of_most_eff_pwr_to_run_fc: 1.0
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 1.0
-        temp_fc_forced_on_kelvin: ~
-        temp_fc_allowed_off_kelvin: ~
+        temp_fc_forced_on_degrees_Celsius: ~
+        temp_fc_allowed_off_degrees_Celsius: ~
     aux_cntrl: AuxOnResPriority
     mass_kilograms: ~
     sim_params:

@@ -202,7 +202,10 @@ pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "Temperature" => extract_units!(uom::si::temperature_interval::kelvin),
+            "TemperatureInterval" => extract_units!(uom::si::temperature_interval::kelvin),
+            "Temperature" => {
+                extract_units!(uom::si::temperature_interval::degree_celsius)
+            }
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }

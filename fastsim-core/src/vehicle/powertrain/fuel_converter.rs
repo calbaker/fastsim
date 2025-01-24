@@ -553,7 +553,7 @@ lazy_static! {
     pub static ref GASOLINE_DENSITY: si::MassDensity = 0.75 * uc::KG / uc::L;
     /// TODO: find a source for this value
     pub static ref GASOLINE_LHV: si::SpecificEnergy = 33.7 * uc::KWH / uc::GALLON / *GASOLINE_DENSITY;
-    pub static ref TE_ADIABATIC_STD: si::Temperature= Air::get_te_from_u(
+    pub static ref TE_ADIABATIC_STD: si::Temperature = Air::get_te_from_u(
             Air::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                 + (Octane::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                     + *GASOLINE_LHV)
@@ -580,7 +580,9 @@ impl FuelConverterThermal {
     ) -> anyhow::Result<()> {
         self.state.pwr_thrml_fc_to_cab = pwr_thrml_fc_to_cab;
         // film temperature for external convection calculations
-        let te_air_film = 0.5 * (self.state.temperature + te_amb);
+        let te_air_film: si::Temperature = 0.5
+            * (self.state.temperature.get::<si::kelvin_abs>() + te_amb.get::<si::kelvin_abs>())
+            * uc::KELVIN;
         // Reynolds number = density * speed * diameter / dynamic viscosity
         // NOTE: might be good to pipe in elevation
         let fc_air_film_re =
@@ -588,40 +590,39 @@ impl FuelConverterThermal {
                 / Air::get_dyn_visc(te_air_film).with_context(|| format_dbg!())?;
 
         // calculate heat transfer coeff. from engine to ambient [W / (m ** 2 * K)]
-        self.state.htc_to_amb =
-            if veh_speed < 1.0 * uc::MPS {
-                // if stopped, scale based on thermostat opening and constant convection
-                self.state.tstat_open_frac =
-                    self.tstat_interp
-                        .interpolate(&[(self.state.temperature.get::<si::kelvin>()
-                            - uc::CELSIUS_TO_KELVIN.value)])
-                        .with_context(|| format_dbg!())?;
-                (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
-                    * self.htc_to_amb_stop
-            } else {
-                // Calculate heat transfer coefficient for sphere,
-                // from Incropera's Intro to Heat Transfer, 5th Ed., eq. 7.44
-                let sphere_conv_params = get_sphere_conv_params(fc_air_film_re.get::<si::ratio>());
-                let htc_to_amb_sphere: si::HeatTransferCoeff = sphere_conv_params.0
-                    * fc_air_film_re.get::<si::ratio>().powf(sphere_conv_params.1)
-                    * Air::get_pr(te_air_film)
-                        .with_context(|| format_dbg!())?
-                        .get::<si::ratio>()
-                        .powf(1.0 / 3.0)
-                    * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
-                    / self.length_for_convection;
-                // if stopped, scale based on thermostat opening and constant convection
-                self.state.tstat_open_frac =
-                    self.tstat_interp
-                        .interpolate(&[(self.state.temperature.get::<si::kelvin>()
-                            - uc::CELSIUS_TO_KELVIN.value)])
-                        .with_context(|| format_dbg!())?;
-                self.state.tstat_open_frac * htc_to_amb_sphere
-            };
+        self.state.htc_to_amb = if veh_speed < 1.0 * uc::MPS {
+            // if stopped, scale based on thermostat opening and constant convection
+            self.state.tstat_open_frac = self
+                .tstat_interp
+                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
+                .with_context(|| format_dbg!())?;
+            (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
+                * self.htc_to_amb_stop
+        } else {
+            // Calculate heat transfer coefficient for sphere,
+            // from Incropera's Intro to Heat Transfer, 5th Ed., eq. 7.44
+            let sphere_conv_params = get_sphere_conv_params(fc_air_film_re.get::<si::ratio>());
+            let htc_to_amb_sphere: si::HeatTransferCoeff = sphere_conv_params.0
+                * fc_air_film_re.get::<si::ratio>().powf(sphere_conv_params.1)
+                * Air::get_pr(te_air_film)
+                    .with_context(|| format_dbg!())?
+                    .get::<si::ratio>()
+                    .powf(1.0 / 3.0)
+                * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
+                / self.length_for_convection;
+            // if stopped, scale based on thermostat opening and constant convection
+            self.state.tstat_open_frac = self
+                .tstat_interp
+                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
+                .with_context(|| format_dbg!())?;
+            self.state.tstat_open_frac * htc_to_amb_sphere
+        };
 
         self.state.pwr_thrml_to_amb =
             self.state.htc_to_amb * PI * self.length_for_convection.powi(typenum::P2::new()) / 4.0
-                * (self.state.temperature - te_amb);
+                * (self.state.temperature.get::<si::degree_celsius>()
+                    - te_amb.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
 
         // let heat_to_amb = ;
         // assumes fuel/air mixture is entering combustion chamber at block temperature
@@ -638,14 +639,17 @@ impl FuelConverterThermal {
         // heat that will go both to the block and out the exhaust port
         self.state.pwr_fuel_as_heat = fc_state.pwr_fuel - (fc_state.pwr_prop + fc_state.pwr_aux);
         self.state.pwr_thrml_to_tm = (self.conductance_from_comb
-            * (self.state.te_adiabatic - self.state.temperature))
+            * (self.state.te_adiabatic.get::<si::degree_celsius>()
+                - self.state.temperature.get::<si::degree_celsius>())
+            * uc::KELVIN_INT)
             .min(self.max_frac_from_comb * self.state.pwr_fuel_as_heat);
-        let delta_temp: si::Temperature = ((self.state.pwr_thrml_to_tm
+        let delta_temp: si::TemperatureInterval = ((self.state.pwr_thrml_to_tm
             - self.state.pwr_thrml_fc_to_cab
             - self.state.pwr_thrml_to_amb)
             * dt)
             / self.heat_capacitance;
         self.state.temp_prev = self.state.temperature;
+        // Interestingly, it seems to be ok to add a `TemperatureInterval` to a `Temperature` here
         self.state.temperature += delta_temp;
 
         self.state.eff_coeff = match self.fc_eff_model {
@@ -690,13 +694,13 @@ impl Init for FuelConverterThermal {
     fn init(&mut self) -> anyhow::Result<()> {
         self.tstat_te_sto = self
             .tstat_te_sto
-            .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
+            .or(Some((85. + uc::CELSIUS_TO_KELVIN) * uc::KELVIN));
         self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
         self.tstat_interp = Interpolator::new_1d(
             vec![
-                self.tstat_te_sto.unwrap().get::<si::kelvin>(),
-                self.tstat_te_sto.unwrap().get::<si::kelvin>()
-                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
+                self.tstat_te_sto.unwrap().get::<si::degree_celsius>(),
+                self.tstat_te_sto.unwrap().get::<si::degree_celsius>()
+                    + self.tstat_te_delta.unwrap().get::<si::degree_celsius>(),
             ],
             vec![0.0, 1.0],
             Strategy::Linear,
@@ -824,7 +828,7 @@ impl Default for FCTempEffModelLinear {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct FCTempEffModelExponential {
     /// temperature at which `fc_eta_temp_coeff` begins to grow
-    pub offset: si::Temperature,
+    pub offset: si::TemperatureInterval,
     /// exponential lag parameter [K^-1]
     pub lag: f64,
     /// minimum value that `fc_eta_temp_coeff` can take
@@ -834,7 +838,7 @@ pub struct FCTempEffModelExponential {
 impl Default for FCTempEffModelExponential {
     fn default() -> Self {
         Self {
-            offset: 0.0 * uc::KELVIN + *uc::CELSIUS_TO_KELVIN,
+            offset: 0.0 * uc::KELVIN_INT,
             lag: 25.0,
             minimum: 0.2 * uc::R,
         }

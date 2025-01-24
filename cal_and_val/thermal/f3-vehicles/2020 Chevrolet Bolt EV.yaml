@@ -16,7 +16,7 @@ cabin:
     width_meters: 2
 hvac: 
   LumpedCabinAndRES:
-    te_set_kelvin: 295.15
+    te_set_degrees_Celsius: 295.15
     te_deadband_kelvin: 1.5
     p_cabin_watts_per_kelvin: 0.0
     i_cabin: 0.0
