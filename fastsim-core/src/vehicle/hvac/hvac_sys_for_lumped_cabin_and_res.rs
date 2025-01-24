@@ -14,7 +14,7 @@ pub struct HVACSystemForLumpedCabinAndRES {
     pub te_set: si::Temperature,
     /// Deadband range.  Any cabin temperature within this range of `te_set`
     /// results in no HVAC power draw
-    pub te_deadband: si::Temperature,
+    pub te_deadband: si::TemperatureInterval,
     /// HVAC proportional gain for cabin
     pub p_cabin: si::ThermalConductance,
     /// HVAC integral gain [W / K / s] for cabin, resets at zero crossing events  
@@ -62,7 +62,7 @@ impl Default for HVACSystemForLumpedCabinAndRES {
     fn default() -> Self {
         Self {
             te_set: *TE_STD_AIR,
-            te_deadband: 1.5 * uc::KELVIN,
+            te_deadband: 1.5 * uc::KELVIN_INT,
             p_cabin: Default::default(),
             i_cabin: Default::default(),
             d_cabin: Default::default(),
@@ -122,81 +122,108 @@ impl HVACSystemForLumpedCabinAndRES {
         let mut pwr_thrml_hvac_to_res: si::Power = self
             .solve_for_res(res_temp, res_temp_prev, dt)
             .with_context(|| format_dbg!())?;
-        let (cop_ideal, te_ref) =
-            if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin > si::Power::ZERO {
-                // heating mode
-                // TODO: account for cabin and battery heat sources in COP calculation!!!!
+        let (cop_ideal, te_ref) = if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin
+            > si::Power::ZERO
+        {
+            // heating mode
+            // TODO: account for cabin and battery heat sources in COP calculation!!!!
 
-                let (te_ref, te_delta_vs_amb) = if pwr_thrml_hvac_to_res > si::Power::ZERO {
-                    // both powers are positive -- i.e. both are in heating mode
+            let (te_ref, te_delta_vs_amb) = if pwr_thrml_hvac_to_res > si::Power::ZERO {
+                // both powers are positive -- i.e. both are in heating mode
 
-                    let te_ref: si::Temperature = if cab_state.temperature > res_temp {
-                        // cabin is hotter
-                        cab_state.temperature
-                    } else {
-                        // battery is hotter
-                        res_temp
-                    };
-                    (te_ref, te_ref - te_amb_air)
-                } else if pwr_thrml_hvac_to_res >= si::Power::ZERO {
-                    // `pwr_thrml_hvac_to_res` dominates need for heating
-                    (res_temp, res_temp - te_amb_air)
+                let te_ref: si::Temperature = if cab_state.temperature > res_temp {
+                    // cabin is hotter
+                    cab_state.temperature
                 } else {
-                    // `pwr_thrml_hvac_to_res` dominates need for heating
-                    (cab_state.temperature, cab_state.temperature - te_amb_air)
+                    // battery is hotter
+                    res_temp
                 };
-
-                // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
-                // cop_ideal is t_h / (t_h - t_c) for heating
-                // cop_ideal is t_c / (t_h - t_c) for cooling
-
-                // divide-by-zero protection and realistic limit on COP
-                // TODO: make sure this is consistent with above commented equation for heating!
-                if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
-                    // cabin is cooler than ambient + threshold
-                    // TODO: make this `5.0` not hardcoded
-                    (te_ref / (5.0 * uc::KELVIN), te_ref)
-                } else {
-                    (te_ref / te_delta_vs_amb.abs(), te_ref)
-                }
-            } else if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin < si::Power::ZERO {
-                // cooling mode
-                // TODO: account for battery cooling source in COP calculation!!!!
-
-                let (te_ref, te_delta_vs_amb) = if pwr_thrml_hvac_to_res < si::Power::ZERO {
-                    // both powers are negative -- i.e. both are in cooling mode
-
-                    let te_ref: si::Temperature = if cab_state.temperature < res_temp {
-                        // cabin is colder
-                        cab_state.temperature
-                    } else {
-                        // battery is colder
-                        res_temp
-                    };
-                    (te_ref, te_ref - te_amb_air)
-                } else if pwr_thrml_hvac_to_res >= si::Power::ZERO {
-                    // `pwr_thrml_hvac_to_cabin` dominates need for cooling
-                    (cab_state.temperature, cab_state.temperature - te_amb_air)
-                } else {
-                    // `pwr_thrml_hvac_to_res` dominates need for cooling
-                    (res_temp, res_temp - te_amb_air)
-                };
-
-                // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
-                // cop_ideal is t_h / (t_h - t_c) for heating
-                // cop_ideal is t_c / (t_h - t_c) for cooling
-
-                // divide-by-zero protection and realistic limit on COP
-                if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
-                    // cooling-dominating component is cooler than ambient + threshold
-                    // TODO: make this `5.0` not hardcoded
-                    (te_ref / (5.0 * uc::KELVIN), te_ref)
-                } else {
-                    (te_ref / te_delta_vs_amb.abs(), te_ref)
-                }
+                (
+                    te_ref,
+                    (te_ref.get::<si::degree_celsius>() - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
+            } else if pwr_thrml_hvac_to_res >= si::Power::ZERO {
+                // `pwr_thrml_hvac_to_res` dominates need for heating
+                (
+                    res_temp,
+                    (res_temp.get::<si::degree_celsius>() - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
             } else {
-                (si::Ratio::ZERO, f64::NAN * uc::KELVIN)
+                // `pwr_thrml_hvac_to_res` dominates need for heating
+                (
+                    cab_state.temperature,
+                    (cab_state.temperature.get::<si::degree_celsius>()
+                        - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
             };
+
+            // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
+            // cop_ideal is t_h / (t_h - t_c) for heating
+            // cop_ideal is t_c / (t_h - t_c) for cooling
+
+            // divide-by-zero protection and realistic limit on COP
+            // TODO: make sure this is consistent with above commented equation for heating!
+            if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
+                // cabin is cooler than ambient + threshold
+                // TODO: make this `5.0` not hardcoded
+                (te_ref / (5.0 * uc::KELVIN), te_ref)
+            } else {
+                (te_ref / te_delta_vs_amb.abs(), te_ref)
+            }
+        } else if pwr_thrml_hvac_to_res + pwr_thrml_hvac_to_cabin < si::Power::ZERO {
+            // cooling mode
+            // TODO: account for battery cooling source in COP calculation!!!!
+
+            let (te_ref, te_delta_vs_amb) = if pwr_thrml_hvac_to_res < si::Power::ZERO {
+                // both powers are negative -- i.e. both are in cooling mode
+
+                let te_ref: si::Temperature = if cab_state.temperature < res_temp {
+                    // cabin is colder
+                    cab_state.temperature
+                } else {
+                    // battery is colder
+                    res_temp
+                };
+                (
+                    te_ref,
+                    (te_ref.get::<si::degree_celsius>() - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
+            } else if pwr_thrml_hvac_to_res >= si::Power::ZERO {
+                // `pwr_thrml_hvac_to_cabin` dominates need for cooling
+                (
+                    cab_state.temperature,
+                    (cab_state.temperature.get::<si::kelvin_abs>()
+                        - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
+            } else {
+                // `pwr_thrml_hvac_to_res` dominates need for cooling
+                (
+                    res_temp,
+                    (res_temp.get::<si::degree_celsius>() - te_amb_air.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT,
+                )
+            };
+
+            // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
+            // cop_ideal is t_h / (t_h - t_c) for heating
+            // cop_ideal is t_c / (t_h - t_c) for cooling
+
+            // divide-by-zero protection and realistic limit on COP
+            if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
+                // cooling-dominating component is cooler than ambient + threshold
+                // TODO: make this `5.0` not hardcoded
+                (te_ref / (5.0 * uc::KELVIN), te_ref)
+            } else {
+                (te_ref / te_delta_vs_amb.abs(), te_ref)
+            }
+        } else {
+            (si::Ratio::ZERO, f64::NAN * uc::KELVIN)
+        };
         self.state.cop = cop_ideal * self.frac_of_ideal_cop;
         ensure!(
             self.state.cop >= 0.0 * uc::R,
@@ -272,8 +299,8 @@ impl HVACSystemForLumpedCabinAndRES {
         cab_heat_cap: si::HeatCapacity,
         dt: si::Time,
     ) -> anyhow::Result<si::Power> {
-        let pwr_thrml_hvac_to_cabin = if cab_state.temperature <= self.te_set + self.te_deadband
-            && cab_state.temperature >= self.te_set - self.te_deadband
+        let pwr_thrml_hvac_to_cabin = if cab_state.temperature <= (self.te_set + self.te_deadband)
+            && cab_state.temperature >= (self.te_set - self.te_deadband)
         {
             // inside deadband; no hvac power is needed
 
@@ -283,7 +310,9 @@ impl HVACSystemForLumpedCabinAndRES {
             si::Power::ZERO
         } else {
             // outside deadband
-            let te_delta_vs_set = cab_state.temperature - self.te_set;
+            let te_delta_vs_set = (cab_state.temperature.get::<si::degree_celsius>()
+                - self.te_set.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
 
             self.state.pwr_p = -self.p_cabin * te_delta_vs_set;
             self.state.pwr_i -= self.i_cabin * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
@@ -293,7 +322,10 @@ impl HVACSystemForLumpedCabinAndRES {
                 .max(-self.pwr_i_max_cabin)
                 .min(self.pwr_i_max_cabin);
             self.state.pwr_d = -self.d_cabin * uc::J / uc::KELVIN
-                * ((cab_state.temperature - cab_state.temp_prev) / dt);
+                * ((cab_state.temperature.get::<si::degree_celsius>()
+                    - cab_state.temp_prev.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT
+                    / dt);
 
             let pwr_thrml_hvac_to_cabin: si::Power =
                 if cab_state.temperature > self.te_set + self.te_deadband {
@@ -361,7 +393,9 @@ impl HVACSystemForLumpedCabinAndRES {
             si::Power::ZERO
         } else {
             // outside deadband
-            let te_delta_vs_set = res_temp - self.te_set;
+            let te_delta_vs_set = (res_temp.get::<si::degree_celsius>()
+                - self.te_set.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
             self.state.pwr_p_res = -self.p_res * te_delta_vs_set;
             self.state.pwr_i_res -= self.i_res * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
             self.state.pwr_i_res = self
@@ -369,8 +403,11 @@ impl HVACSystemForLumpedCabinAndRES {
                 .pwr_i_res
                 .max(-self.pwr_i_max_res)
                 .min(self.pwr_i_max_res);
-            self.state.pwr_d_res =
-                -self.d_res * uc::J / uc::KELVIN * ((res_temp - res_temp_prev) / dt);
+            self.state.pwr_d_res = -self.d_res * uc::J / uc::KELVIN
+                * ((res_temp.get::<si::degree_celsius>()
+                    - res_temp_prev.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT
+                    / dt);
 
             let pwr_thrml_hvac_to_res: si::Power = if res_temp > self.te_set + self.te_deadband {
                 // COOLING MODE; Reversible Energy Storage is hotter than set point
@@ -429,7 +466,7 @@ impl HVACSystemForLumpedCabinAndRES {
                 *pwr_thrml_hvac_to_cabin = pwr_thrml_hvac_to_cabin
                     .min(
                         cab_heat_cap *
-                    (te_fc.unwrap() - cab_state.temperature)
+                    (te_fc.unwrap().get::<si::degree_celsius>() - cab_state.temperature.get::<si::degree_celsius>()) * uc::KELVIN_INT
                         * 0.1 // so that it's substantially less
                         / dt,
                     )

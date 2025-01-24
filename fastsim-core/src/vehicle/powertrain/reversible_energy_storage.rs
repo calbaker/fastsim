@@ -218,8 +218,7 @@ impl ReversibleEnergyStorage {
                     / self.energy_capacity.get::<si::watt_hour>(),
                 te_res
                     .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-                    .get::<si::kelvin>()
-                    - uc::CELSIUS_TO_KELVIN.value,
+                    .get::<si::degree_celsius>(),
             ],
             (Interpolator::Interp3D(..), RESEffInterpInputs::CRateSOCTemperature) => &[
                 state.pwr_out_electrical.get::<si::watt>()
@@ -227,8 +226,7 @@ impl ReversibleEnergyStorage {
                 state.soc.get::<si::ratio>(),
                 te_res
                     .with_context(|| format_dbg!("Expected thermal model to be configured"))?
-                    .get::<si::kelvin>()
-                    - uc::CELSIUS_TO_KELVIN.value,
+                    .get::<si::degree_celsius>(),
             ],
             _ => bail!(
                 "
@@ -855,10 +853,15 @@ impl RESLumpedThermal {
     ) -> anyhow::Result<()> {
         self.state.temp_prev = self.state.temperature;
         // TODO: make sure this impacts cabin temperature
-        self.state.pwr_thrml_from_cabin =
-            self.conductance_to_cab * (te_cab - self.state.temperature);
+        self.state.pwr_thrml_from_cabin = self.conductance_to_cab
+            * (te_cab.get::<si::degree_celsius>()
+                - self.state.temperature.get::<si::degree_celsius>())
+            * uc::KELVIN_INT;
         self.state.pwr_thrml_hvac_to_res = pwr_thrml_hvac_to_res;
-        self.state.pwr_thrml_from_amb = self.conductance_to_cab * (te_amb - self.state.temperature);
+        self.state.pwr_thrml_from_amb = self.conductance_to_cab
+            * (te_amb.get::<si::degree_celsius>()
+                - self.state.temperature.get::<si::degree_celsius>())
+            * uc::KELVIN_INT;
         self.state.pwr_thrml_loss =
             res_state.pwr_out_electrical.abs() * (1.0 * uc::R - res_state.eff);
         self.state.temperature += (self.state.pwr_thrml_hvac_to_res

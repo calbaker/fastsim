@@ -108,7 +108,9 @@ impl LumpedCabin {
         self.state.pwr_thrml_to_res = pwr_thrml_to_res;
         // flat plate model for isothermal, mixed-flow from Incropera and deWitt, Fundamentals of Heat and Mass
         // Transfer, 7th Edition
-        let cab_te_film_ext = 0.5 * (self.state.temperature + te_amb_air);
+        let cab_te_film_ext: si::Temperature = 0.5
+            * (self.state.temperature.get::<si::kelvin_abs>() + te_amb_air.get::<si::kelvin_abs>())
+            * uc::KELVIN;
         self.state.reynolds_for_plate =
             Air::get_density(Some(cab_te_film_ext), Some(veh_state.elev_curr))
                 * veh_state.speed_ach
@@ -139,11 +141,17 @@ impl LumpedCabin {
                         * Air::get_therm_cond(cab_te_film_ext).with_context(|| format_dbg!())?
                         / self.length)
                     + 1.0 / self.cab_shell_htc_to_amb);
-            (self.length * self.width) * htc_overall_moving * (te_amb_air - self.state.temperature)
+            (self.length * self.width)
+                * htc_overall_moving
+                * (te_amb_air.get::<si::degree_celsius>()
+                    - self.state.temperature.get::<si::degree_celsius>())
+                * uc::KELVIN_INT
         } else {
             (self.length * self.width)
                 / (1.0 / self.cab_htc_to_amb_stop + 1.0 / self.cab_shell_htc_to_amb)
-                * (te_amb_air - self.state.temperature)
+                * (te_amb_air.get::<si::degree_celsius>()
+                    - self.state.temperature.get::<si::degree_celsius>())
+                * uc::KELVIN_INT
         };
 
         self.state.temp_prev = self.state.temperature;
