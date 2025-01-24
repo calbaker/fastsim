@@ -110,12 +110,15 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     obj_fns=(
         (
             lambda sd_dict: np.array(sd_dict['veh']['pt_type']['BatteryElectricVehicle']['res']['history']['soc']),
-            lambda df: df['TODO: find signal for test data soc']
+            lambda df: df['HVBatt_SOC_CAN4__per']
         ),
         # TODO: add objectives for:
-        # - engine fuel usage 
         # - battery temperature
-        # - engine temperature
+        (
+            lambda sd_dict: np.array(sd_dict['veh']['pt_type']['BatteryElectricVehicle']['res']['thermal']['RESLumpedThermal']['history']['temperature_kelvin']),
+            # HVBatt_cell_temp_1_CAN3__C (or average of temps?) or HVBatt_pack_average_temp_HPCM2__C?
+            lambda df: df['HVBatt_pack_average_temp_HPCM2__C']
+        ),
         # - cabin temperature
         # - HVAC power, if available
     ),
