@@ -94,7 +94,7 @@ pt_type:
         FuelConverterThermal:
           heat_capacitance_joules_per_kelvin: 200000.0
           length_for_convection_meters: 1.0
-          htc_to_amb_stop_watts_per_square_meter_kelvin: 50.0
+          htc_to_amb_stop_watts_per_square_meter_degree_celsius: 50.0
           conductance_from_comb_watts_per_kelvin: 5.0
           max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
@@ -226,8 +226,8 @@ chassis:
   cargo_mass_kilograms: ~
 cabin:
   LumpedCabin:
-    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 0.05
-    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
+    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
+    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
     heat_capacitance_joules_per_kelvin: 200000.0
     length_meters: 2.5
     width_meters: 2.0
