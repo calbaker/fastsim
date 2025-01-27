@@ -94,7 +94,7 @@ pt_type:
         FuelConverterThermal:
           heat_capacitance_joules_per_kelvin: 200000.0
           length_for_convection_meters: 1.0
-          htc_to_amb_stop_watts_per_square_meter_degree_celsius: 50.0
+          htc_to_amb_stop_watts_per_square_meter_kelvin: 50.0
           conductance_from_comb_watts_per_kelvin: 5.0
           max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
@@ -226,8 +226,8 @@ chassis:
   cargo_mass_kilograms: ~
 cabin:
   LumpedCabin:
-    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
-    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
+    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 0.05
+    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
     heat_capacitance_joules_per_kelvin: 200000.0
     length_meters: 2.5
     width_meters: 2.0
@@ -253,32 +253,3 @@ mass_kilograms: 1508.195
 pwr_aux_base_watts: 500.0
 trans_eff: 0.98
 save_interval: 1
-state:
-  i: 0
-  pwr_prop_fwd_max_watts: 0.0
-  pwr_prop_bwd_max_watts: 0.0
-  pwr_tractive_watts: 0.0
-  pwr_tractive_for_cyc_watts: 0.0
-  energy_tractive_joules: 0.0
-  pwr_aux_watts: 0.0
-  energy_aux_joules: 0.0
-  pwr_drag_watts: 0.0
-  energy_drag_joules: 0.0
-  pwr_accel_watts: 0.0
-  energy_accel_joules: 0.0
-  pwr_ascent_watts: 0.0
-  energy_ascent_joules: 0.0
-  pwr_rr_watts: 0.0
-  energy_rr_joules: 0.0
-  pwr_whl_inertia_watts: 0.0
-  energy_whl_inertia_joules: 0.0
-  pwr_brake_watts: 0.0
-  energy_brake_joules: 0.0
-  cyc_met: true
-  cyc_met_overall: true
-  speed_ach_meters_per_second: 0.0
-  dist_meters: 0.0
-  grade_curr: 0.0
-  elev_curr_meters: .nan
-  air_density_kilograms_per_cubic_meter: 1.172
-  mass_kilograms: .nan

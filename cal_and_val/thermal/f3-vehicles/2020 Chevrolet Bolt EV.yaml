@@ -5,9 +5,9 @@ year: 2020
 cabin: 
   LumpedCabin:
     # 0.05 is Chad's uncalibrated estimate
-    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
+    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 0.05
     # 0.05 is Chad's uncalibrated estimate
-    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
+    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
     # 200,000 is Chad's uncalibrated estimate
     heat_capacitance_joules_per_kelvin: 200000
     # TODO: get actual vehicle length, but calibrate this later
