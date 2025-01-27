@@ -44,14 +44,17 @@ pub struct Cycle {
     pub elev: Vec<si::Length>,
     /// road charging/discharing capacity
     pub pwr_max_chrg: Vec<si::Power>,
+    /// ambient air temperature w.r.t. to time (rather than spatial position)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub temp_amb_air: Vec<si::Temperature>,
+    /// solar heat load w.r.t. to time (rather than spatial position)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pwr_solar_load: Vec<si::Power>,
+    // TODO: add provision for optional time-varying aux load
     /// grade interpolator
     pub grade_interp: Option<Interpolator>,
     /// elevation interpolator
     pub elev_interp: Option<Interpolator>,
-    /// ambient air temperature w.r.t. to time (rather than spatial position)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub temp_amb_air: Vec<si::Temperature>,
-    // TODO: add provision for optional time-varying aux load
 }
 
 lazy_static! {
@@ -160,9 +163,26 @@ impl SerdeAPI for Cycle {
                         // unchecked indexing should be ok because of `self.len()`
                         time: self.time[i],
                         speed: self.speed[i],
-                        grade: Some(self.grade[i]),
-                        pwr_max_charge: Some(self.pwr_max_chrg[i]),
-                        temp_amb_air: Some(self.temp_amb_air[i]),
+                        grade: if !self.grade.is_empty() {
+                            Some(self.grade[i])
+                        } else {
+                            None
+                        },
+                        pwr_max_charge: if !self.pwr_max_chrg.is_empty() {
+                            Some(self.pwr_max_chrg[i])
+                        } else {
+                            None
+                        },
+                        temp_amb_air: if !self.temp_amb_air.is_empty() {
+                            Some(self.temp_amb_air[i])
+                        } else {
+                            None
+                        },
+                        pwr_solar_load: if !self.pwr_solar_load.is_empty() {
+                            Some(self.pwr_solar_load[i])
+                        } else {
+                            None
+                        },
                     })?;
                 }
                 wtr.flush()?
@@ -205,6 +225,7 @@ impl SerdeAPI for Cycle {
                 for result in rdr.deserialize() {
                     cyc.push(result?)?;
                 }
+
                 cyc
             }
             #[cfg(feature = "json")]
@@ -343,11 +364,19 @@ impl Cycle {
         self.speed.push(element.speed);
         match element.grade {
             Some(grade) => self.grade.push(grade),
-            _ => self.grade.push(0.0 * uc::R),
+            None => self.grade.push(si::Ratio::ZERO),
         }
         match element.pwr_max_charge {
             Some(pwr_max_chrg) => self.pwr_max_chrg.push(pwr_max_chrg),
-            _ => self.pwr_max_chrg.push(0.0 * uc::W),
+            None => self.pwr_max_chrg.push(si::Power::ZERO),
+        }
+        match element.temp_amb_air {
+            Some(temp_amb_air) => self.temp_amb_air.push(temp_amb_air),
+            None => self.temp_amb_air.push(*TE_STD_AIR),
+        }
+        match element.pwr_solar_load {
+            Some(pwr_solar_load) => self.pwr_solar_load.push(pwr_solar_load),
+            None => self.pwr_solar_load.push(si::Power::ZERO),
         }
         Ok(())
     }
@@ -454,6 +483,8 @@ pub struct CycleElement {
     // TODO: make sure all fields in cycle are represented here, as appropriate
     /// ambient air temperature w.r.t. to time (rather than spatial position)
     pub temp_amb_air: Option<si::Temperature>,
+    /// solar heat load w.r.t. to time (rather than spatial position)
+    pub pwr_solar_load: Option<si::Power>,
 }
 
 impl SerdeAPI for CycleElement {}
@@ -475,6 +506,7 @@ mod tests {
             grade_interp: Default::default(),
             elev_interp: Default::default(),
             temp_amb_air: Default::default(),
+            pwr_solar_load: Default::default(),
         };
         cyc.init().unwrap();
         cyc
