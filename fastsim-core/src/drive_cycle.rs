@@ -35,14 +35,18 @@ pub struct Cycle {
     pub speed: Vec<si::Velocity>,
     // TODO: consider trapezoidal integration scheme
     /// calculated prescribed distance based on RHS integral of time and speed
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dist: Vec<si::Length>,
     /// road grade (expressed as a decimal, not percent)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub grade: Vec<si::Ratio>,
     // TODO: consider trapezoidal integration scheme
     // TODO: @mokeefe, please check out how elevation is handled
     /// calculated prescribed elevation based on RHS integral distance and grade
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub elev: Vec<si::Length>,
     /// road charging/discharing capacity
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pwr_max_chrg: Vec<si::Power>,
     /// ambient air temperature w.r.t. to time (rather than spatial position)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -52,8 +56,10 @@ pub struct Cycle {
     pub pwr_solar_load: Vec<si::Power>,
     // TODO: add provision for optional time-varying aux load
     /// grade interpolator
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grade_interp: Option<Interpolator>,
     /// elevation interpolator
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub elev_interp: Option<Interpolator>,
 }
 
@@ -87,6 +93,10 @@ impl Init for Cycle {
                 .collect()
         };
 
+        // populate grade if not provided
+        if self.grade.is_empty() {
+            self.grade = vec![si::Ratio::ZERO; self.len().with_context(|| format_dbg!())?]
+        };
         // calculate elevation from RHS integral of grade and distance
         self.init_elev = self.init_elev.or_else(|| Some(*ELEV_DEFAULT));
         self.elev = self
@@ -223,9 +233,9 @@ impl SerdeAPI for Cycle {
                 let mut cyc = Self::default();
                 let mut rdr = csv::Reader::from_reader(rdr);
                 for result in rdr.deserialize() {
-                    cyc.push(result?)?;
+                    cyc.push(result.with_context(|| format_dbg!())?)
+                        .with_context(|| format_dbg!())?;
                 }
-
                 cyc
             }
             #[cfg(feature = "json")]

@@ -19,6 +19,7 @@ import seaborn as sns
 import pandas as pd  # noqa: F401
 import polars as pl  # noqa: F401
 from typing import List, Dict
+from pymoo.core.problem import StarmapParallelization
 
 import fastsim as fsim
 
@@ -40,50 +41,88 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_S
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp
 # and then copy it to the local folder below
-cyc_folder_path = Path(__file__) / "dyno_test_data/2021 Hyundai Sonata Hybrid/Extended Datasets"
+cyc_folder_path = Path(__file__).parent / "dyno_test_data/2021 Hyundai Sonata Hybrid/Extended Datasets"
 assert cyc_folder_path.exists()
 
 # See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
 cyc_files: List[str] = [
-    # TODO: try to find 3 hot cycles, 3 room temp cycles, and 3 cold cycles.
     # The hot and cold cycles must have HVAC active!
     # - wide range of initial and ambient temperatures
     # - good signal quality -- somewhat subjective
+
     # HWY x2, hot (M155), HVAC active (B155)
-    # TODO: connect drive cycle solar load to cabin
-    # TODO: check for solar load (should be around 1 kW / m^2) 
     "62202004 Test Data.txt", 
+
     # US06 x2, hot, HVAC active
-    # TODO: check for solar load (should be around 1 kW / m^2) 
     "62202005 Test Data.txt",
+
     # UDDS x1, room temperature ambient
     "62201013 Test Data.txt",
+
     # HWY x2, room temperature ambient
     "62201014 Test Data.txt",
+
+    # UDDSx2, 4 bag (FTP), cold start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
+    "62202013 Test Data.txt",
+
+    # UDDS, 2 bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
+    "62202014 Test Data.txt",
+
+    # US06x2, 4 (split) bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
+    "62202016 Test Data.txt",
+
     # TODO: check for seat heater usage in cold cycles and account for that in model!
 ]
 assert len(cyc_files) > 0
-cyc_files = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
+cyc_files: List[Path] = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
 
-# TODO: use random or manual selection to retain ~70% of cycles for calibration,
+# use random or manual selection to retain ~70% of cycles for calibration,
 # and reserve the remaining for validation
-cyc_files_for_cal: List[Path] = [
-    # TOOD: populate this somehow -- e.g. random split of `cyc_files`
+cyc_files_for_cal: List[str] = [
+    "62202004 Test Data.txt", 
+    # "62202005 Test Data.txt",
+    "62201013 Test Data.txt",
+    "62201014 Test Data.txt",
+    "62202013 Test Data.txt",
+    # "62202014 Test Data.txt", 
+    "62202016 Test Data.txt",
 ]
+cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.name in cyc_files_for_cal]
 assert len(cyc_files_for_cal) > 0
 
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
-    cyc_dict_raw = df.to_dict()
     # filter out "before" time
-    cyc_dict_raw = cyc_dict_raw[cyc_dict_raw["Time[s]_RawFacilities"] >= 0.0]
+    df = df[df["Time[s]_RawFacilities"] >= 0.0]
     cyc_dict = {
-        "time_seconds": df["Time[s]_RawFacilities"],
-        "speed_meters_per_second": df["Dyno_Spd[mph]"] * mps_per_mph,
-        "temp_amb_air_kelvin": df["Cell_Temp[C]"] + celsius_to_kelvin_offset,
+        "time_seconds": df["Time[s]_RawFacilities"].to_list(),
+        "speed_meters_per_second": (df["Dyno_Spd[mph]"] * mps_per_mph).to_list(),
+        "temp_amb_air_kelvin": (df["Cell_Temp[C]"] + celsius_to_kelvin_offset).to_list(),
+        # TODO: pipe solar load from `Cycle` into cabin thermal model
+        # TODO: use something (e.g. regex) to determine solar load
+        # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx
         # "pwr_solar_load_watts": df[],
     }
     return fsim.Cycle.from_pydict(cyc_dict)
-    
+
+def veh_init(veh: fsim.Vehicle, cyc_file_stem: str) -> fsim.Vehicle:
+    veh_dict = veh.to_pydict()
+    # initialize SOC
+    veh_dict['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
+        dfs_for_cal[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
+    # initialize cabin temp
+    veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
+        dfs_for_cal[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
+    # initialize battery temperature to match cabin temperature because battery
+    # temperature is not available in test data
+    # Also, battery temperature has no effect in the HEV because efficiency data
+    # does not go below 23*C and there is no active thermal management
+    veh_dict['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
+        dfs_for_cal[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
+    # initialize engine temperature
+    veh_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
+        dfs_for_cal[cyc_file_stem]["engine_coolant_temp_PCAN__C"][0] + celsius_to_kelvin_offset
+    return fsim.Vehicle.from_pydict(veh_dict)
+
 
 dfs_for_cal: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
@@ -105,19 +144,12 @@ sds_for_cal: Dict[str, fsim.SimDrive] = {}
 for (cyc_file_stem, cyc) in cycs_for_cal.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
-    veh_dict = veh.to_pydict()
-    # initialize SOC
-    veh_dict['veh']['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = dfs_for_cal[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
-    # TODO: pick up work here!
-    # TODO: clone veh and set up initial conditions for:
-    # - SOC
-    # - cabin temp
-    # - battery temp if available, else use cabin temp
-    # - engine temp for HEV
     # NOTE: maybe change `save_interval` to 5
+    veh = veh_init(veh, cyc_file_stem)
     sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
+assert len(cyc_files_for_val) > 0
 
 dfs_for_val: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
@@ -136,12 +168,7 @@ sds_for_val: Dict[str, fsim.SimDrive] = {}
 for (cyc_file_stem, cyc) in cycs_for_val.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
-    # TODO: clone veh and set up initial conditions for:
-    # - SOC
-    # - cabin temp
-    # - battery temp if available, else use cabin temp
-    # - engine temp for HEV
-    # NOTE: maybe change `save_interval` to 5
+    veh = veh_init(veh, cyc_file_stem)
     sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 # Setup model objectives
@@ -153,8 +180,6 @@ def new_em_eff_max(sd_dict, new_eff_peak):
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
     em.set_eff_peak(new_eff_peak)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
-    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
-    # maybe do this by individually perturbing all the objectives and checking for response
 
 def new_em_eff_range(sd_dict, new_eff_range):
     """
@@ -163,7 +188,6 @@ def new_em_eff_range(sd_dict, new_eff_range):
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
     em.set_eff_range(new_eff_range)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
-    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
 def new_fc_eff_max(sd_dict, new_eff_peak):
     """
@@ -172,7 +196,6 @@ def new_fc_eff_max(sd_dict, new_eff_peak):
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.set_eff_peak(new_eff_peak)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
-    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
 
 def new_fc_eff_range(sd_dict, new_eff_range):
     """
@@ -181,8 +204,6 @@ def new_fc_eff_range(sd_dict, new_eff_range):
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.set_eff_range(new_eff_range)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
-    # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
-
 
 ## Model Objectives
 cal_mod_obj = fsim.pymoo_api.ModelObjectives(
@@ -191,7 +212,7 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     obj_fns=(
         (
             lambda sd_dict: np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc']),
-            lambda df: df['TODO: find signal for test data soc']
+            lambda df: df['HVBatt_SOC_high_precision_PCAN__per']
         ),
         # TODO: add objectives for:
         # - engine fuel usage 
@@ -209,10 +230,6 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
         #   controls for BEV)
-        # - battery thermal
-        #     - thermal mass
-        #     - convection to ambient
-        #     - convection to cabin
         # - cabin thermal
         #     - thermal mass
         #     - length
@@ -222,6 +239,10 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
         #     - thermal mass
         #     - convection to ambient when stopped
         #     - diameter
+        # - battery thermal -- not necessary for HEV because battery temperature has no real effect
+        #     - thermal mass
+        #     - convection to ambient
+        #     - convection to cabin
     ),
     # must match order and length of `params_fns`
     bounds=(
@@ -233,7 +254,90 @@ cal_mod_obj = fsim.pymoo_api.ModelObjectives(
     
 )
 
-# Setup calibration problem
-cal_prob = fsim.pymoo_api.CalibrationProblem(
-    mod_obj=cal_mod_obj,
+# verify that model responds to input parameter changes by individually perturbing parameters
+baseline_errors = cal_mod_obj.get_errors(
+    cal_mod_obj.update_params([0.90, 0.3, 0.4])
 )
+param0_perturb = cal_mod_obj.get_errors(
+    cal_mod_obj.update_params([0.90 + 0.5, 0.3, 0.4])
+)
+assert list(param0_perturb.values()) != list(baseline_errors.values())
+param1_perturb = cal_mod_obj.get_errors(
+    cal_mod_obj.update_params([0.90, 0.3 + 0.1, 0.4])
+)
+assert list(param1_perturb.values()) != list(baseline_errors.values())
+param2_perturb = cal_mod_obj.get_errors(
+    cal_mod_obj.update_params([0.90, 0.3, 0.4 + 0.01])
+)
+assert list(param2_perturb.values()) != list(baseline_errors.values())
+
+if __name__ == "__main__":
+    parser = fsim.cal.get_parser(
+        # Defaults are set low to allow for fast run time during testing.  For a good
+        # optimization, set this much higher.
+        def_save_path=None,
+    )
+    args = parser.parse_args()
+
+    n_processes = args.processes 
+    n_max_gen = args.n_max_gen 
+    # should be at least as big as n_processes
+    pop_size = args.pop_size 
+    run_minimize = not (args.skip_minimize)
+    if args.save_path is not None:
+        save_path = Path(args.save_path) 
+        save_path.mkdir(exist_ok=True)
+    else:
+        save_path = None
+
+    print("Starting calibration.")
+    algorithm = fsim.calibration.NSGA2(
+        # size of each population
+        pop_size=pop_size,
+        # LatinHyperCube sampling seems to be more effective than the default
+        # random sampling
+        sampling=fsim.calibration.LHS(),
+    )
+    termination = fsim.calibration.DMOT(
+        # max number of generations, default of 10 is very small
+        n_max_gen=n_max_gen,
+        # evaluate tolerance over this interval of generations every
+        period=5,
+        # parameter variation tolerance
+        xtol=args.xtol,
+        # objective variation tolerance
+        ftol=args.ftol
+    )
+
+    if n_processes == 1:
+        print("Running serial evaluation.")
+        # series evaluation
+        # Setup calibration problem
+        cal_prob = fsim.pymoo_api.CalibrationProblem(
+            mod_obj=cal_mod_obj,
+        )
+        
+        res, res_df = fsim.pymoo_api.run_minimize(
+            problem=cal_prob,
+            algorithm=algorithm,
+            termination=termination,
+            save_path=save_path,
+        )
+    else:
+        print(f"Running parallel evaluation with n_processes: {n_processes}.")
+        assert n_processes > 1
+        # parallel evaluation
+        import multiprocessing
+
+        with multiprocessing.Pool(n_processes) as pool:
+            problem = fsim.calibration.CalibrationProblem(
+                mod_obj=cal_mod_obj,
+                elementwise_runner=StarmapParallelization(pool.starmap),
+            )
+            res, res_df = fsim.pymoo_api.run_minimize(
+                problem=problem,
+                algorithm=algorithm,
+                termination=termination,
+                save_path=save_path,
+            )
+
