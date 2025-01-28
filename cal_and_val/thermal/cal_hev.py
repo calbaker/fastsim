@@ -1,15 +1,6 @@
 """
 Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
 """
-# # TODO Calibration Tasks
-# - [x] put vehicle test data in a sharepoint folder, grant Robin access, and paste link in here
-# - [x] develop means of skewing curves via setter or similar -- Kyle is doing this
-# - [ ] show what signals should be used for objectives
-#     - [x] and how to access them in code
-# - [ ] make a version of this that calibrates against a fully warmed up vehicle
-#       with room temp ambient, no climate control, and no thermal parameters
-
-# critical import
 from pathlib import Path
 
 # anticipated cricital imports
@@ -22,6 +13,7 @@ from typing import List, Dict
 from pymoo.core.problem import StarmapParallelization
 
 import fastsim as fsim
+from fastsim import pymoo_api
 
 mps_per_mph = 0.447
 celsius_to_kelvin_offset = 273.15
@@ -93,6 +85,7 @@ assert len(cyc_files_for_cal) > 0
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     # filter out "before" time
     df = df[df["Time[s]_RawFacilities"] >= 0.0]
+    assert len(df) > 10
     cyc_dict = {
         "time_seconds": df["Time[s]_RawFacilities"].to_list(),
         "speed_meters_per_second": (df["Dyno_Spd[mph]"] * mps_per_mph).to_list(),
@@ -102,25 +95,25 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
         # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx
         # "pwr_solar_load_watts": df[],
     }
-    return fsim.Cycle.from_pydict(cyc_dict)
+    return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
-def veh_init(veh: fsim.Vehicle, cyc_file_stem: str) -> fsim.Vehicle:
+def veh_init(veh: fsim.Vehicle, cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     veh_dict = veh.to_pydict()
     # initialize SOC
     veh_dict['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
-        dfs_for_cal[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
+        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
     # initialize cabin temp
     veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
-        dfs_for_cal[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
+        dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize battery temperature to match cabin temperature because battery
     # temperature is not available in test data
     # Also, battery temperature has no effect in the HEV because efficiency data
     # does not go below 23*C and there is no active thermal management
     veh_dict['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
-        dfs_for_cal[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
+        dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize engine temperature
-    veh_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
-        dfs_for_cal[cyc_file_stem]["engine_coolant_temp_PCAN__C"][0] + celsius_to_kelvin_offset
+    veh_dict['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
+        dfs[cyc_file_stem]["engine_coolant_temp_PCAN__C"][0] + celsius_to_kelvin_offset
     return fsim.Vehicle.from_pydict(veh_dict)
 
 
@@ -145,7 +138,7 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
     # NOTE: maybe change `save_interval` to 5
-    veh = veh_init(veh, cyc_file_stem)
+    veh = veh_init(veh, cyc_file_stem, dfs_for_cal)
     sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
@@ -168,17 +161,17 @@ sds_for_val: Dict[str, fsim.SimDrive] = {}
 for (cyc_file_stem, cyc) in cycs_for_val.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
-    veh = veh_init(veh, cyc_file_stem)
+    veh = veh_init(veh, cyc_file_stem, dfs_for_val)
     sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 # Setup model objectives
 ## Parameter Functions
-def new_em_eff_max(sd_dict, new_eff_peak):
+def new_em_eff_max(sd_dict, new_eff_max):
     """
     Set `new_eff_max` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
-    em.set_eff_peak(new_eff_peak)
+    em.__eff_max = new_eff_max
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
 
 def new_em_eff_range(sd_dict, new_eff_range):
@@ -186,15 +179,15 @@ def new_em_eff_range(sd_dict, new_eff_range):
     Set `new_eff_range` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
-    em.set_eff_range(new_eff_range)
+    em.__eff_range = new_eff_range
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
 
-def new_fc_eff_max(sd_dict, new_eff_peak):
+def new_fc_eff_max(sd_dict, new_eff_max):
     """
     Set `new_eff_max` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
-    fc.set_eff_peak(new_eff_peak)
+    fc.__eff_max = new_eff_max
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
 
 def new_fc_eff_range(sd_dict, new_eff_range):
@@ -202,11 +195,11 @@ def new_fc_eff_range(sd_dict, new_eff_range):
     Set `new_eff_range` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
-    fc.set_eff_range(new_eff_range)
+    fc.__eff_range = new_eff_range
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
 
 ## Model Objectives
-cal_mod_obj = fsim.pymoo_api.ModelObjectives(
+cal_mod_obj = pymoo_api.ModelObjectives(
     models = sds_for_cal,
     dfs = dfs_for_cal,
     obj_fns=(
@@ -313,11 +306,11 @@ if __name__ == "__main__":
         print("Running serial evaluation.")
         # series evaluation
         # Setup calibration problem
-        cal_prob = fsim.pymoo_api.CalibrationProblem(
+        cal_prob = pymoo_api.CalibrationProblem(
             mod_obj=cal_mod_obj,
         )
         
-        res, res_df = fsim.pymoo_api.run_minimize(
+        res, res_df = pymoo_api.run_minimize(
             problem=cal_prob,
             algorithm=algorithm,
             termination=termination,
@@ -334,7 +327,7 @@ if __name__ == "__main__":
                 mod_obj=cal_mod_obj,
                 elementwise_runner=StarmapParallelization(pool.starmap),
             )
-            res, res_df = fsim.pymoo_api.run_minimize(
+            res, res_df = pymoo_api.run_minimize(
                 problem=problem,
                 algorithm=algorithm,
                 termination=termination,

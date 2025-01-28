@@ -15,7 +15,7 @@ pub struct Transmission {
     /// time step interval between saves. 1 is a good option. If None, no saving occurs.
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: TransmissionState,
     /// Custom vector of [Self::state]
     #[serde(default, skip_serializing_if = "TransmissionStateHistoryVec::is_empty")]

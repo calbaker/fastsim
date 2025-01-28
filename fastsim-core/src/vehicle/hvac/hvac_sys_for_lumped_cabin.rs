@@ -35,7 +35,7 @@ pub struct HVACSystemForLumpedCabin {
     /// max allowed aux load for HVAC
     pub pwr_aux_for_hvac_max: si::Power,
     /// coefficient of performance of vapor compression cycle
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: HVACSystemForLumpedCabinState,
     #[serde(
         default,

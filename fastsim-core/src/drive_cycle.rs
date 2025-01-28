@@ -14,7 +14,7 @@ use fastsim_2::cycle::RustCycle as Cycle2;
 
     #[pyo3(name = "len")]
     fn len_py(&self) -> PyResult<u32> {
-       Ok(self.len().map(|l| l as u32)?)
+       Ok(self.len_checked().map(|l| l as u32)?)
     }
 )]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -72,7 +72,7 @@ impl Init for Cycle {
     /// # Assumptions
     /// - if `init_elev.is_none()`, then defaults to [static@ELEV_DEFAULT]
     fn init(&mut self) -> anyhow::Result<()> {
-        let _ = self.len().with_context(|| format_dbg!())?;
+        let _ = self.len_checked().with_context(|| format_dbg!())?;
 
         if !self.temp_amb_air.is_empty() {
             ensure!(self.temp_amb_air.len() == self.time.len());
@@ -95,7 +95,11 @@ impl Init for Cycle {
 
         // populate grade if not provided
         if self.grade.is_empty() {
-            self.grade = vec![si::Ratio::ZERO; self.len().with_context(|| format_dbg!())?]
+            self.grade = vec![
+                si::Ratio::ZERO;
+                self.len_checked()
+                    .with_context(|| format_dbg!(self.len_checked()))?
+            ]
         };
         // calculate elevation from RHS integral of grade and distance
         self.init_elev = self.init_elev.or_else(|| Some(*ELEV_DEFAULT));
@@ -168,7 +172,7 @@ impl SerdeAPI for Cycle {
             #[cfg(feature = "csv")]
             "csv" => {
                 let mut wtr = csv::Writer::from_writer(wtr);
-                for i in 0..self.len().with_context(|| format_dbg!())? {
+                for i in 0..self.len_checked().with_context(|| format_dbg!())? {
                     wtr.serialize(CycleElement {
                         // unchecked indexing should be ok because of `self.len()`
                         time: self.time[i],
@@ -316,7 +320,7 @@ impl Cycle {
             - *self.time.get(i - 1).with_context(|| format_dbg!())?)
     }
 
-    pub fn len(&self) -> anyhow::Result<usize> {
+    pub fn len_checked(&self) -> anyhow::Result<usize> {
         ensure!(
             self.time.len() == self.speed.len(),
             format!(
@@ -363,7 +367,7 @@ impl Cycle {
     }
 
     pub fn is_empty(&self) -> anyhow::Result<bool> {
-        Ok(self.len().with_context(|| format_dbg!())? == 0)
+        Ok(self.len_checked().with_context(|| format_dbg!())? == 0)
     }
 
     pub fn push(&mut self, element: CycleElement) -> anyhow::Result<()> {
@@ -421,7 +425,7 @@ impl Cycle {
 
     pub fn trim(&mut self, start_idx: Option<usize>, end_idx: Option<usize>) -> anyhow::Result<()> {
         let start_idx = start_idx.unwrap_or_default();
-        let len = self.len().with_context(|| format_dbg!())?;
+        let len = self.len_checked().with_context(|| format_dbg!())?;
         let end_idx = end_idx.unwrap_or(len);
         ensure!(end_idx <= len, format_dbg!(end_idx <= len));
 
@@ -433,7 +437,7 @@ impl Cycle {
     /// Write (serialize) cycle to a CSV string
     #[cfg(feature = "csv")]
     pub fn to_csv(&self) -> anyhow::Result<String> {
-        let mut buf = Vec::with_capacity(self.len().with_context(|| format_dbg!())?);
+        let mut buf = Vec::with_capacity(self.len_checked().with_context(|| format_dbg!())?);
         self.to_writer(&mut buf, "csv")?;
         Ok(String::from_utf8(buf)?)
     }
@@ -464,7 +468,7 @@ impl Cycle {
                 .collect(),
             grade: self.grade.iter().map(|g| g.get::<si::ratio>()).collect(),
             orphaned: false,
-            road_type: vec![0.; self.len().with_context(|| format_dbg!())?].into(),
+            road_type: vec![0.; self.len_checked().with_context(|| format_dbg!())?].into(),
         };
 
         Ok(cyc2)

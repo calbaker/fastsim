@@ -157,7 +157,7 @@ pub struct Vehicle {
     /// time step interval at which `state` is saved into `history`
     save_interval: Option<usize>,
     /// current state of vehicle
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: VehicleState,
     /// Vector-like history of [Self::state]
     #[serde(default, skip_serializing_if = "VehicleStateHistoryVec::is_empty")]

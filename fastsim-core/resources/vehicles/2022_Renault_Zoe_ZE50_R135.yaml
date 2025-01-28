@@ -14,6 +14,27 @@ pt_type:
       min_soc: 0.029
       max_soc: 0.98
       save_interval: 1
+      state:
+        pwr_prop_max_watts: 0.0
+        pwr_regen_max_watts: 0.0
+        pwr_disch_max_watts: 0.0
+        pwr_charge_max_watts: 0.0
+        i: 0
+        soc: 0.5
+        soc_regen_buffer: 1.0
+        soc_disch_buffer: 0.0
+        eff: 0.0
+        soh: 0.0
+        pwr_out_electrical_watts: 0.0
+        pwr_out_prop_watts: 0.0
+        pwr_aux_watts: 0.0
+        pwr_loss_watts: 0.0
+        pwr_out_chemical_watts: 0.0
+        energy_out_electrical_joules: 0.0
+        energy_out_prop_joules: 0.0
+        energy_aux_joules: 0.0
+        energy_loss_joules: 0.0
+        energy_out_chemical_joules: 0.0
     em:
       eff_interp_achieved:
         Interp1D:
@@ -75,11 +96,39 @@ pt_type:
       specific_pwr_watts_per_kilogram: ~
       mass_kilograms: ~
       save_interval: 1
+      state:
+        i: 0
+        eff: 0.0
+        pwr_mech_fwd_out_max_watts: 0.0
+        eff_fwd_at_max_input: 0.0
+        pwr_mech_regen_max_watts: 0.0
+        eff_at_max_regen: 0.0
+        pwr_rate_out_max_watts_per_second: 0.0
+        pwr_out_req_watts: 0.0
+        energy_out_req_joules: 0.0
+        pwr_elec_prop_in_watts: 0.0
+        energy_elec_prop_in_joules: 0.0
+        pwr_mech_prop_out_watts: 0.0
+        energy_mech_prop_out_joules: 0.0
+        pwr_mech_dyn_brake_watts: 0.0
+        energy_mech_dyn_brake_joules: 0.0
+        pwr_elec_dyn_brake_watts: 0.0
+        energy_elec_dyn_brake_joules: 0.0
+        pwr_loss_watts: 0.0
+        energy_loss_joules: 0.0
     transmission:
       mass_kilograms: ~
       eff_interp:
         Interp0D: 0.92
       save_interval: 1
+      state:
+        i: 0
+        eff: 0.0
+        pwr_out_watts: 0.0
+        pwr_in_watts: 0.0
+        pwr_loss_watts: 0.0
+        energy_out_joules: 0.0
+        energy_loss_joules: 0.0
     mass_kilograms: ~
 chassis:
   drag_coef: 0.33

@@ -72,7 +72,7 @@ pub struct LumpedCabin {
     pub length: si::Length,
     /// cabin width, modeled as a flat plate
     pub width: si::Length,
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: LumpedCabinState,
     #[serde(default, skip_serializing_if = "LumpedCabinStateHistoryVec::is_empty")]
     pub history: LumpedCabinStateHistoryVec,

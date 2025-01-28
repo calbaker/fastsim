@@ -112,7 +112,7 @@ pub struct ReversibleEnergyStorage {
     /// Time step interval at which history is saved
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: ReversibleEnergyStorageState,
     /// Custom vector of [Self::state]
     #[serde(
@@ -825,7 +825,7 @@ pub struct RESLumpedThermal {
     /// parameter for heat transfer coeff from [ReversibleEnergyStorage::thrml] to cabin
     pub conductance_to_cab: si::ThermalConductance,
     /// current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: RESLumpedThermalState,
     /// history of state
     #[serde(

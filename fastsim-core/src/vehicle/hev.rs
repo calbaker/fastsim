@@ -26,7 +26,7 @@ pub struct HybridElectricVehicle {
     #[serde(default)]
     pub sim_params: HEVSimulationParams,
     /// field for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: HEVState,
     /// vector of [Self::state]
     #[serde(default, skip_serializing_if = "HEVStateHistoryVec::is_empty")]
@@ -842,7 +842,7 @@ pub struct RESGreedyWithDynamicBuffers {
     #[serde(default)]
     pub temp_fc_allowed_off: Option<si::Temperature>,
     /// current state of control variables
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: RGWDBState,
     #[serde(default, skip_serializing_if = "RGWDBStateHistoryVec::is_empty")]
     /// history of current state

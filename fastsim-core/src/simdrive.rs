@@ -171,7 +171,7 @@ impl SimDrive {
 
     /// Run vehicle simulation once
     pub fn walk_once(&mut self) -> anyhow::Result<()> {
-        let len = self.cyc.len().with_context(|| format_dbg!())?;
+        let len = self.cyc.len_checked().with_context(|| format_dbg!())?;
         ensure!(len >= 2, format_dbg!(len < 2));
         self.save_state();
         // to increment `i` to 1 everywhere
@@ -232,7 +232,11 @@ impl SimDrive {
         let vs = &mut self.veh.state;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
         vs.grade_curr = if vs.cyc_met_overall {
-            *self.cyc.grade.get(i).with_context(|| format_dbg!())?
+            *self
+                .cyc
+                .grade
+                .get(i)
+                .with_context(|| format_dbg!(self.cyc.grade.len()))?
         } else {
             uc::R
                 * self
@@ -545,7 +549,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().is_none());
     }
@@ -557,7 +561,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
@@ -573,7 +577,7 @@ mod tests {
             sim_params: Default::default(),
         };
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }

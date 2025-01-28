@@ -33,10 +33,11 @@ use crate::pyo3::*;
     //     self.get_eff_max()
     // }
 
-    // #[setter("__eff_max")]
-    // fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
-    //     self.set_eff_max(eff_max).map_err(PyValueError::new_err)
-    // }
+    #[setter("__eff_max")]
+    fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
+        self.set_eff_max(eff_max)?;
+        Ok(())
+    }
 
     // #[getter("eff_min")]
     // fn get_eff_min_py(&self) -> f64 {
@@ -48,10 +49,11 @@ use crate::pyo3::*;
     //     self.get_eff_range()
     // }
 
-    // #[setter("__eff_range")]
-    // fn set_eff_range_py(&mut self, eff_range: f64) -> PyResult<()> {
-    //     self.set_eff_range(eff_range).map_err(PyValueError::new_err)
-    // }
+    #[setter("__eff_range")]
+    fn set_eff_range_py(&mut self, eff_range: f64) -> PyResult<()> {
+        self.set_eff_range(eff_range)?;
+        Ok(())
+    }
 )]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 #[non_exhaustive]
@@ -80,7 +82,7 @@ pub struct ElectricMachine {
     /// Time step interval between saves. 1 is a good option. If None, no saving occurs.
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: ElectricMachineState,
     /// Custom vector of [Self::state]
     #[serde(

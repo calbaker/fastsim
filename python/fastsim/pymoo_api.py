@@ -9,7 +9,6 @@ import pandas as pd
 import argparse
 import time
 from dataclasses import dataclass
-import logger
 # pymoo
 try:
     from pymoo.optimize import minimize
@@ -165,7 +164,7 @@ class ModelObjectives(object):
     ) -> Union[
         Dict[str, Dict[str, float]],
         # or if return_mods is True
-        Tuple[Dict[str, fsim.simdrive.SimDrive], Dict[str, Dict[str, float]]]
+        Tuple[Dict[str, fsim.SimDrive], Dict[str, Dict[str, float]]]
     ]:
         """
         Calculate model errors w.r.t. test data for each element in dfs/models for each objective.
@@ -187,7 +186,7 @@ class ModelObjectives(object):
             df_exp: pd.DataFrame
             # TODO: maybe put a `try...except` block here
             t0 = time.perf_counter()
-            sd.sim_drive() # type: ignore
+            sd.walk_once() # type: ignore
             t1 = time.perf_counter()
 
             if self.verbose:

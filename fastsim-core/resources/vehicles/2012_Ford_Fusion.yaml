@@ -223,11 +223,34 @@ pt_type:
           extrapolate: Error
       pwr_idle_fuel_watts: 0.0
       save_interval: 1
+      state:
+        i: 0
+        pwr_out_max_watts: 0.0
+        pwr_prop_max_watts: 0.0
+        eff: 0.0
+        pwr_prop_watts: 0.0
+        energy_prop_joules: 0.0
+        pwr_aux_watts: 0.0
+        energy_aux_joules: 0.0
+        pwr_fuel_watts: 0.0
+        energy_fuel_joules: 0.0
+        pwr_loss_watts: 0.0
+        energy_loss_joules: 0.0
+        fc_on: false
+        time_on_seconds: 0.0
     transmission:
       mass_kilograms: ~
       eff_interp:
         Interp0D: 0.875
       save_interval: 1
+      state:
+        i: 0
+        eff: 0.0
+        pwr_out_watts: 0.0
+        pwr_in_watts: 0.0
+        pwr_loss_watts: 0.0
+        energy_out_joules: 0.0
+        energy_loss_joules: 0.0
     mass_kilograms: ~
     alt_eff: 1.0
 chassis:
