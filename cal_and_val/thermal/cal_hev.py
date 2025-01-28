@@ -18,18 +18,23 @@ import matplotlib.pyplot as plt  # noqa: F401
 import seaborn as sns
 import pandas as pd  # noqa: F401
 import polars as pl  # noqa: F401
+from typing import List, Dict
 
 import fastsim as fsim
+
+mps_per_mph = 0.447
+celsius_to_kelvin_offset = 273.15
 
 # Initialize seaborn plot configuration
 sns.set()
 
 # TODO: Kyle or Robin:
-# - [ ] in the `./f3-vehicles`, reduce all ~100 element arrays to just the ~10
+# - [x] in the `./f3-vehicles`, reduce all ~100 element arrays to just the ~10
 #       element arrays,
-#     - [ ] for FC, grab Atkinson efficiency map from fastsim-2
+#     - [x] for FC, grab Atkinson efficiency map from fastsim-2
 # - [x] and make sure linear interpolation is used
-# - [ ] make sure temp- and current/c-rate-dependent battery efficiency interp is being used
+# - [x] make sure temp- and current/c-rate-dependent battery efficiency interp
+#       is being used -- temp is 23*C and up and c-rate ranges from -5/hr to 5/hr
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 
 # Obtain the data from
@@ -39,16 +44,17 @@ cyc_folder_path = Path(__file__) / "dyno_test_data/2021 Hyundai Sonata Hybrid/Ex
 assert cyc_folder_path.exists()
 
 # See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
-cyc_files = [
+cyc_files: List[str] = [
     # TODO: try to find 3 hot cycles, 3 room temp cycles, and 3 cold cycles.
     # The hot and cold cycles must have HVAC active!
     # - wide range of initial and ambient temperatures
     # - good signal quality -- somewhat subjective
     # HWY x2, hot (M155), HVAC active (B155)
-    # TODO: check for solar load (should be around 1 kW / m^2) and implement place for this somewhere (`drive_cycle`???)
+    # TODO: connect drive cycle solar load to cabin
+    # TODO: check for solar load (should be around 1 kW / m^2) 
     "62202004 Test Data.txt", 
     # US06 x2, hot, HVAC active
-    # TODO: check for solar load (should be around 1 kW / m^2) and implement or this somewhere (`drive_cycle`???)
+    # TODO: check for solar load (should be around 1 kW / m^2) 
     "62202005 Test Data.txt",
     # UDDS x1, room temperature ambient
     "62201013 Test Data.txt",
@@ -59,31 +65,50 @@ cyc_files = [
 assert len(cyc_files) > 0
 cyc_files = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
 
-# TODO: use random selection to retain ~70% of cycles for calibration, and
-# reserve the remaining for validation
-cyc_files_for_cal = [
+# TODO: use random or manual selection to retain ~70% of cycles for calibration,
+# and reserve the remaining for validation
+cyc_files_for_cal: List[Path] = [
     # TOOD: populate this somehow -- e.g. random split of `cyc_files`
 ]
 assert len(cyc_files_for_cal) > 0
-dfs_for_cal = {}
-for cyc_file in cyc_files_for_cal:
-    cyc_file: Path
+
+def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
+    cyc_dict_raw = df.to_dict()
+    # filter out "before" time
+    cyc_dict_raw = cyc_dict_raw[cyc_dict_raw["Time[s]_RawFacilities"] >= 0.0]
+    cyc_dict = {
+        "time_seconds": df["Time[s]_RawFacilities"],
+        "speed_meters_per_second": df["Dyno_Spd[mph]"] * mps_per_mph,
+        "temp_amb_air_kelvin": df["Cell_Temp[C]"] + celsius_to_kelvin_offset,
+        # "pwr_solar_load_watts": df[],
+    }
+    return fsim.Cycle.from_pydict(cyc_dict)
+    
+
+dfs_for_cal: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
-    dfs_for_cal[cyc_file.stem] = pd.read_csv(cyc_file, delimiter="\t")
-cycs_for_cal = {}
+    cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_cal
+}
+
+cycs_for_cal: Dict[str, fsim.Cycle] = {}
+# populate `cycs_for_cal`
 for (cyc_file_stem, df) in dfs_for_cal.items():
     cyc_file_stem: str
     df: pd.DataFrame
-    cyc_dict = df.to_dict()
-    # TODO: be ready to do some massaging of `cyc_dict`, like making sure that
-    # keys match expected, purging invalid keys, and massaging data types
+    cyc_dict_raw = df.to_dict()
+    cyc_file_stem: str
+    df: pd.DataFrame
+    cycs_for_cal[cyc_file_stem] = df_to_cyc(df)
 
-    # TODO: make sure this catches ambient temperature
-    cycs_for_cal[cyc_file_stem] = fsim.Cycle.from_pydict(cyc_dict)
-sds_for_cal = {}
+sds_for_cal: Dict[str, fsim.SimDrive] = {}
+# populate `sds_for_cal`
 for (cyc_file_stem, cyc) in cycs_for_cal.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
+    veh_dict = veh.to_pydict()
+    # initialize SOC
+    veh_dict['veh']['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = dfs_for_cal[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
+    # TODO: pick up work here!
     # TODO: clone veh and set up initial conditions for:
     # - SOC
     # - cabin temp
@@ -92,8 +117,32 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
     # NOTE: maybe change `save_interval` to 5
     sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
-# TODO: flesh this out for validation stuff
-# cyc_files_for_val = []
+cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
+
+dfs_for_val: Dict[str, pd.DataFrame] = {
+    # `delimiter="\t"` should work for tab separated variables
+    cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_val
+}
+
+cycs_for_val: Dict[str, fsim.Cycle] = {}
+# populate `cycs_for_val`
+for (cyc_file_stem, df) in dfs_for_val.items():
+    cyc_file_stem: str
+    df: pd.DataFrame
+    cycs_for_val[cyc_file_stem] = df_to_cyc(df)
+
+sds_for_val: Dict[str, fsim.SimDrive] = {}
+# populate `sds_for_val`
+for (cyc_file_stem, cyc) in cycs_for_val.items():
+    cyc_file_stem: str
+    cyc: fsim.Cycle
+    # TODO: clone veh and set up initial conditions for:
+    # - SOC
+    # - cabin temp
+    # - battery temp if available, else use cabin temp
+    # - engine temp for HEV
+    # NOTE: maybe change `save_interval` to 5
+    sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 # Setup model objectives
 ## Parameter Functions
@@ -105,6 +154,7 @@ def new_em_eff_max(sd_dict, new_eff_peak):
     em.set_eff_peak(new_eff_peak)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
     # TODO: check that `sd_dict` is mutably modified outside the scope of this function, e.g. with a debugger
+    # maybe do this by individually perturbing all the objectives and checking for response
 
 def new_em_eff_range(sd_dict, new_eff_range):
     """

@@ -185,9 +185,11 @@ class ModelObjectives(object):
         for ((key, df_exp), sd) in zip(self.dfs.items(), sim_drives.values()):
             key: str
             df_exp: pd.DataFrame
+            # TODO: maybe put a `try...except` block here
             t0 = time.perf_counter()
             sd.sim_drive() # type: ignore
             t1 = time.perf_counter()
+
             if self.verbose:
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
             sd_dict = sd.to_pydict()
