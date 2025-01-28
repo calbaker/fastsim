@@ -5,11 +5,11 @@ use std::f64::consts::PI;
 // TODO: think about how to incorporate life modeling for Fuel Cells and other tech
 
 #[fastsim_api(
-    // // optional, custom, struct-specific pymethods
-    // #[getter("eff_max")]
-    // fn get_eff_max_py(&self) -> f64 {
-    //     self.get_eff_max()
-    // }
+    // optional, custom, struct-specific pymethods
+    #[getter("eff_max")]
+    fn get_eff_max_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_max()?)
+    }
 
     #[setter("__eff_max")]
     fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
@@ -17,14 +17,15 @@ use std::f64::consts::PI;
         Ok(())
     }
 
-    // #[getter("eff_min")]
-    // fn get_eff_min_py(&self) -> f64 {
-    //     self.get_eff_min()
-    // }
+    #[getter("eff_min")]
+    fn get_eff_min_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_min()?)
+    }
 
     // #[getter("eff_range")]
-    // fn get_eff_range_py(&self) -> f64 {
-    //     self.get_eff_range()
+    // fn get_eff_range_py(&self) -> PyResult<f64> {
+    //     self.get_eff_range()?;
+    //     Ok(())
     // }
 
     #[setter("__eff_range")]

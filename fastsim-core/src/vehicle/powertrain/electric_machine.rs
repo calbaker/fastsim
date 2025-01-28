@@ -28,30 +28,30 @@ use crate::pyo3::*;
     //     self.set_pwr_in_frac_interp()
     // }
 
-    // #[getter("eff_max")]
-    // fn get_eff_max_py(&self) -> f64 {
-    //     self.get_eff_max()
-    // }
+    #[getter("eff_fwd_max")]
+    fn get_eff_max_fwd_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_fwd_max()?)
+    }
 
-    #[setter("__eff_max")]
-    fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
-        self.set_eff_max(eff_max)?;
+    #[setter("__eff_fwd_max")]
+    fn set_eff_fwd_max_py(&mut self, eff_max: f64) -> PyResult<()> {
+        self.set_eff_fwd_max(eff_max)?;
         Ok(())
     }
 
-    // #[getter("eff_min")]
-    // fn get_eff_min_py(&self) -> f64 {
-    //     self.get_eff_min()
-    // }
+    #[getter("eff_min_fwd")]
+    fn get_eff_min_fwd_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_min_fwd()?)
+    }
 
-    // #[getter("eff_range")]
-    // fn get_eff_range_py(&self) -> f64 {
-    //     self.get_eff_range()
-    // }
+    #[getter("eff_fwd_range")]
+    fn get_eff_fwd_range_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_fwd_range()?)
+    }
 
-    #[setter("__eff_range")]
-    fn set_eff_range_py(&mut self, eff_range: f64) -> PyResult<()> {
-        self.set_eff_range(eff_range)?;
+    #[setter("__eff_fwd_range")]
+    fn set_eff_fwd_range_py(&mut self, eff_range: f64) -> PyResult<()> {
+        self.set_eff_fwd_range(eff_range)?;
         Ok(())
     }
 )]
@@ -419,7 +419,7 @@ impl Mass for ElectricMachine {
 
 impl ElectricMachine {
     /// Returns max value of `eff_interp_fwd`
-    pub fn get_eff_max_fwd(&self) -> anyhow::Result<f64> {
+    pub fn get_eff_fwd_max(&self) -> anyhow::Result<f64> {
         // since efficiency is all f64 between 0 and 1, NEG_INFINITY is safe
         Ok(self
             .eff_interp_achieved
@@ -441,9 +441,9 @@ impl ElectricMachine {
     }
 
     /// Scales eff_interp_fwd and eff_interp_bwd by ratio of new `eff_max` per current calculated max
-    pub fn set_eff_max(&mut self, eff_max: f64) -> anyhow::Result<()> {
+    pub fn set_eff_fwd_max(&mut self, eff_max: f64) -> anyhow::Result<()> {
         if (0.0..=1.0).contains(&eff_max) {
-            let old_max_fwd = self.get_eff_max_fwd()?;
+            let old_max_fwd = self.get_eff_fwd_max()?;
             let old_max_bwd = self.get_eff_max_bwd()?;
             let f_x_fwd = self.eff_interp_achieved.f_x()?.to_owned();
             match &mut self.eff_interp_achieved {
@@ -505,8 +505,8 @@ impl ElectricMachine {
     }
 
     /// Max value of `eff_interp_fwd` minus min value of `eff_interp_fwd`.
-    pub fn get_eff_range_fwd(&self) -> anyhow::Result<f64> {
-        Ok(self.get_eff_max_fwd()? - self.get_eff_min_fwd()?)
+    pub fn get_eff_fwd_range(&self) -> anyhow::Result<f64> {
+        Ok(self.get_eff_fwd_max()? - self.get_eff_min_fwd()?)
     }
 
     /// Max value of `eff_interp_bwd` minus min value of `eff_interp_bwd`.
@@ -517,8 +517,8 @@ impl ElectricMachine {
     /// Scales values of `eff_interp_fwd.f_x` and `eff_interp_bwd.f_x` without changing max such that max - min
     /// is equal to new range.  Will change max if needed to ensure no values are
     /// less than zero.
-    pub fn set_eff_range(&mut self, eff_range: f64) -> anyhow::Result<()> {
-        let eff_max_fwd = self.get_eff_max_fwd()?;
+    pub fn set_eff_fwd_range(&mut self, eff_range: f64) -> anyhow::Result<()> {
+        let eff_max_fwd = self.get_eff_fwd_max()?;
         let eff_max_bwd = self.get_eff_max_bwd()?;
         if eff_range == 0.0 {
             let f_x_fwd = vec![
@@ -548,7 +548,7 @@ impl ElectricMachine {
             Ok(())
         } else if (0.0..=1.0).contains(&eff_range) {
             let old_min = self.get_eff_min_fwd()?;
-            let old_range = self.get_eff_max_fwd()? - old_min;
+            let old_range = self.get_eff_fwd_max()? - old_min;
             if old_range == 0.0 {
                 return Err(anyhow!(
                     "`eff_range` is already zero so it cannot be modified."
@@ -576,10 +576,10 @@ impl ElectricMachine {
                     _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
                 }
             }
-            if self.get_eff_max_fwd()? > 1.0 {
+            if self.get_eff_fwd_max()? > 1.0 {
                 return Err(anyhow!(format!(
                     "`eff_max` ({:.3}) must be no greater than 1.0",
-                    self.get_eff_max_fwd()?
+                    self.get_eff_fwd_max()?
                 )));
             }
             let old_min = self.get_eff_min_at_max_input()?;

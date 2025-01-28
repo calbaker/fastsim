@@ -29,6 +29,10 @@ sns.set()
 # - [x] make sure temp- and current/c-rate-dependent battery efficiency interp
 #       is being used -- temp is 23*C and up and c-rate ranges from -5/hr to 5/hr
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
+veh_dict = veh.to_pydict()
+
+sim_params_dict = fsim.SimParams.default().to_pydict()
+sim_params_dict["trace_miss_opts"] = 
 
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp
@@ -97,8 +101,7 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     }
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
-def veh_init(veh: fsim.Vehicle, cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
-    veh_dict = veh.to_pydict()
+def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     # initialize SOC
     veh_dict['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
         dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
@@ -138,7 +141,7 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
     # NOTE: maybe change `save_interval` to 5
-    veh = veh_init(veh, cyc_file_stem, dfs_for_cal)
+    veh = veh_init(cyc_file_stem, dfs_for_cal)
     sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
@@ -161,7 +164,7 @@ sds_for_val: Dict[str, fsim.SimDrive] = {}
 for (cyc_file_stem, cyc) in cycs_for_val.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
-    veh = veh_init(veh, cyc_file_stem, dfs_for_val)
+    veh = veh_init(cyc_file_stem, dfs_for_val)
     sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
 
 # Setup model objectives
@@ -171,7 +174,7 @@ def new_em_eff_max(sd_dict, new_eff_max):
     Set `new_eff_max` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
-    em.__eff_max = new_eff_max
+    em.__eff_fwd_max = new_eff_max
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
 
 def new_em_eff_range(sd_dict, new_eff_range):
@@ -179,7 +182,7 @@ def new_em_eff_range(sd_dict, new_eff_range):
     Set `new_eff_range` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
-    em.__eff_range = new_eff_range
+    em.__eff_fwd_range = new_eff_range
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
 
 def new_fc_eff_max(sd_dict, new_eff_max):
@@ -218,7 +221,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_em_eff_max,
         new_em_eff_range,
         new_fc_eff_max,
-        # new_fc_eff_range, # not sure I want to include this one
+        # new_fc_eff_range, 
         # TODO: make sure this has functions for modifying
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
@@ -242,14 +245,19 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.80, 0.99),
         (0.1, 0.6),
         (0.32, 0.45),
-        # (...) # not sure I want to include `new_fc_eff_range`
+        # (0.0, 0.45),
     ),
     
 )
 
 # verify that model responds to input parameter changes by individually perturbing parameters
 baseline_errors = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([0.90, 0.3, 0.4])
+    cal_mod_obj.update_params([
+        fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em']).eff_fwd_max,
+        fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em']).eff_fwd_range,
+        fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc']).eff_max,
+        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+    ])
 )
 param0_perturb = cal_mod_obj.get_errors(
     cal_mod_obj.update_params([0.90 + 0.5, 0.3, 0.4])

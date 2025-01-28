@@ -5,20 +5,51 @@ use super::vehicle::Vehicle;
 use crate::imports::*;
 use crate::prelude::*;
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Self::default()
+    }
+)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 /// Solver parameters
 pub struct SimParams {
+    #[serde(default = "SimParams::def_ach_speed_max_iter")]
     pub ach_speed_max_iter: u32,
+    #[serde(default = "SimParams::def_ach_speed_tol")]
     pub ach_speed_tol: si::Ratio,
+    #[serde(default = "SimParams::def_ach_speed_solver_gain")]
     pub ach_speed_solver_gain: f64,
-
+    #[serde(default = "SimParams::def_trace_miss_tol")]
     pub trace_miss_tol: TraceMissTolerance,
-
+    #[serde(default = "SimParams::def_trace_miss_opts")]
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
+    #[serde(default = "SimParams::def_f2_const_air_density")]
     pub f2_const_air_density: bool,
+}
+
+impl SimParams {
+    fn def_ach_speed_max_iter() -> u32 {
+        Self::default().ach_speed_max_iter
+    }
+    fn def_ach_speed_tol() -> si::Ratio {
+        Self::default().ach_speed_tol
+    }
+    fn def_ach_speed_solver_gain() -> f64 {
+        Self::default().ach_speed_solver_gain
+    }
+    fn def_trace_miss_tol() -> TraceMissTolerance {
+        Self::default().trace_miss_tol
+    }
+    fn def_trace_miss_opts() -> TraceMissOptions {
+        Self::default().trace_miss_opts
+    }
+    fn def_f2_const_air_density() -> bool {
+        Self::default().f2_const_air_density
+    }
 }
 
 impl SerdeAPI for SimParams {}

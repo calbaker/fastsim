@@ -186,7 +186,11 @@ class ModelObjectives(object):
             df_exp: pd.DataFrame
             # TODO: maybe put a `try...except` block here
             t0 = time.perf_counter()
-            sd.walk_once() # type: ignore
+            try:
+                sd.walk_once() # type: ignore
+            except RuntimeError as err:
+                print(f"key: {key}")
+                raise(err)
             t1 = time.perf_counter()
 
             if self.verbose:
