@@ -32,7 +32,8 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_S
 veh_dict = veh.to_pydict()
 
 sim_params_dict = fsim.SimParams.default().to_pydict()
-sim_params_dict["trace_miss_opts"] = 
+sim_params_dict["trace_miss_opts"] = "Allow"
+sim_params = fsim.SimParams.from_pydict(sim_params_dict)
 
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp
@@ -142,7 +143,7 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
     cyc: fsim.Cycle
     # NOTE: maybe change `save_interval` to 5
     veh = veh_init(cyc_file_stem, dfs_for_cal)
-    sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
+    sds_for_cal[cyc_file_stem] = fsim.SimDrive(veh, cyc, sim_params).to_pydict()
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
 assert len(cyc_files_for_val) > 0
@@ -165,7 +166,7 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
     cyc_file_stem: str
     cyc: fsim.Cycle
     veh = veh_init(cyc_file_stem, dfs_for_val)
-    sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc).to_pydict()
+    sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc, sim_params).to_pydict()
 
 # Setup model objectives
 ## Parameter Functions

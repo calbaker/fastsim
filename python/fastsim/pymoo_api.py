@@ -26,7 +26,7 @@ try:
     from pymoo.util.ref_dirs import get_reference_directions  # noqa: F401
     PYMOO_AVAILABLE = True
 except ModuleNotFoundError as err:
-    logger.warning(
+    print(
         f"{err}\nTry running `pip install pymoo==0.6.0.1` to use all features in " + 
         "`fastsim.calibration`"
     )

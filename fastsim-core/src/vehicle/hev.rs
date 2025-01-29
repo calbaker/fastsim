@@ -588,11 +588,13 @@ impl HEVPowertrainControls {
             "{}
 `pwr_out_req`: {} kW
 `em_state.pwr_mech_fwd_out_max`: {} kW
-`fc_state.pwr_prop_max`: {} kW",
+`fc_state.pwr_prop_max`: {} kW
+`res.state.soc`: {}",
             format_dbg!(),
             pwr_prop_req.get::<si::kilowatt>(),
             em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
-            fc_state.pwr_prop_max.get::<si::kilowatt>()
+            fc_state.pwr_prop_max.get::<si::kilowatt>(),
+            res.state.soc.get::<si::ratio>()
         );
 
         // # Brain dump for thermal stuff

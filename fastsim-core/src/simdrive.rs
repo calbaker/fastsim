@@ -17,11 +17,19 @@ use crate::prelude::*;
 /// Solver parameters
 pub struct SimParams {
     #[serde(default = "SimParams::def_ach_speed_max_iter")]
+    /// max number of iterations allowed in setting achieved speed when trace
+    /// cannot be achieved
     pub ach_speed_max_iter: u32,
     #[serde(default = "SimParams::def_ach_speed_tol")]
+    /// tolerance in change in speed guess in setting achieved speed when trace
+    /// cannot be achieved
     pub ach_speed_tol: si::Ratio,
     #[serde(default = "SimParams::def_ach_speed_solver_gain")]
+    /// Newton method gain for setting achieved speed
     pub ach_speed_solver_gain: f64,
+    // TODO: plumb this up to actually do something
+    /// When implemented, this will set the tolerance on how much trace miss
+    /// is allowed
     #[serde(default = "SimParams::def_trace_miss_tol")]
     pub trace_miss_tol: TraceMissTolerance,
     #[serde(default = "SimParams::def_trace_miss_opts")]
@@ -453,10 +461,10 @@ pwr deficit: {} kW
         // initial guess
         let speed_guess = (1e-3 * uc::MPS).max(cyc_speed);
         // stop criteria
-        let max_iter = self.sim_params.ach_speed_max_iter;
-        let xtol = self.sim_params.ach_speed_tol;
+        let max_iter = &self.sim_params.ach_speed_max_iter;
+        let xtol = &self.sim_params.ach_speed_tol;
         // solver gain
-        let g = self.sim_params.ach_speed_solver_gain;
+        let g = &self.sim_params.ach_speed_solver_gain;
         let pwr_err_fn = |speed_guess: si::Velocity| -> si::Power {
             t3 * speed_guess.powi(typenum::P3::new())
                 + t2 * speed_guess.powi(typenum::P2::new())
@@ -480,10 +488,10 @@ pwr deficit: {} kW
         // speed achieved iteration counter
         let mut spd_ach_iter_counter = 1;
         let mut converged = pwr_err <= si::Power::ZERO;
-        while spd_ach_iter_counter < max_iter && !converged {
+        while &spd_ach_iter_counter < max_iter && !converged {
             let speed_guess = *speed_guesses.iter().last().with_context(|| format_dbg!())?
                 * (1.0 - g)
-                - g * *new_speed_guesses
+                - *g * *new_speed_guesses
                     .iter()
                     .last()
                     .with_context(|| format_dbg!())?
@@ -496,7 +504,7 @@ pwr deficit: {} kW
             d_pwr_err_per_d_speed_guesses.push(pwr_err_per_speed_guess);
             new_speed_guesses.push(new_speed_guess);
             // is the fractional change between previous and current speed guess smaller than `xtol`
-            converged = ((*speed_guesses.iter().last().with_context(|| format_dbg!())?
+            converged = &((*speed_guesses.iter().last().with_context(|| format_dbg!())?
                 - speed_guesses[speed_guesses.len() - 2])
                 / speed_guesses[speed_guesses.len() - 2])
                 .abs()
@@ -533,9 +541,17 @@ pwr deficit: {} kW
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 pub struct TraceMissTolerance {
+    /// if the vehicle falls this far behind trace in terms of absolute
+    /// difference and [TraceMissOptions::is_allow_checked], fail
     tol_dist: si::Length,
+    /// if the vehicle falls this far behind trace in terms of fractional
+    /// difference and [TraceMissOptions::is_allow_checked], fail
     tol_dist_frac: si::Ratio,
+    /// if the vehicle falls this far behind instantaneous speed and
+    /// [TraceMissOptions::is_allow_checked], fail
     tol_speed: si::Velocity,
+    /// if the vehicle falls this far behind instantaneous speed in terms of
+    /// fractional difference and [TraceMissOptions::is_allow_checked], fail
     tol_speed_frac: si::Ratio,
 }
 
@@ -545,11 +561,10 @@ impl Init for TraceMissTolerance {}
 impl Default for TraceMissTolerance {
     fn default() -> Self {
         Self {
-            // TODO: update these values
-            tol_dist: 666. * uc::M,
-            tol_dist_frac: 666. * uc::R,
-            tol_speed: 666. * uc::MPS,
-            tol_speed_frac: 666. * uc::R,
+            tol_dist: 100. * uc::M,
+            tol_dist_frac: 0.01 * uc::R,
+            tol_speed: 10. * uc::MPS,
+            tol_speed_frac: 0.5 * uc::R,
         }
     }
 }
@@ -558,6 +573,9 @@ impl Default for TraceMissTolerance {
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
+    // TODO: plumb this up
+    /// Allow trace miss within error tolerance
+    AllowChecked,
     #[default]
     /// Error out when trace miss happens
     Error,
