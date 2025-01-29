@@ -76,7 +76,6 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
         "temp_amb_air_kelvin": (df["Cell_Temp[C]"] + celsius_to_kelvin_offset).to_list(),
         # TODO: pipe solar load from `Cycle` into cabin thermal model
         # TODO: use something (e.g. regex) to determine solar load
-        # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx
         # "pwr_solar_load_watts": df[],
     }
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
@@ -91,8 +90,6 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize battery temperature to match cabin temperature because battery
     # temperature is not available in test data
-    # Also, battery temperature has no effect in the HEV because efficiency data
-    # does not go below 23*C and there is no active thermal management
     veh_dict['pt_type']['BatteryElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize engine temperature
