@@ -67,7 +67,7 @@ impl Default for SimParams {
     fn default() -> Self {
         Self {
             ach_speed_max_iter: 3,
-            ach_speed_tol: 1.0e-9 * uc::R,
+            ach_speed_tol: 1.0e-3 * uc::R,
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
@@ -279,6 +279,11 @@ impl SimDrive {
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
+        let interp_pt_dist: &[f64] = match self.cyc.grade_interp {
+            Some(Interpolator::Interp0D(..)) => &[],
+            Some(Interpolator::Interp1D(..)) => &[vs.dist.get::<si::meter>()],
+            _ => unreachable!(),
+        };
         vs.grade_curr = if vs.cyc_met_overall {
             *self
                 .cyc
@@ -292,7 +297,8 @@ impl SimDrive {
                     .grade_interp
                     .as_ref()
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
-                    .interpolate(&[vs.dist.get::<si::meter>()])?
+                    .interpolate(interp_pt_dist)
+                    .with_context(|| format_dbg!())?
         };
         vs.elev_curr = if vs.cyc_met_overall {
             *self.cyc.elev.get(i).with_context(|| format_dbg!())?
@@ -303,7 +309,8 @@ impl SimDrive {
                     .elev_interp
                     .as_ref()
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
-                    .interpolate(&[vs.dist.get::<si::meter>()])?
+                    .interpolate(interp_pt_dist)
+                    .with_context(|| format_dbg!())?
         };
 
         vs.air_density = if self.sim_params.f2_const_air_density {
@@ -620,7 +627,7 @@ impl Default for TraceMissTolerance {
     fn default() -> Self {
         Self {
             tol_dist: 100. * uc::M,
-            tol_dist_frac: 0.01 * uc::R,
+            tol_dist_frac: 0.05 * uc::R,
             tol_speed: 10. * uc::MPS,
             tol_speed_frac: 0.5 * uc::R,
         }

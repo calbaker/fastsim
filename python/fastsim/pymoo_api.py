@@ -94,11 +94,11 @@ class ModelObjectives(object):
       tuple containing functions to modify parameters and bounds for optimizer
       Example   
       ```
-      def new_peak_res_eff (sd_dict, new_peak_eff):
+      def new_peak_res_eff (sd_dict, new_peak_eff) -> Dict:
           sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['peak_eff'] = new_peak_eff
+          return sd_dict
       ...
       param_fns = (
-          # generally good to check that sd_dict is mutably modified, but it should work out as expected
           new_peak_res_eff,
       )
       ``` 
@@ -142,15 +142,18 @@ class ModelObjectives(object):
         # Update all model parameters
         for key, pydict in self.models.items():
             for (param_fn, new_val) in zip(self.param_fns, xs):
-                param_fn(pydict, new_val)
+                pydict = param_fn(pydict, new_val)
             # this assignement may be redundant, but `pydict` is probably **not** mutably modified.
             # If this is correct, then this assignment is necessary
             self.models[key] = pydict
 
         # Instantiate SimDrive objects
-        sim_drives = {
-            key: fsim.SimDrive.from_pydict(pydict) for key, pydict in self.models.items()
-        }
+        sim_drives = {}
+        for key, pydict in self.models.items():
+            try:
+                sim_drives[key] = fsim.SimDrive.from_pydict(pydict, skip_init=False) 
+            except Exception as err:
+                sim_drives[key] = err
         t1 = time.perf_counter()
         if self.verbose:
             print(f"Time to update params: {t1 - t0:.3g} s")
@@ -183,20 +186,24 @@ class ModelObjectives(object):
         for ((key, df_exp), sd) in zip(self.dfs.items(), sim_drives.values()):
             key: str
             df_exp: pd.DataFrame
-            # TODO: maybe put a `try...except` block here
-            t0 = time.perf_counter()
+
+            if not isinstance(sd, fsim.SimDrive):
+                solved_mods[key] = sd
+                objectives[key] = [1e12] * len(self.obj_fns) * len(self.dfs)
+                continue
+            
             try:
+                t0 = time.perf_counter()
                 sd.walk_once() # type: ignore
+                t1 = time.perf_counter()
                 sd_dict = sd.to_pydict()
                 sd_df = sd.to_dataframe()
             except RuntimeError as err:
-                sd.to_file("sd_fail.yaml") # uncomment for debugging
                 sd_dict = sd.to_pydict()
                 sd_df = sd.to_dataframe(allow_partial=True)
-                if sd_dict['veh']['state']['time_seconds'] < 50:
+                if sd_dict['veh']['state']['time_seconds'] < len(df_exp) / 2:
                     print(f"key: {key}")
                     raise(err)
-            t1 = time.perf_counter()
 
             if self.verbose:
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
@@ -212,7 +219,7 @@ class ModelObjectives(object):
                 if len(obj_fn) == 2:
                     # objective and reference passed
                     mod_sig = obj_fn[0](sd_df)  
-                    ref_sig = obj_fn[1](df_exp)  
+                    ref_sig = obj_fn[1](df_exp)[:len(sd_df)]
                 elif len(obj_fn) == 1:
                     # minimizing scalar objective 
                     mod_sig = obj_fn[0](sd_df)  

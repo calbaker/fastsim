@@ -11,6 +11,7 @@ import pandas as pd  # noqa: F401
 import polars as pl  # noqa: F401
 from typing import List, Dict
 from pymoo.core.problem import StarmapParallelization
+from copy import deepcopy
 
 import fastsim as fsim
 from fastsim import pymoo_api
@@ -83,13 +84,6 @@ assert len(cyc_files_for_cal) > 0
 print("cyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]))
 
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
-    # filter out "before" time
-    df = df[df["Time[s]_RawFacilities"] >= 0.0]
-    # TODO: figure out if we should use an integrator for resampling rate vars
-    # df = df.set_index("Time[s]_RawFacilities")
-    # df = df.resample("1s", origin="start").bfill()
-    df = df[::10]
-    assert len(df) > 10
     cyc_dict = {
         "time_seconds": df["Time[s]_RawFacilities"].to_list(),
         "speed_meters_per_second": (df["Dyno_Spd[mph]"] * mps_per_mph).to_list(),
@@ -102,10 +96,10 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
-    vd = veh_dict.copy()
+    vd = deepcopy(veh_dict)
     # initialize SOC
     vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
-        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][1] / 100
+        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].iloc[1] / 100
     assert 0 < vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] < 1, "\ninit soc: {}\nhead: {}".format(
         vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].head())
     # initialize cabin temp
@@ -127,7 +121,16 @@ dfs_for_cal: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
     cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_cal
 }
-
+for key, df_for_cal in dfs_for_cal.items():
+    # filter out "before" time
+    df_for_cal = df_for_cal[df_for_cal["Time[s]_RawFacilities"] >= 0.0]
+    # TODO: figure out if we should use an integrator for resampling rate vars
+    # df_for_cal = df_for_cal.set_index("Time[s]_RawFacilities")
+    # df_for_cal = df_for_cal.resample("1s", origin="start").bfill()
+    df_for_cal = df_for_cal[::10]
+    df_for_cal.reset_index(inplace=True)
+    dfs_for_cal[key] = df_for_cal
+    
 cycs_for_cal: Dict[str, fsim.Cycle] = {}
 # populate `cycs_for_cal`
 for (cyc_file_stem, df) in dfs_for_cal.items():
@@ -155,6 +158,15 @@ dfs_for_val: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
     cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_val
 }
+for key, df_for_val in dfs_for_val.items():
+    # filter out "before" time
+    df_for_val = df_for_val[df_for_val["Time[s]_RawFacilities"] >= 0.0]
+    # TODO: figure out if we should use an integrator for resampling rate vars
+    # df_for_val = df_for_val.set_index("Time[s]_RawFacilities")
+    # df_for_val = df_for_val.resample("1s", origin="start").bfill()
+    df_for_val = df_for_val[::10]
+    df_for_val.reset_index(inplace=True)
+    dfs_for_val[key] = df_for_val
 
 cycs_for_val: Dict[str, fsim.Cycle] = {}
 # populate `cycs_for_val`
@@ -173,37 +185,41 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
 
 # Setup model objectives
 ## Parameter Functions
-def new_em_eff_max(sd_dict, new_eff_max):
+def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
     em.__eff_fwd_max = new_eff_max
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    return sd_dict
 
-def new_em_eff_range(sd_dict, new_eff_range):
+def new_em_eff_range(sd_dict, new_eff_range) -> Dict:
     """
     Set `new_eff_range` in `ElectricMachine`
     """
     em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
     em.__eff_fwd_range = new_eff_range
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    return sd_dict
 
-def new_fc_eff_max(sd_dict, new_eff_max):
+def new_fc_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.__eff_max = new_eff_max
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    return sd_dict
 
-def new_fc_eff_range(sd_dict, new_eff_range):
+def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     """
     Set `new_eff_range` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.__eff_range = new_eff_range
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    return sd_dict
 
 ## Model Objectives
 cal_mod_obj = pymoo_api.ModelObjectives(
@@ -215,11 +231,12 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             lambda df: df['HVBatt_SOC_high_precision_PCAN__per']
         ),
         # TODO: add objectives for:
+        # - achieved and cycle speed
         # - engine fuel usage 
-        # - battery temperature
+        # - battery temperature -- BEV only, if available
         # - engine temperature
         # - cabin temperature
-        # - HVAC power, if available
+        # - HVAC power for cabin, if available
     ),
     param_fns=(
         new_em_eff_max,
@@ -227,22 +244,23 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_fc_eff_max,
         # new_fc_eff_range, 
         # TODO: make sure this has functions for modifying
-        # - HVAC PID controls for cabin (not for battery because Sonata has
-        #   passive thermal management, but make sure to do battery thermal
-        #   controls for BEV)
         # - cabin thermal
         #     - thermal mass
         #     - length
         #     - htc to amb when stopped
         #     - set width from vehicle specs -- no need to calibrate
-        # - engine thermal
-        #     - thermal mass
-        #     - convection to ambient when stopped
-        #     - diameter
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
         #     - convection to ambient
         #     - convection to cabin
+        # ## HEV specific stuff
+        # - HVAC PID controls for cabin (not for battery because Sonata has
+        #   passive thermal management, but make sure to do battery thermal
+        #   controls for BEV)
+        # - engine thermal
+        #     - thermal mass
+        #     - convection to ambient when stopped
+        #     - diameter
     ),
     # must match order and length of `params_fns`
     bounds=(
@@ -288,10 +306,11 @@ param2_perturb = cal_mod_obj.get_errors(
     cal_mod_obj.update_params([
         em_eff_fwd_max,
         em_eff_fwd_range,
-        fc_eff_max + 0.01,
+        fc_eff_max - 0.1,
         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
     ])
 )
+breakpoint()
 assert list(param2_perturb.values()) != list(baseline_errors.values())
 
 if __name__ == "__main__":
