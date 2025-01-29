@@ -198,7 +198,6 @@ class ModelObjectives(object):
                 sd_dict = sd.to_pydict()
             except RuntimeError as err:
                 t1 = time.perf_counter()
-                sd.to_file("sd_fail.yaml") # uncomment for debugging
                 sd_dict = sd.to_pydict()
                 if sd_dict['veh']['state']['time_seconds'] < 50:
                     print(f"key: {key}")

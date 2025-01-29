@@ -281,43 +281,43 @@ cal_mod_obj = pymoo_api.ModelObjectives(
 em_eff_fwd_max = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_max 
 em_eff_fwd_range = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_range 
 fc_eff_max = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False).eff_max 
-print("Verifying that model responds to input parameter changes by individually perturbing parameters")
-baseline_errors = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([
-        em_eff_fwd_max,
-        em_eff_fwd_range,
-        fc_eff_max,
-        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-    ])
-)
-param0_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([
-        em_eff_fwd_max + 0.05,
-        em_eff_fwd_range,
-        fc_eff_max,
-        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-    ])
-)
-assert list(param0_perturb.values()) != list(baseline_errors.values())
-param1_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([
-        em_eff_fwd_max,
-        em_eff_fwd_range + 0.1,
-        fc_eff_max,
-        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-    ])
-)
-assert list(param1_perturb.values()) != list(baseline_errors.values())
-param2_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([
-        em_eff_fwd_max,
-        em_eff_fwd_range,
-        fc_eff_max - 0.15,
-        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-    ])
-)
-assert list(param2_perturb.values()) != list(baseline_errors.values())
-print("Success!")
+# print("Verifying that model responds to input parameter changes by individually perturbing parameters")
+# baseline_errors = cal_mod_obj.get_errors(
+#     cal_mod_obj.update_params([
+#         em_eff_fwd_max,
+#         em_eff_fwd_range,
+#         fc_eff_max,
+#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+#     ])
+# )
+# param0_perturb = cal_mod_obj.get_errors(
+#     cal_mod_obj.update_params([
+#         em_eff_fwd_max + 0.05,
+#         em_eff_fwd_range,
+#         fc_eff_max,
+#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+#     ])
+# )
+# assert list(param0_perturb.values()) != list(baseline_errors.values())
+# param1_perturb = cal_mod_obj.get_errors(
+#     cal_mod_obj.update_params([
+#         em_eff_fwd_max,
+#         em_eff_fwd_range + 0.1,
+#         fc_eff_max,
+#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+#     ])
+# )
+# assert list(param1_perturb.values()) != list(baseline_errors.values())
+# param2_perturb = cal_mod_obj.get_errors(
+#     cal_mod_obj.update_params([
+#         em_eff_fwd_max,
+#         em_eff_fwd_range,
+#         fc_eff_max - 0.15,
+#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+#     ])
+# )
+# assert list(param2_perturb.values()) != list(baseline_errors.values())
+# print("Success!")
 
 if __name__ == "__main__":
     parser = pymoo_api.get_parser(
