@@ -132,7 +132,7 @@ class ModelObjectives(object):
 
     def update_params(self, xs: List[Any]):
         """
-        Updates model parameters based on `x`, which must match length of self.params
+        Updates model parameters based on `x`, which must match length of self.param_fns
         """
         assert len(xs) == len(self.param_fns), f"({len(xs)} != {len(self.param_fns)}"
 

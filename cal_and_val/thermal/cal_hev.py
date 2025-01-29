@@ -224,7 +224,7 @@ def get_mod_soc(sd_dict):
     return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
 
 def get_exp_soc(df):
-    return df['HVBatt_SOC_high_precision_PCAN__per']
+    return df['HVBatt_SOC_high_precision_PCAN__per'] / 100
 
 save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
 save_path.mkdir(exist_ok=True, parents=True)
