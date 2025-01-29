@@ -66,15 +66,14 @@ class ModelObjectives(object):
     - `dfs` (Dict[str, pd.DataFrame]): dictionary of dataframes from test data
       corresponding to `models`
     - `obj_fns` (Tuple[Callable] | Tuple[Tuple[Callable, Callable]]): 
-      Tuple of functions (either `def` or `lambda`, depending on complexity
-      needed) for extracting objective signal values for either minimizing a
+      Tuple of functions for extracting objective signal values for either minimizing a
       scalar metric (e.g. fuel economy) or minimizing error relative to test
       data.
         - minimizing error in fuel consumption relative to test data
           ```
           obj_fns = (
               (
-                  # model
+                  # model -- note, `lambda` only works for single thread
                   lambda sd_dict: sd_dict['veh']['pt_type']['Conventional']['fc']['history']['energy_fuel_joules'],
                   # test data
                   lambda df: df['fuel_flow_gps'] * ... (conversion factors to get to same unit),
@@ -197,11 +196,11 @@ class ModelObjectives(object):
                 sd.walk_once() # type: ignore
                 t1 = time.perf_counter()
                 sd_dict = sd.to_pydict()
-                sd_df = sd.to_dataframe()
             except RuntimeError as err:
+                t1 = time.perf_counter()
+                sd.to_file("sd_fail.yaml") # uncomment for debugging
                 sd_dict = sd.to_pydict()
-                sd_df = sd.to_dataframe(allow_partial=True)
-                if sd_dict['veh']['state']['time_seconds'] < len(df_exp) / 2:
+                if sd_dict['veh']['state']['time_seconds'] < 50:
                     print(f"key: {key}")
                     raise(err)
 
@@ -215,20 +214,20 @@ class ModelObjectives(object):
             # loop through the objectives for each trip
             for i_obj, obj_fn in enumerate(self.obj_fns):
                 i_obj: int
-                obj_fn: Tuple[Callable(sd_df), Callable(df_exp)]
+                obj_fn: Tuple[Callable(sd_dict), Callable(df_exp)]
                 if len(obj_fn) == 2:
                     # objective and reference passed
-                    mod_sig = obj_fn[0](sd_df)  
-                    ref_sig = obj_fn[1](df_exp)[:len(sd_df)]
+                    mod_sig = obj_fn[0](sd_dict)  
+                    ref_sig = obj_fn[1](df_exp)[:len(sd_dict['veh']['history']['time_seconds'])]
                 elif len(obj_fn) == 1:
                     # minimizing scalar objective 
-                    mod_sig = obj_fn[0](sd_df)  
+                    mod_sig = obj_fn[0](sd_dict)  
                     ref_sig = None
                 else:
                     raise ValueError("Each element in `self.obj_fns` must have length of 1 or 2")
 
                 if ref_sig is not None:
-                    time_s = sd_df['veh.history.time_seconds']
+                    time_s = sd_dict['veh']['history']['time_seconds']
                     # TODO: provision for incomplete simulation in here somewhere
 
                     try:
@@ -275,23 +274,22 @@ if PYMOO_AVAILABLE:
             elementwise_runner=LoopedElementwiseEvaluation(),
         ):
             self.mod_obj = mod_obj
-            assert len(self.mod_obj.param_bounds) == len(
-                self.mod_obj.param_fns), f"{len(self.mod_obj.param_bounds)} != {len(self.mod_obj.param_fns)}"
+            assert len(self.mod_obj.bounds) == len(
+                self.mod_obj.param_fns), f"{len(self.mod_obj.bounds)} != {len(self.mod_obj.param_fns)}"
             super().__init__(
                 n_var=len(self.mod_obj.param_fns),
                 n_obj=self.mod_obj.n_obj,
                 xl=[bounds[0]
-                    for bounds in self.mod_obj.param_bounds],
+                    for bounds in self.mod_obj.bounds],
                 xu=[bounds[1]
-                    for bounds in self.mod_obj.param_bounds],
+                    for bounds in self.mod_obj.bounds],
                 elementwise_runner=elementwise_runner,
             )
 
         def _evaluate(self, x, out, *args, **kwargs):
             sim_drives = self.mod_obj.update_params(x)
-            out['F'] = [
-                val for inner_dict in self.mod_obj.get_errors(sim_drives).values() for val in inner_dict.values()
-            ]
+            out['F'] = list(self.mod_obj.get_errors(sim_drives).values())
+            
 
     class CustomOutput(Output):
         def __init__(self):

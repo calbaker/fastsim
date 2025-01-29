@@ -314,36 +314,23 @@ impl Init for ElectricMachine {
                 )
              )?;
         self.state.init().with_context(|| anyhow!(format_dbg!()))?;
-        // TODO: make use of `use fastsim_2::params::{LARGE_BASELINE_EFF, LARGE_MOTOR_POWER_KW, SMALL_BASELINE_EFF,SMALL_MOTOR_POWER_KW};`
-        // to set
-        // if let None = self.pwr_out_frac_interp {
-        //     self.pwr_out_frac_interp =
-        // }
-        // TODO: verify that `pwr_in_frac_interp` is set somewhere and if it is, maybe move it to here???
-        if self.eff_interp_at_max_input.is_none() {
-            // sets eff_interp_bwd to eff_interp_fwd, but changes the x-value.
-            // TODO: what should the default strategy be for eff_interp_bwd?
-            let eff_interp_at_max_input = Interpolator::new_1d(
-                self.eff_interp_achieved
-                    .x()?
-                    .iter()
-                    .zip(self.eff_interp_achieved.f_x()?)
-                    .map(|(x, y)| x / y)
-                    .collect(),
-                self.eff_interp_achieved.f_x()?.to_owned(),
-                // TODO: should these be set to be the same as eff_interp_fwd,
-                // as currently is done, or should they be set to be specific
-                // Extrapolate and Strategy types?
-                self.eff_interp_achieved.strategy()?.to_owned(),
-                self.eff_interp_achieved.extrapolate()?.to_owned(),
-            )?;
-            self.eff_interp_at_max_input = Some(eff_interp_at_max_input);
-        } else {
-            println!(
-                "`eff_interp_at_max_input` is being overwritten by {}",
-                format_dbg!()
-            )
-        }
+        // sets eff_interp_bwd to eff_interp_fwd, but changes the x-value.
+        // TODO: what should the default strategy be for eff_interp_bwd?
+        let eff_interp_at_max_input = Interpolator::new_1d(
+            self.eff_interp_achieved
+                .x()?
+                .iter()
+                .zip(self.eff_interp_achieved.f_x()?)
+                .map(|(x, y)| x / y)
+                .collect(),
+            self.eff_interp_achieved.f_x()?.to_owned(),
+            // TODO: should these be set to be the same as eff_interp_fwd,
+            // as currently is done, or should they be set to be specific
+            // Extrapolate and Strategy types?
+            self.eff_interp_achieved.strategy()?.to_owned(),
+            self.eff_interp_achieved.extrapolate()?.to_owned(),
+        )?;
+        self.eff_interp_at_max_input = Some(eff_interp_at_max_input);
         Ok(())
     }
 }

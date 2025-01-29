@@ -66,7 +66,7 @@ cyc_files: List[str] = [
 ]
 assert len(cyc_files) > 0
 cyc_files: List[Path] = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
-print("cyc_files:\n", '\n'.join([cf.name for cf in cyc_files]))
+print("\ncyc_files:\n", '\n'.join([cf.name for cf in cyc_files]), sep='')
 
 # use random or manual selection to retain ~70% of cycles for calibration,
 # and reserve the remaining for validation
@@ -81,7 +81,7 @@ cyc_files_for_cal: List[str] = [
 ]
 cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.name in cyc_files_for_cal]
 assert len(cyc_files_for_cal) > 0
-print("cyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]))
+print("\ncyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]), sep='')
 
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     cyc_dict = {
@@ -152,7 +152,7 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
 assert len(cyc_files_for_val) > 0
-print("cyc_files_for_val:\n", '\n'.join([cf.name for cf in cyc_files_for_val]))
+print("\ncyc_files_for_val:\n", '\n'.join([cf.name for cf in cyc_files_for_val]), sep='')
 
 dfs_for_val: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
@@ -221,14 +221,20 @@ def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
     return sd_dict
 
+def get_mod_soc(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
+
+def get_exp_soc(df):
+    return df['HVBatt_SOC_high_precision_PCAN__per']
+
 ## Model Objectives
 cal_mod_obj = pymoo_api.ModelObjectives(
     models = sds_for_cal,
     dfs = dfs_for_cal,
     obj_fns=(
         (
-            lambda sd_df: np.array(sd_df['veh.pt_type.HybridElectricVehicle.res.history.soc']),
-            lambda df: df['HVBatt_SOC_high_precision_PCAN__per']
+            get_mod_soc,
+            get_exp_soc
         ),
         # TODO: add objectives for:
         # - achieved and cycle speed
@@ -269,7 +275,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.32, 0.45),
         # (0.0, 0.45),
     ),
-    verbose=True,    
+    verbose=False,    
 )
 
 em_eff_fwd_max = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_max 
@@ -306,15 +312,15 @@ param2_perturb = cal_mod_obj.get_errors(
     cal_mod_obj.update_params([
         em_eff_fwd_max,
         em_eff_fwd_range,
-        fc_eff_max - 0.1,
+        fc_eff_max - 0.15,
         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
     ])
 )
-breakpoint()
 assert list(param2_perturb.values()) != list(baseline_errors.values())
+print("Success!")
 
 if __name__ == "__main__":
-    parser = fsim.cal.get_parser(
+    parser = pymoo_api.get_parser(
         # Defaults are set low to allow for fast run time during testing.  For a good
         # optimization, set this much higher.
         def_save_path=None,
@@ -333,14 +339,14 @@ if __name__ == "__main__":
         save_path = None
 
     print("Starting calibration.")
-    algorithm = fsim.calibration.NSGA2(
+    algorithm = pymoo_api.NSGA2(
         # size of each population
         pop_size=pop_size,
         # LatinHyperCube sampling seems to be more effective than the default
         # random sampling
-        sampling=fsim.calibration.LHS(),
+        sampling=pymoo_api.LHS(),
     )
-    termination = fsim.calibration.DMOT(
+    termination = pymoo_api.DMOT(
         # max number of generations, default of 10 is very small
         n_max_gen=n_max_gen,
         # evaluate tolerance over this interval of generations every
@@ -372,7 +378,7 @@ if __name__ == "__main__":
         import multiprocessing
 
         with multiprocessing.Pool(n_processes) as pool:
-            problem = fsim.calibration.CalibrationProblem(
+            problem = pymoo_api.CalibrationProblem(
                 mod_obj=cal_mod_obj,
                 elementwise_runner=StarmapParallelization(pool.starmap),
             )
