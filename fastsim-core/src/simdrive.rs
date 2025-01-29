@@ -227,6 +227,7 @@ impl SimDrive {
     /// Solves current time step
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
         let i = self.veh.state.i;
+        self.veh.state.time = self.cyc.time[i];
         let dt = self.cyc.dt_at_i(i)?;
         let speed_prev = self.veh.state.speed_ach;
         // maybe make controls like:
@@ -249,6 +250,14 @@ impl SimDrive {
         self.veh.state.pwr_tractive_for_cyc = self.veh.state.pwr_tractive;
         self.set_ach_speed(self.cyc.speed[i], speed_prev, dt)
             .with_context(|| anyhow!(format_dbg!()))?;
+        if self.sim_params.trace_miss_opts.is_allow_checked() {
+            self.sim_params.trace_miss_tol.check_trace_miss(
+                self.cyc.speed[i],
+                self.veh.state.speed_ach,
+                self.cyc.dist[i],
+                self.veh.state.dist,
+            )?;
+        }
         self.veh
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -374,6 +383,9 @@ impl SimDrive {
             match self.sim_params.trace_miss_opts {
                 TraceMissOptions::Allow => {
                     // do nothing because `set_ach_speed` should be allowed to proceed to handle this
+                }
+                TraceMissOptions::AllowChecked => {
+                    // this will be handled later
                 }
                 TraceMissOptions::Error => bail!(
                     "{}\nFailed to meet speed trace.
@@ -540,6 +552,7 @@ pwr deficit: {} kW
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
+// NOTE: consider embedding this in TraceMissOptions::AllowChecked
 pub struct TraceMissTolerance {
     /// if the vehicle falls this far behind trace in terms of absolute
     /// difference and [TraceMissOptions::is_allow_checked], fail
@@ -555,9 +568,54 @@ pub struct TraceMissTolerance {
     tol_speed_frac: si::Ratio,
 }
 
+impl TraceMissTolerance {
+    fn check_trace_miss(
+        &self,
+        cyc_speed: si::Velocity,
+        ach_speed: si::Velocity,
+        cyc_dist: si::Length,
+        ach_dist: si::Length,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            cyc_speed - ach_speed < self.tol_speed,
+            "{}\n{}\n{}",
+            format_dbg!(cyc_speed),
+            format_dbg!(ach_speed),
+            format_dbg!(self.tol_speed)
+        );
+        // if condition to prevent divide-by-zero errors
+        if cyc_speed > self.tol_speed {
+            ensure!(
+                (cyc_speed - ach_speed) / cyc_speed < self.tol_speed_frac,
+                "{}\n{}\n{}",
+                format_dbg!(cyc_speed),
+                format_dbg!(ach_speed),
+                format_dbg!(self.tol_speed_frac)
+            )
+        }
+        ensure!(
+            (cyc_dist - ach_dist) < self.tol_dist,
+            "{}\n{}\n{}",
+            format_dbg!(cyc_dist),
+            format_dbg!(ach_dist),
+            format_dbg!(self.tol_dist)
+        );
+        // if condition to prevent checking early in cycle
+        if cyc_dist > self.tol_dist * 5.0 {
+            ensure!(
+                (cyc_dist - ach_dist) / cyc_dist < self.tol_dist_frac,
+                "{}\n{}\n{}",
+                format_dbg!(cyc_dist),
+                format_dbg!(ach_dist),
+                format_dbg!(self.tol_dist_frac)
+            )
+        }
+
+        Ok(())
+    }
+}
 impl SerdeAPI for TraceMissTolerance {}
 impl Init for TraceMissTolerance {}
-
 impl Default for TraceMissTolerance {
     fn default() -> Self {
         Self {
@@ -573,7 +631,6 @@ impl Default for TraceMissTolerance {
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
-    // TODO: plumb this up
     /// Allow trace miss within error tolerance
     AllowChecked,
     #[default]

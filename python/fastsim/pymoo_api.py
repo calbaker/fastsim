@@ -188,14 +188,18 @@ class ModelObjectives(object):
             t0 = time.perf_counter()
             try:
                 sd.walk_once() # type: ignore
+                sd_dict = sd.to_pydict()
+                sd_df = sd.to_dataframe()
             except RuntimeError as err:
-                print(f"key: {key}")
-                raise(err)
+                sd_dict = sd.to_pydict()
+                sd_df = sd.to_dataframe(allow_partial=True)
+                if sd_dict['veh']['state']['time_seconds'] < 50:
+                    print(f"key: {key}")
+                    raise(err)
             t1 = time.perf_counter()
 
             if self.verbose:
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
-            sd_dict = sd.to_pydict()
 
             objectives[key] = []
             if return_mods:
@@ -204,20 +208,20 @@ class ModelObjectives(object):
             # loop through the objectives for each trip
             for i_obj, obj_fn in enumerate(self.obj_fns):
                 i_obj: int
-                obj_fn: Tuple[Callable(sd_dict), Callable(df_exp)]
+                obj_fn: Tuple[Callable(sd_df), Callable(df_exp)]
                 if len(obj_fn) == 2:
                     # objective and reference passed
-                    mod_sig = obj_fn[0](sd_dict)  
+                    mod_sig = obj_fn[0](sd_df)  
                     ref_sig = obj_fn[1](df_exp)  
                 elif len(obj_fn) == 1:
                     # minimizing scalar objective 
-                    mod_sig = obj_fn[0](sd_dict)  
+                    mod_sig = obj_fn[0](sd_df)  
                     ref_sig = None
                 else:
                     raise ValueError("Each element in `self.obj_fns` must have length of 1 or 2")
 
                 if ref_sig is not None:
-                    time_s = sd_dict['cyc']['time_seconds']
+                    time_s = sd_df['veh.state.time_seconds']
                     # TODO: provision for incomplete simulation in here somewhere
 
                     try:

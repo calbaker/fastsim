@@ -275,6 +275,7 @@ trans_eff: 0.875
 save_interval: 1
 state:
   i: 0
+  time_seconds: 0.0
   pwr_prop_fwd_max_watts: 0.0
   pwr_prop_bwd_max_watts: 0.0
   pwr_tractive_watts: 0.0

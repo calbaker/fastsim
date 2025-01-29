@@ -32,7 +32,7 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_S
 veh_dict = veh.to_pydict()
 
 sim_params_dict = fsim.SimParams.default().to_pydict()
-sim_params_dict["trace_miss_opts"] = "Allow"
+sim_params_dict["trace_miss_opts"] = "AllowChecked"
 sim_params = fsim.SimParams.from_pydict(sim_params_dict)
 
 # Obtain the data from
@@ -105,7 +105,7 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     # initialize SOC
     veh_dict['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
-        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0]
+        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0] / 100
     # initialize cabin temp
     veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
@@ -208,7 +208,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
     dfs = dfs_for_cal,
     obj_fns=(
         (
-            lambda sd_dict: np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc']),
+            lambda sd_df: np.array(sd_df['veh.pt_type.HybridElectricVehicle.res.history.soc']),
             lambda df: df['HVBatt_SOC_high_precision_PCAN__per']
         ),
         # TODO: add objectives for:

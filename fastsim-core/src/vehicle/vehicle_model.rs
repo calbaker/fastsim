@@ -567,6 +567,9 @@ pub struct VehicleState {
     /// time step index
     pub i: usize,
 
+    /// elapsed simulation time since start
+    pub time: si::Time,
+
     // power and energy fields
     /// maximum forward propulsive power vehicle can produce
     pub pwr_prop_fwd_max: si::Power,
@@ -636,6 +639,7 @@ impl Default for VehicleState {
     fn default() -> Self {
         Self {
             i: Default::default(),
+            time: si::Time::ZERO,
             pwr_prop_fwd_max: si::Power::ZERO,
             pwr_prop_bwd_max: si::Power::ZERO,
             pwr_tractive: si::Power::ZERO,
