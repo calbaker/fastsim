@@ -27,7 +27,8 @@ veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2020 Chevrolet
 veh_dict = veh.to_pydict()
 
 sim_params_dict = fsim.SimParams.default().to_pydict()
-sim_params_dict["trace_miss_opts"] = 
+sim_params_dict["trace_miss_opts"] = "AllowChecked"
+sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp

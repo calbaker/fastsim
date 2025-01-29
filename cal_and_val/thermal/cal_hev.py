@@ -3,7 +3,6 @@ Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue
 """
 from pathlib import Path
 
-# anticipated cricital imports
 import numpy as np  # noqa: F401
 import matplotlib.pyplot as plt  # noqa: F401
 import seaborn as sns
@@ -227,6 +226,9 @@ def get_mod_soc(sd_dict):
 def get_exp_soc(df):
     return df['HVBatt_SOC_high_precision_PCAN__per']
 
+save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
+save_path.mkdir(exist_ok=True, parents=True)
+
 ## Model Objectives
 cal_mod_obj = pymoo_api.ModelObjectives(
     models = sds_for_cal,
@@ -255,6 +257,56 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         #     - length
         #     - htc to amb when stopped
         #     - set width from vehicle specs -- no need to calibrate
+        # - battery thermal -- not necessary for HEV because battery temperature has no real effect
+        #     - thermal mass
+        #     - convection to ambient
+        #     - convection to cabin
+        # ## HEV specific stuff
+        # - HVAC PID controls for cabin (not for battery because Sonata has
+        #   passive thermal management, but make sure to do battery thermal
+        #   controls for BEV)
+        # - engine thermal
+        #     - thermal mass
+        #     - convection to ambient when stopped
+        #     - diameter
+    ),
+    # must match order and length of `params_fns`
+    bounds=(
+        (0.80, 0.99),
+        (0.1, 0.6),
+        (0.32, 0.45),
+        # (0.0, 0.45),
+    ),
+    verbose=False,    
+)
+
+val_mod_obj = pymoo_api.ModelObjectives(
+    models = sds_for_val,
+    dfs = dfs_for_val,
+    obj_fns=(
+        (
+            get_mod_soc,
+            get_exp_soc
+        ),
+        # TODO: add objectives for:
+        # - achieved and cycle speed
+        # - engine fuel usage 
+        # - battery temperature -- BEV only, if available
+        # - engine temperature
+        # - cabin temperature
+        # - HVAC power for cabin, if available
+    ),
+    param_fns=(
+        new_em_eff_max,
+        new_em_eff_range,
+        new_fc_eff_max,
+        # new_fc_eff_range, 
+        # TODO: make sure this has functions for modifying
+        # - cabin thermal
+        #     - thermal mass
+        #     - length
+        #     - htc to amb when stopped
+        #     - set width from vehicle specs -- no need to valibrate
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
         #     - convection to ambient
@@ -320,11 +372,7 @@ fc_eff_max = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricV
 # print("Success!")
 
 if __name__ == "__main__":
-    parser = pymoo_api.get_parser(
-        # Defaults are set low to allow for fast run time during testing.  For a good
-        # optimization, set this much higher.
-        def_save_path=None,
-    )
+    parser = pymoo_api.get_parser()
     args = parser.parse_args()
 
     n_processes = args.processes 
@@ -332,11 +380,6 @@ if __name__ == "__main__":
     # should be at least as big as n_processes
     pop_size = args.pop_size 
     run_minimize = not (args.skip_minimize)
-    if args.save_path is not None:
-        save_path = Path(args.save_path) 
-        save_path.mkdir(exist_ok=True)
-    else:
-        save_path = None
 
     print("Starting calibration.")
     algorithm = pymoo_api.NSGA2(

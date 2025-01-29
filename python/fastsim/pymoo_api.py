@@ -311,10 +311,10 @@ if PYMOO_AVAILABLE:
             problem: CalibrationProblem,
             algorithm: GeneticAlgorithm,
             termination: DMOT,
+            save_path: Union[Path, str],
             copy_algorithm: bool = False,
             copy_termination: bool = False,
             save_history: bool = False,
-            save_path: Union[Path, str] = Path("pymoo_res/"),
         ) -> Tuple[Result, pd.DataFrame]:
             """
             Wrapper for pymoo.optimize.minimize that adds various helpful features
@@ -350,14 +350,12 @@ if PYMOO_AVAILABLE:
                 columns=[param for param in problem.mod_obj.param_fns],
             )
 
-            if save_path is not None:
-                Path(save_path).mkdir(exist_ok=True, parents=True)
+            Path(save_path).mkdir(exist_ok=True, parents=True)
 
             res_df = pd.concat([x_df, f_df], axis=1)
             res_df['euclidean'] = (
                 res_df.iloc[:, len(problem.mod_obj.param_fns):] ** 2).sum(1).pow(1/2)
-            if save_path is not None:
-                res_df.to_csv(Path(save_path) / "pymoo_res_df.csv", index=False)
+            res_df.to_csv(Path(save_path) / "pymoo_res_df.csv", index=False)
 
             t1 = time.perf_counter()
             print(f"Elapsed time to run minimization: {t1-t0:.5g} s")
@@ -369,8 +367,6 @@ def get_parser(
     def_p:int=4,
     def_n_max_gen:int=500,
     def_pop_size:int=12,
-    def_save_path:Optional[str]="pymoo_res"
-
 ) -> argparse.ArgumentParser:
     """
     Generate parser for optimization hyper params and misc. other params
@@ -379,7 +375,6 @@ def get_parser(
         - `def_p`: default number of processes
         - `def_n_max_gen`: max allowed generations
         - `def_pop_size`: default population size
-        - `def_save_path`: default save path
 
     # Returns:
         argparse.ArgumentParser: _description_
@@ -420,14 +415,6 @@ def get_parser(
         '--skip-minimize', 
         action="store_true",
         help="If provided, load previous results."
-    )
-    parser.add_argument(
-        '--save-path', 
-        type=str, 
-        default=def_save_path,               
-        help="File location to save results dataframe with rows of parameter and corresponding" 
-            + " objective values and any optional plots." 
-            + (" If not provided, results are not saved" if def_save_path is None else "")
     )
     # parser.add_argument(
     #     '--show', 
