@@ -84,7 +84,7 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     # initialize SOC
     # TODO: figure out if `HVBatt_SOC_CAN4__per` is the correct column within the dyno data
     veh_dict['pt_type']['BatteryElectricVehicle']['res']['state']['soc'] = \
-        dfs[cyc_file_stem]["HVBatt_SOC_CAN4__per"][0]
+        dfs[cyc_file_stem]["HVBatt_SOC_CAN4__per"][0] / 100
     # initialize cabin temp
     veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
