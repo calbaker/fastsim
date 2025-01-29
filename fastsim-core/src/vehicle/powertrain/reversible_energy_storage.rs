@@ -128,16 +128,15 @@ impl ReversibleEnergyStorage {
         let state = &mut self.state;
 
         ensure!(
-            state.soc <= self.max_soc || (pwr_out_req + state.pwr_aux) >= si::Power::ZERO,
-            "{}\n{}",
-            format_dbg!(pwr_out_req + state.pwr_aux),
-            state.soc.get::<si::ratio>()
+            state.soc <= self.max_soc,
+            format_dbg!(state.soc.get::<si::ratio>())
         );
         ensure!(
-            state.soc >= self.min_soc || (pwr_out_req + state.pwr_aux) <= si::Power::ZERO,
-            "{}\n{}",
-            format_dbg!(pwr_out_req + state.pwr_aux),
-            state.soc.get::<si::ratio>()
+            almost_ge_uom(&state.soc, &self.min_soc, Some(1e-3)),
+            "{}\n{}\n{}",
+            format_dbg!(state.soc.get::<si::ratio>()),
+            format_dbg!(state.soc_disch_buffer.get::<si::ratio>()),
+            format_dbg!(state.pwr_aux.get::<si::watt>())
         );
 
         state.pwr_out_prop = pwr_out_req;

@@ -80,8 +80,8 @@ pt_type:
           strategy: Linear
           extrapolate: Clamp
       eff_interp_inputs: CRateTemperature
-      min_soc: 0.5
-      max_soc: 0.95
+      min_soc: 0.15
+      max_soc: 0.9
       save_interval: 1
     fs:
       pwr_out_max_watts: 2000000.0

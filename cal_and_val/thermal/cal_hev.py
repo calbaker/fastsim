@@ -21,19 +21,12 @@ celsius_to_kelvin_offset = 273.15
 # Initialize seaborn plot configuration
 sns.set()
 
-# TODO: Kyle or Robin:
-# - [x] in the `./f3-vehicles`, reduce all ~100 element arrays to just the ~10
-#       element arrays,
-#     - [x] for FC, grab Atkinson efficiency map from fastsim-2
-# - [x] and make sure linear interpolation is used
-# - [x] make sure temp- and current/c-rate-dependent battery efficiency interp
-#       is being used -- temp is 23*C and up and c-rate ranges from -5/hr to 5/hr
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 veh_dict = veh.to_pydict()
 
 sim_params_dict = fsim.SimParams.default().to_pydict()
 sim_params_dict["trace_miss_opts"] = "AllowChecked"
-sim_params = fsim.SimParams.from_pydict(sim_params_dict)
+sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp
@@ -72,6 +65,7 @@ cyc_files: List[str] = [
 ]
 assert len(cyc_files) > 0
 cyc_files: List[Path] = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
+print("cyc_files:\n", '\n'.join([cf.name for cf in cyc_files]))
 
 # use random or manual selection to retain ~70% of cycles for calibration,
 # and reserve the remaining for validation
@@ -86,10 +80,15 @@ cyc_files_for_cal: List[str] = [
 ]
 cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.name in cyc_files_for_cal]
 assert len(cyc_files_for_cal) > 0
+print("cyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]))
 
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     # filter out "before" time
     df = df[df["Time[s]_RawFacilities"] >= 0.0]
+    # TODO: figure out if we should use an integrator for resampling rate vars
+    # df = df.set_index("Time[s]_RawFacilities")
+    # df = df.resample("1s", origin="start").bfill()
+    df = df[::10]
     assert len(df) > 10
     cyc_dict = {
         "time_seconds": df["Time[s]_RawFacilities"].to_list(),
@@ -103,22 +102,25 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
+    vd = veh_dict.copy()
     # initialize SOC
-    veh_dict['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
-        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][0] / 100
+    vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
+        dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"][1] / 100
+    assert 0 < vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] < 1, "\ninit soc: {}\nhead: {}".format(
+        vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].head())
     # initialize cabin temp
-    veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
+    vd['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize battery temperature to match cabin temperature because battery
     # temperature is not available in test data
     # Also, battery temperature has no effect in the HEV because efficiency data
     # does not go below 23*C and there is no active thermal management
-    veh_dict['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
+    vd['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize engine temperature
-    veh_dict['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
+    vd['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["engine_coolant_temp_PCAN__C"][0] + celsius_to_kelvin_offset
-    return fsim.Vehicle.from_pydict(veh_dict)
+    return fsim.Vehicle.from_pydict(vd, skip_init=False)
 
 
 dfs_for_cal: Dict[str, pd.DataFrame] = {
@@ -147,6 +149,7 @@ for (cyc_file_stem, cyc) in cycs_for_cal.items():
 
 cyc_files_for_val: List[Path] = list(set(cyc_files) - set(cyc_files_for_cal))
 assert len(cyc_files_for_val) > 0
+print("cyc_files_for_val:\n", '\n'.join([cf.name for cf in cyc_files_for_val]))
 
 dfs_for_val: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
@@ -248,28 +251,46 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.32, 0.45),
         # (0.0, 0.45),
     ),
-    
+    verbose=True,    
 )
 
-# verify that model responds to input parameter changes by individually perturbing parameters
+em_eff_fwd_max = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_max 
+em_eff_fwd_range = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_range 
+fc_eff_max = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False).eff_max 
+print("Verifying that model responds to input parameter changes by individually perturbing parameters")
 baseline_errors = cal_mod_obj.get_errors(
     cal_mod_obj.update_params([
-        fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em']).eff_fwd_max,
-        fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em']).eff_fwd_range,
-        fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc']).eff_max,
+        em_eff_fwd_max,
+        em_eff_fwd_range,
+        fc_eff_max,
         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
     ])
 )
 param0_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([0.90 + 0.5, 0.3, 0.4])
+    cal_mod_obj.update_params([
+        em_eff_fwd_max + 0.05,
+        em_eff_fwd_range,
+        fc_eff_max,
+        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+    ])
 )
 assert list(param0_perturb.values()) != list(baseline_errors.values())
 param1_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([0.90, 0.3 + 0.1, 0.4])
+    cal_mod_obj.update_params([
+        em_eff_fwd_max,
+        em_eff_fwd_range + 0.1,
+        fc_eff_max,
+        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+    ])
 )
 assert list(param1_perturb.values()) != list(baseline_errors.values())
 param2_perturb = cal_mod_obj.get_errors(
-    cal_mod_obj.update_params([0.90, 0.3, 0.4 + 0.01])
+    cal_mod_obj.update_params([
+        em_eff_fwd_max,
+        em_eff_fwd_range,
+        fc_eff_max + 0.01,
+        # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
+    ])
 )
 assert list(param2_perturb.values()) != list(baseline_errors.values())
 

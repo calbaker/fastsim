@@ -142,7 +142,6 @@ class ModelObjectives(object):
         # Update all model parameters
         for key, pydict in self.models.items():
             for (param_fn, new_val) in zip(self.param_fns, xs):
-                # TODO: need to check that param_fn mutably modifies pydict
                 param_fn(pydict, new_val)
             # this assignement may be redundant, but `pydict` is probably **not** mutably modified.
             # If this is correct, then this assignment is necessary
@@ -191,6 +190,7 @@ class ModelObjectives(object):
                 sd_dict = sd.to_pydict()
                 sd_df = sd.to_dataframe()
             except RuntimeError as err:
+                sd.to_file("sd_fail.yaml") # uncomment for debugging
                 sd_dict = sd.to_pydict()
                 sd_df = sd.to_dataframe(allow_partial=True)
                 if sd_dict['veh']['state']['time_seconds'] < 50:
@@ -221,7 +221,7 @@ class ModelObjectives(object):
                     raise ValueError("Each element in `self.obj_fns` must have length of 1 or 2")
 
                 if ref_sig is not None:
-                    time_s = sd_df['veh.state.time_seconds']
+                    time_s = sd_df['veh.history.time_seconds']
                     # TODO: provision for incomplete simulation in here somewhere
 
                     try:
