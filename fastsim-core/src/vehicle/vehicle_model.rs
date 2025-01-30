@@ -140,6 +140,7 @@ pub struct Vehicle {
 
     /// HVAC model
     #[serde(default, skip_serializing_if = "HVACOption::is_none")]
+    #[has_state]
     pub hvac: HVACOption,
 
     /// Total vehicle mass
@@ -294,17 +295,12 @@ impl SetCumulative for Vehicle {
         if let Some(em) = self.em_mut() {
             em.set_cumulative(dt);
         }
-        match &mut self.cabin {
-            CabinOption::LumpedCabin(lumped_cabin) => lumped_cabin.set_cumulative(dt),
-            CabinOption::LumpedCabinWithShell => todo!(),
-            CabinOption::None => {}
-        }
+        self.cabin.set_cumulative(dt);
         self.state.dist += self.state.speed_ach * dt;
     }
 }
 
 impl Vehicle {
-    // TODO: run this assumption by Robin: peak power of all components can be produced concurrently.
     /// # Assumptions
     /// - peak power of all components can be produced concurrently.
     pub fn get_pwr_rated(&self) -> si::Power {

@@ -17,6 +17,8 @@ from fastsim import pymoo_api
 
 mps_per_mph = 0.447
 celsius_to_kelvin_offset = 273.15
+lhv_btu_per_lbm = 18_575 
+lhv_joules_per_gram = 43_205.450 
 
 # Initialize seaborn plot configuration
 sns.set()
@@ -84,6 +86,9 @@ print("\ncyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal])
 
 time_column = "Time[s]_RawFacilities"
 speed_column = "Dyno_Spd[mph]"
+cabin_temp_column = "Cabin_Temp[C]"
+eng_clnt_temp_column = "engine_coolant_temp_PCAN__C"
+fuel_column = "Eng_FuelFlow_Direct2[gps]"
 
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     cyc_dict = {
@@ -106,7 +111,7 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
         vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].head())
     # initialize cabin temp
     vd['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
-        dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
+        dfs[cyc_file_stem][cabin_temp_column][0] + celsius_to_kelvin_offset
     # initialize battery temperature to match cabin temperature because battery
     # temperature is not available in test data
     # Also, battery temperature has no effect in the HEV because efficiency data
@@ -115,7 +120,7 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize engine temperature
     vd['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
-        dfs[cyc_file_stem]["engine_coolant_temp_PCAN__C"][0] + celsius_to_kelvin_offset
+        dfs[cyc_file_stem][eng_clnt_temp_column][0] + celsius_to_kelvin_offset
     return fsim.Vehicle.from_pydict(vd, skip_init=False)
 
 
@@ -185,7 +190,7 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
     veh = veh_init(cyc_file_stem, dfs_for_val)
     sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc, sim_params).to_pydict()
 
-# Setup model objectives
+# Setup model parameters and objectives
 ## Parameter Functions
 def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """
@@ -223,11 +228,36 @@ def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
     return sd_dict
 
+## Objective Functions
 def get_mod_soc(sd_dict):
     return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
 
 def get_exp_soc(df):
     return df['HVBatt_SOC_high_precision_PCAN__per'] / 100
+
+def get_mod_fc_temp(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['history']['temperature_kelvin'])
+
+def get_exp_fc_temp(df):
+    return df[eng_clnt_temp_column] + celsius_to_kelvin_offset
+
+def get_mod_cab_temp(sd_dict):
+    return np.array(sd_dict['veh']['cabin']['LumpedCabin']['history']['temperature_kelvin'])
+
+def get_exp_cab_temp(df):
+    return df[cabin_temp_column] + celsius_to_kelvin_offset
+
+def get_mod_spd(sd_dict):
+    return np.array(sd_dict['veh']['history']['speed_ach_meters_per_second'])
+
+def get_exp_spd(df):
+    return df[speed_column] * mps_per_mph
+
+def get_mod_pwr_fuel(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['pwr_fuel_watts'])
+
+def get_exp_pwr_fuel(df):
+    return df[fuel_column] * lhv_joules_per_gram
 
 save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
 save_path.mkdir(exist_ok=True, parents=True)
@@ -241,12 +271,24 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             get_mod_soc,
             get_exp_soc
         ),
+        (
+            get_mod_pwr_fuel,
+            get_exp_pwr_fuel
+        ),
+        (
+            get_mod_cab_temp,
+            get_exp_cab_temp  
+        ),
+        (
+            get_mod_fc_temp,
+            get_exp_fc_temp  
+        ),
+        (
+            get_mod_spd,
+            get_exp_spd  
+        ),
         # TODO: add objectives for:
-        # - achieved and cycle speed
-        # - engine fuel usage 
         # - battery temperature -- BEV only, if available
-        # - engine temperature
-        # - cabin temperature
         # - HVAC power for cabin, if available
     ),
     param_fns=(
@@ -265,9 +307,11 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         #     - convection to ambient
         #     - convection to cabin
         # ## HEV specific stuff
+        # - powersplit controls
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
         #   controls for BEV)
+        # - engine temperature-dependent efficiency parameters
         # - engine thermal
         #     - thermal mass
         #     - convection to ambient when stopped
@@ -291,12 +335,24 @@ val_mod_obj = pymoo_api.ModelObjectives(
             get_mod_soc,
             get_exp_soc
         ),
+        (
+            get_mod_pwr_fuel,
+            get_exp_pwr_fuel
+        ),
+        (
+            get_mod_cab_temp,
+            get_exp_cab_temp  
+        ),
+        (
+            get_mod_fc_temp,
+            get_exp_fc_temp  
+        ),
+        (
+            get_mod_spd,
+            get_exp_spd  
+        ),
         # TODO: add objectives for:
-        # - achieved and cycle speed
-        # - engine fuel usage 
         # - battery temperature -- BEV only, if available
-        # - engine temperature
-        # - cabin temperature
         # - HVAC power for cabin, if available
     ),
     param_fns=(

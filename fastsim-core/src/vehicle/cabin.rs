@@ -48,6 +48,15 @@ impl Init for CabinOption {
     }
 }
 impl SerdeAPI for CabinOption {}
+impl SetCumulative for CabinOption {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        match self {
+            Self::LumpedCabin(lc) => lc.set_cumulative(dt),
+            Self::LumpedCabinWithShell => todo!(),
+            Self::None => {}
+        }
+    }
+}
 
 #[fastsim_api(
     #[staticmethod]

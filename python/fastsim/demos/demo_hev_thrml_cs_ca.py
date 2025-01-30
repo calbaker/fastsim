@@ -21,20 +21,28 @@ SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"
 # if environment var `SAVE_FIGS=true` is set, save plots
 SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 
+celsius_to_kelvin = 273.15
+temp_amb_and_init = -6.7 + celsius_to_kelvin
 # `fastsim3` -- load vehicle and cycle, build simulation, and run
 # %%
 
 # load 2021 Hyundai Sonata HEV from file
-veh = fsim.Vehicle.from_file(
+veh_dict = fsim.Vehicle.from_file(
     fsim.package_root() /
     "../../cal_and_val/thermal/f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml"
-)
+).to_pydict()
+veh_dict['cabin']['LumpedCabin']['state']['temperature_kelvin'] = temp_amb_and_init
+veh_dict['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = temp_amb_and_init
+veh_dict['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = temp_amb_and_init
+veh = fsim.Vehicle.from_pydict(veh_dict)
 
 # Set `save_interval` at vehicle level -- cascades to all sub-components with time-varying states
 fsim.set_param_from_path(veh, "save_interval", 1)
 
 # load cycle from file
-cyc = fsim.Cycle.from_resource("udds.csv")
+cyc_dict = fsim.Cycle.from_resource("udds.csv").to_pydict()
+cyc_dict['temp_amb_air_kelvin'] = [temp_amb_and_init] * len(cyc_dict['time_seconds'])
+cyc = fsim.Cycle.from_pydict(cyc_dict)
 
 # instantiate `SimDrive` simulation object
 sd = fsim.SimDrive(veh, cyc)

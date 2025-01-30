@@ -232,22 +232,16 @@ cabin:
     length_meters: 2.5
     width_meters: 2.0
 hvac:
-  LumpedCabinAndRES:
+  LumpedCabin:
     te_set_kelvin: 295.15
     te_deadband_kelvin: 1.5
-    p_cabin_watts_per_kelvin: 0.0
-    i_cabin: 0.0
-    pwr_i_max_cabin_watts: 5000.0
-    d_cabin: 0.0
-    p_res_watts_per_kelvin: 0.0
-    i_res: 0.0
-    pwr_i_max_res_watts: 0.0
-    d_res: 0.0
+    p_watts_per_kelvin: 100.0
+    i: 10.0
+    pwr_i_max_watts: 5000.0
+    d: 5.0
     pwr_thrml_max_watts: 10000.0
     frac_of_ideal_cop: 0.15
-    cabin_heat_source: FuelConverter
-    res_heat_source: None
-    res_cooling_source: None
+    heat_source: FuelConverter
     pwr_aux_for_hvac_max_watts: 5000.0
 mass_kilograms: 1508.195
 pwr_aux_base_watts: 500.0
