@@ -263,7 +263,11 @@ def get_mod_pwr_hvac(sd_dict):
     return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts'])
 
 def get_exp_pwr_hvac(df):
-    return df["HVAC_Power_Hioki_P3[W]"]
+    if df["Cell_Temp[C]"].mean() < 15:
+        pwr_hvac = [0] * len(df)
+    else:
+        pwr_hvac = df["HVAC_Power_Hioki_P3[W]"]
+    return pwr_hvac
 
 save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
 save_path.mkdir(exist_ok=True, parents=True)
