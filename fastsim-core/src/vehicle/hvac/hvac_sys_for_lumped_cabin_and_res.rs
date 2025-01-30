@@ -1,3 +1,4 @@
+// TODO: lots of `ensures` need to propagate from hvac_sys_for_lumped_cabin
 use super::*;
 
 #[fastsim_api(
@@ -355,7 +356,7 @@ impl HVACSystemForLumpedCabinAndRES {
                         self.state.pwr_i = si::Power::ZERO;
                     }
                     let mut pwr_thrml_hvac_to_cabin: si::Power =
-                        (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
+                        (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
                             .min(self.pwr_thrml_max);
 
                     // Assumes blower has negligible impact on aux load, may want to revise later

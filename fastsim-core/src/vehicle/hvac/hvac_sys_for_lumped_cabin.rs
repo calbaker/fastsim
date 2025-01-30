@@ -186,7 +186,7 @@ impl HVACSystemForLumpedCabin {
                         )
                         .with_context(|| format_dbg!())?;
                     ensure!(
-                        pwr_thrml_hvac_to_cab > si::Power::ZERO,
+                        pwr_thrml_hvac_to_cab >= si::Power::ZERO,
                         "{}\nHVAC should be heating cabin",
                         format_dbg!()
                     );
@@ -237,7 +237,7 @@ impl HVACSystemForLumpedCabin {
                         .max(si::Power::ZERO),
                 );
                 ensure!(
-                    *pwr_thrml_hvac_to_cab > si::Power::ZERO,
+                    *pwr_thrml_hvac_to_cab >= si::Power::ZERO,
                     "{}\nHVAC should be heating cabin",
                     format_dbg!()
                 );
