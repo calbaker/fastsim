@@ -230,7 +230,8 @@ cabin:
     cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
     heat_capacitance_joules_per_kelvin: 200000.0
     length_meters: 2.5
-    width_meters: 2.0
+    # 1.86 meters (73.2 in). Source: https://www.edmunds.com/hyundai/sonata-hybrid/2021/st-401867551/features-specs/
+    width_meters: 1.86
 hvac:
   LumpedCabin:
     te_set_kelvin: 295.15
