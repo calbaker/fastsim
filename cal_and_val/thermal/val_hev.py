@@ -27,6 +27,7 @@ plot_save_path.mkdir(exist_ok=True)
 for ((key, df_cal), sd_cal) in zip(cal_mod_obj.dfs.items(), sds_cal):
     for obj_fn in cal_mod_obj.obj_fns:
         fig, ax = plt.subplots(2, 1, sharex=True)
+        ax.suptitle(key)
         ax[0].plot(
             sd_cal['veh']['history']['time_seconds'],
             obj_fn[0](sd_cal),
@@ -52,4 +53,4 @@ for ((key, df_cal), sd_cal) in zip(cal_mod_obj.dfs.items(), sds_cal):
         )
         ax[1].legend()
         ax[1].set_ylabel("Speed [m/s]")
-
+        plt.savefig(plot_save_path / f"{key}.svg")
