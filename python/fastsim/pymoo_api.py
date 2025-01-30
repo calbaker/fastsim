@@ -336,7 +336,7 @@ if PYMOO_AVAILABLE:
             )
 
             f_columns = [
-                f"{key}: {obj[0].__name__}"
+                f"{key}: {obj[0].__name__.split(' ')[0]}"
                 for key in problem.mod_obj.dfs.keys()
                 for obj in problem.mod_obj.obj_fns
             ]

@@ -9,3 +9,4 @@ best_row = res_df["euclidean"].argmin()
 best_df = res_df.iloc[best_row, :]
 param_vals = res_df.iloc[best_row, : len(cal_mod_obj.param_fns)].to_numpy()
 
+# plotting 
