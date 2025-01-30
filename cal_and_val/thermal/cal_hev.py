@@ -259,6 +259,12 @@ def get_mod_pwr_fuel(sd_dict):
 def get_exp_pwr_fuel(df):
     return df[fuel_column] * lhv_joules_per_gram
 
+def get_mod_pwr_hvac(sd_dict):
+    return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts'])
+
+def get_exp_pwr_hvac(df):
+    return df["HVAC_Power_Hioki_P3[W]"]
+
 save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
 save_path.mkdir(exist_ok=True, parents=True)
 
@@ -286,6 +292,10 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (
             get_mod_spd,
             get_exp_spd  
+        ),
+        (
+            get_mod_pwr_hvac,
+            get_exp_pwr_hvac  
         ),
         # TODO: add objectives for:
         # - battery temperature -- BEV only, if available
@@ -316,6 +326,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         #     - thermal mass
         #     - convection to ambient when stopped
         #     - diameter
+        # - aux power
     ),
     # must match order and length of `params_fns`
     bounds=(
