@@ -153,7 +153,7 @@ impl HVACSystemForLumpedCabin {
                     }
                     let pwr_thrml_fc_to_cabin = si::Power::ZERO;
                     ensure!(
-                        pwr_thrml_hvac_to_cab != si::Power::ZERO,
+                        pwr_thrml_hvac_to_cab < si::Power::ZERO,
                         "{}\nHVAC should be cooling cabin",
                         format_dbg!()
                     );
@@ -166,10 +166,10 @@ impl HVACSystemForLumpedCabin {
                         self.state.pwr_i = si::Power::ZERO;
                     }
                     let mut pwr_thrml_hvac_to_cab =
-                        (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
+                        (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
                             .min(self.pwr_thrml_max);
                     ensure!(
-                        pwr_thrml_hvac_to_cab != si::Power::ZERO,
+                        pwr_thrml_hvac_to_cab > si::Power::ZERO,
                         "{}\nHVAC should be heating cabin",
                         format_dbg!()
                     );
@@ -186,7 +186,7 @@ impl HVACSystemForLumpedCabin {
                         )
                         .with_context(|| format_dbg!())?;
                     ensure!(
-                        pwr_thrml_hvac_to_cab != si::Power::ZERO,
+                        pwr_thrml_hvac_to_cab > si::Power::ZERO,
                         "{}\nHVAC should be heating cabin",
                         format_dbg!()
                     );
@@ -220,7 +220,7 @@ impl HVACSystemForLumpedCabin {
                     format_dbg!()
                 );
                 ensure!(
-                    *pwr_thrml_hvac_to_cab != si::Power::ZERO,
+                    *pwr_thrml_hvac_to_cab > si::Power::ZERO,
                     "{}\nHVAC should be heating cabin",
                     format_dbg!()
                 );
@@ -237,7 +237,7 @@ impl HVACSystemForLumpedCabin {
                         .max(si::Power::ZERO),
                 );
                 ensure!(
-                    *pwr_thrml_hvac_to_cab != si::Power::ZERO,
+                    *pwr_thrml_hvac_to_cab > si::Power::ZERO,
                     "{}\nHVAC should be heating cabin",
                     format_dbg!()
                 );
