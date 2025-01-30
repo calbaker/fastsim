@@ -82,10 +82,13 @@ cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.
 assert len(cyc_files_for_cal) > 0
 print("\ncyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]), sep='')
 
+time_column = "Time[s]_RawFacilities"
+speed_column = "Dyno_Spd[mph]"
+
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     cyc_dict = {
-        "time_seconds": df["Time[s]_RawFacilities"].to_list(),
-        "speed_meters_per_second": (df["Dyno_Spd[mph]"] * mps_per_mph).to_list(),
+        "time_seconds": df[time_column].to_list(),
+        "speed_meters_per_second": (df[speed_column] * mps_per_mph).to_list(),
         "temp_amb_air_kelvin": (df["Cell_Temp[C]"] + celsius_to_kelvin_offset).to_list(),
         # TODO: pipe solar load from `Cycle` into cabin thermal model
         # TODO: use something (e.g. regex) to determine solar load
@@ -122,9 +125,9 @@ dfs_for_cal: Dict[str, pd.DataFrame] = {
 }
 for key, df_for_cal in dfs_for_cal.items():
     # filter out "before" time
-    df_for_cal = df_for_cal[df_for_cal["Time[s]_RawFacilities"] >= 0.0]
+    df_for_cal = df_for_cal[df_for_cal[time_column] >= 0.0]
     # TODO: figure out if we should use an integrator for resampling rate vars
-    # df_for_cal = df_for_cal.set_index("Time[s]_RawFacilities")
+    # df_for_cal = df_for_cal.set_index(time_column)
     # df_for_cal = df_for_cal.resample("1s", origin="start").bfill()
     df_for_cal = df_for_cal[::10]
     df_for_cal.reset_index(inplace=True)
@@ -159,9 +162,9 @@ dfs_for_val: Dict[str, pd.DataFrame] = {
 }
 for key, df_for_val in dfs_for_val.items():
     # filter out "before" time
-    df_for_val = df_for_val[df_for_val["Time[s]_RawFacilities"] >= 0.0]
+    df_for_val = df_for_val[df_for_val[time_column] >= 0.0]
     # TODO: figure out if we should use an integrator for resampling rate vars
-    # df_for_val = df_for_val.set_index("Time[s]_RawFacilities")
+    # df_for_val = df_for_val.set_index(time_column)
     # df_for_val = df_for_val.resample("1s", origin="start").bfill()
     df_for_val = df_for_val[::10]
     df_for_val.reset_index(inplace=True)
