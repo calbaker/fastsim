@@ -347,7 +347,7 @@ if PYMOO_AVAILABLE:
 
             x_df = pd.DataFrame(
                 data=[x for x in res.X.tolist()],
-                columns=[param for param in problem.mod_obj.param_fns],
+                columns=[param.__name__ for param in problem.mod_obj.param_fns],
             )
 
             Path(save_path).mkdir(exist_ok=True, parents=True)
