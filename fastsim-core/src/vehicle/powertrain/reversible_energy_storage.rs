@@ -857,7 +857,7 @@ impl RESLumpedThermal {
                 - self.state.temperature.get::<si::degree_celsius>())
             * uc::KELVIN_INT;
         self.state.pwr_thrml_hvac_to_res = pwr_thrml_hvac_to_res;
-        self.state.pwr_thrml_from_amb = self.conductance_to_cab
+        self.state.pwr_thrml_from_amb = self.conductance_to_amb
             * (te_amb.get::<si::degree_celsius>()
                 - self.state.temperature.get::<si::degree_celsius>())
             * uc::KELVIN_INT;
