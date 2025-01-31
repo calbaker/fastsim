@@ -253,6 +253,10 @@ class ModelObjectives(object):
                     objectives[key].append(mod_sig)                    
 
             t2 = time.perf_counter()
+            import pprint
+            print("\n")
+            pprint.pp(objectives)
+            print("\n")
             if self.verbose:
                 print(f"Time to postprocess: {t2 - t1:.3g} s")
         print(f'\n{objectives}\n')
