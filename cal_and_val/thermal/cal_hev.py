@@ -332,26 +332,26 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             get_mod_soc,
             get_exp_soc
         ),
-        # (
-        #     get_mod_pwr_fuel,
-        #     get_exp_pwr_fuel
-        # ),
-        # (
-        #     get_mod_cab_temp,
-        #     get_exp_cab_temp  
-        # ),
-        # (
-        #     get_mod_fc_temp,
-        #     get_exp_fc_temp  
-        # ),
-        # (
-        #     get_mod_spd,
-        #     get_exp_spd  
-        # ),
-        # (
-        #     get_mod_pwr_hvac,
-        #     get_exp_pwr_hvac  
-        # ),
+        (
+            get_mod_pwr_fuel,
+            get_exp_pwr_fuel
+        ),
+        (
+            get_mod_cab_temp,
+            get_exp_cab_temp  
+        ),
+        (
+            get_mod_fc_temp,
+            get_exp_fc_temp  
+        ),
+        (
+            get_mod_spd,
+            get_exp_spd  
+        ),
+        (
+            get_mod_pwr_hvac,
+            get_exp_pwr_hvac  
+        ),
     ),
     param_fns=(
         new_em_eff_max,

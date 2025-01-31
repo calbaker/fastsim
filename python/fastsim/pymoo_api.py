@@ -157,8 +157,6 @@ class ModelObjectives(object):
         t1 = time.perf_counter()
         if self.verbose:
             print(f"Time to update params: {t1 - t0:.3g} s")
-        import pprint
-        pprint.pp(sim_drives)
         return sim_drives
 
     def get_errors(
@@ -255,13 +253,8 @@ class ModelObjectives(object):
                     objectives[key].append(mod_sig)                    
 
             t2 = time.perf_counter()
-            import pprint
-            print("\n")
-            pprint.pp(objectives)
-            print("\n")
             if self.verbose:
                 print(f"Time to postprocess: {t2 - t1:.3g} s")
-        print(f'\n{objectives}\n')
         if return_mods:
             return objectives, solved_mods
         else:
