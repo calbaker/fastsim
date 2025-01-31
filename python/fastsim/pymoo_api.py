@@ -187,10 +187,10 @@ class ModelObjectives(object):
             key: str
             df_exp: pd.DataFrame
 
-            # if not isinstance(sd, fsim.SimDrive):
-            #     solved_mods[key] = sd
-            #     objectives[key] = [1e12] * len(self.obj_fns)
-            #     continue
+            if not isinstance(sd, fsim.SimDrive):
+                solved_mods[key] = sd
+                objectives[key] = [1.01e12] * len(self.obj_fns)
+                continue
             
             try:
                 t0 = time.perf_counter()
@@ -231,8 +231,8 @@ class ModelObjectives(object):
                     time_s = sd_dict['veh']['history']['time_seconds']
                     # TODO: provision for incomplete simulation in here somewhere
 
-                    if walk_success:
-                        objectives[key].append(1e12)
+                    if not walk_success:
+                        objectives[key].append(0.99e12)
                     else:
                         try:
                             objectives[key].append(get_error_val(
