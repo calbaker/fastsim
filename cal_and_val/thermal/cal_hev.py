@@ -391,6 +391,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
         #   controls for BEV)
+        # - HVAC cop frac
         # - engine temperature-dependent efficiency parameters
         # - engine thermal
         #     - thermal mass
