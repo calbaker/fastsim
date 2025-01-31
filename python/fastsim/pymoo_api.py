@@ -203,7 +203,7 @@ class ModelObjectives(object):
                 sd_dict = sd.to_pydict()
                 walk_success = True
                 if len(sd_dict['veh']['history']['time_seconds']) < np.floor(len(df_exp) / 2):
-                    walk_success = True
+                    walk_success = False
 
             if self.verbose:
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
@@ -262,7 +262,7 @@ class ModelObjectives(object):
 
     def params_and_bounds(self):
         return [
-            (param_fn, bound_set) for (param_fn, bound_set) in zip(self.param_fns, self.bounds)
+            (param_fn.__name__, bound_set) for (param_fn, bound_set) in zip(self.param_fns, self.bounds)
         ]
         
     
