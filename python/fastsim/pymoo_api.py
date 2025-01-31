@@ -143,18 +143,13 @@ class ModelObjectives(object):
 
         # Update all model parameters
         for key, pydict in self.models.items():
-            try:
-                for (param_fn, new_val) in zip(self.param_fns, xs):
-                    pydict = param_fn(pydict, new_val)
-            except Exception as err:
-                sim_drives[key] = err
+            for (param_fn, new_val) in zip(self.param_fns, xs):
+                pydict = param_fn(pydict, new_val)
             # this assignement may be redundant, but `pydict` is probably **not** mutably modified.
             # If this is correct, then this assignment is necessary
             self.models[key] = pydict
 
         for key, pydict in self.models.items():
-            if key in list(sim_drives.keys()):
-                continue
             try:
                 sim_drives[key] = fsim.SimDrive.from_pydict(pydict, skip_init=False) 
             except Exception as err:

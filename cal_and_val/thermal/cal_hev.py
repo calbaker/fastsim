@@ -216,7 +216,7 @@ def new_fc_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
     fc.__eff_max = new_eff_max
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"] = fc.to_pydict()
     return sd_dict
 
 def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
@@ -224,8 +224,26 @@ def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     Set `new_eff_range` in `FuelConverter`
     """
     fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
-    fc.__eff_range = new_eff_range
+    fc_eff_max = fc.eff_max
+    # TODO: this is a quick and dirty apprach, change to using constraints in PyMOO
+    fc.__eff_range = min(new_eff_range, fc_eff_max * 0.95)
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    return sd_dict
+
+def new_cab_shell_htc(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['cabin']['LumpedCabin']['cab_shell_htc_to_amb_watts_per_square_meter_kelvin'] = new_val
+    return sd_dict
+
+def new_cab_htc_to_amb_stop(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['cabin']['LumpedCabin']['cab_htc_to_amb_stop_watts_per_square_meter_kelvin'] = new_val
+    return sd_dict
+
+def new_cab_tm(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['cabin']['LumpedCabin']['heat_capacitance_joules_per_kelvin'] = new_val
+    return sd_dict
+
+def new_cab_length(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['cabin']['LumpedCabin']['length_meters'] = new_val
     return sd_dict
 
 ## Objective Functions
@@ -306,7 +324,11 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_em_eff_max,
         new_em_eff_range,
         new_fc_eff_max,
-        new_fc_eff_range, 
+        # new_fc_eff_range, 
+        new_cab_shell_htc,
+        new_cab_htc_to_amb_stop,
+        new_cab_tm,
+        new_cab_length,
         # TODO: make sure this has functions for modifying
         # - cabin thermal
         #     - thermal mass
@@ -334,7 +356,11 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.80, 0.99),
         (0.1, 0.6),
         (0.32, 0.45),
-        (0.2, 0.45),
+        # (0.2, 0.45),
+        (10, 250),
+        (10, 250),
+        (100e3, 350e3),
+        (1.5, 7),
     ),
     verbose=False,    
 )
