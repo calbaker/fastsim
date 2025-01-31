@@ -42,15 +42,17 @@ cyc_files: List[str] = [
     # - wide range of initial and ambient temperatures
     # - good signal quality -- somewhat subjective
 
-    # HWY x2, hot (M155), HVAC active (B155)
+    # HWYx2, 2 bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
     "62202004 Test Data.txt", 
 
-    # US06 x2, hot, HVAC active
+    # US06x2, 4 (split) bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
     "62202005 Test Data.txt",
 
+    # UDDS, 2 bag, warm start in ECO mode
     # UDDS x1, room temperature ambient
     "62201013 Test Data.txt",
 
+    # Hwyx2, 2 bag, warm start in ECO mode
     # HWY x2, room temperature ambient
     "62201014 Test Data.txt",
 
@@ -72,12 +74,17 @@ print("\ncyc_files:\n", '\n'.join([cf.name for cf in cyc_files]), sep='')
 # use random or manual selection to retain ~70% of cycles for calibration,
 # and reserve the remaining for validation
 cyc_files_for_cal: List[str] = [
+    # HWY x2, hot (M155), HVAC active (B155)
     "62202004 Test Data.txt", 
     # "62202005 Test Data.txt",
+    # UDDS x1, room temperature ambient
     "62201013 Test Data.txt",
+    # HWY x2, room temperature ambient
     "62201014 Test Data.txt",
+    # UDDSx2, 4 bag (FTP), cold start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
     "62202013 Test Data.txt",
     # "62202014 Test Data.txt", 
+    # US06x2, 4 (split) bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
     "62202016 Test Data.txt",
 ]
 cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.name in cyc_files_for_cal]
@@ -103,6 +110,7 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
+    # TODO: turn off HVAC for 22*C ambient
     vd = deepcopy(veh_dict)
     # initialize SOC
     vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \

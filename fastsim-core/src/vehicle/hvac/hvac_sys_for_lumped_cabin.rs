@@ -10,8 +10,8 @@ use super::*;
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin]
 pub struct HVACSystemForLumpedCabin {
-    /// set point temperature
-    pub te_set: si::Temperature,
+    /// set point temperature, `None` means HVAC is inactive
+    pub te_set: Option<si::Temperature>,
     /// deadband range.  any cabin temperature within this range of
     /// `te_set` results in no HVAC power draw
     pub te_deadband: si::TemperatureInterval,
@@ -46,7 +46,7 @@ pub struct HVACSystemForLumpedCabin {
 impl Default for HVACSystemForLumpedCabin {
     fn default() -> Self {
         Self {
-            te_set: *TE_STD_AIR,
+            te_set: Some(*TE_STD_AIR),
             te_deadband: 1.5 * uc::KELVIN_INT,
             p: Default::default(),
             i: Default::default(),
@@ -86,9 +86,13 @@ impl HVACSystemForLumpedCabin {
         cab_heat_cap: si::HeatCapacity,
         dt: si::Time,
     ) -> anyhow::Result<(si::Power, si::Power)> {
+        let te_set = match self.te_set {
+            Some(te_set) => te_set,
+            None => return Ok((si::Power::ZERO, si::Power::ZERO)),
+        };
         let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) = if cab_state.temperature
-            <= self.te_set + self.te_deadband
-            && cab_state.temperature >= self.te_set - self.te_deadband
+            <= te_set + self.te_deadband
+            && cab_state.temperature >= te_set - self.te_deadband
         {
             // inside deadband; no hvac power is needed
 
@@ -101,7 +105,7 @@ impl HVACSystemForLumpedCabin {
         } else {
             // outside deadband
             let te_delta_vs_set = (cab_state.temperature.get::<si::degree_celsius>()
-                - self.te_set.get::<si::degree_celsius>())
+                - te_set.get::<si::degree_celsius>())
                 * uc::KELVIN_INT;
             let te_delta_vs_amb: si::TemperatureInterval =
                 (cab_state.temperature.get::<si::degree_celsius>()
@@ -120,7 +124,7 @@ impl HVACSystemForLumpedCabin {
                     / dt);
 
             let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) =
-                if cab_state.temperature > self.te_set + self.te_deadband {
+                if cab_state.temperature > te_set + self.te_deadband {
                     // COOLING MODE; cabin is hotter than set point
 
                     // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
