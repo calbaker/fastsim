@@ -430,27 +430,22 @@ val_mod_obj.models = sds_for_val
 def perturb_params(pct: float = 0.05):
     em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False)
     fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False)
-    lumped_cabin = fsim.LumpedCabin.from_pydict(veh_dict['cabin']['LumpedCabin'], skip_init=False)
-    rgwdb = fsim.RESGreedyWithDynamicBuffers.from_pydict(veh_dict["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"])
-    baseline_param_paths = [
-        "cabin.LumpedCabin.cab_shell_htc_to_amb_watts_per_square_meter_kelvin",
-    ]
     baseline_params = [
         em.eff_fwd_max,
         em.eff_fwd_range,
         fc.eff_max,
         # fc.eff_range,
-        veh_dict['cabin']['LumpedCabin']['cab_shell_htc_to_amb_watts_per_square_meter_kelvin'],
-        veh_dict['cabin']['LumpedCabin']['cab_htc_to_amb_stop_watts_per_square_meter_kelvin'],
-        lumped_cabin.heat_capacitance_joules_per_kelvin,
-        lumped_cabin.length_meters,
-        rgwdb.speed_soc_disch_buffer_meters_per_second,
-        rgwdb.speed_soc_disch_buffer_coeff,
-        rgwdb.speed_soc_fc_on_buffer_meters_per_second,
-        rgwdb.speed_soc_fc_on_buffer_coeff,
-        rgwdb.fc_min_time_on_seconds,
-        rgwdb.frac_pwr_demand_fc_forced_on,
-        rgwdb.frac_of_most_eff_pwr_to_run_fc,
+        veh_dict_flat['cabin.LumpedCabin.cab_shell_htc_to_amb_watts_per_square_meter_kelvin'],
+        veh_dict_flat['cabin.LumpedCabin.cab_htc_to_amb_stop_watts_per_square_meter_kelvin'],
+        veh_dict_flat['cabin.LumpedCabin.heat_capacitance_joules_per_kelvin'],
+        veh_dict_flat['cabin.LumpedCabin.length_meters'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_meters_per_second'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_coeff'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_meters_per_second'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_coeff'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.fc_min_time_on_seconds'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_pwr_demand_fc_forced_on'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_of_most_eff_pwr_to_run_fc'],
     ]
 
     print("Verifying that model responds to input parameter changes by individually perturbing parameters")
