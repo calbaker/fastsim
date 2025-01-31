@@ -203,7 +203,7 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
     sds_for_val[cyc_file_stem] = fsim.SimDrive(veh, cyc, sim_params).to_pydict()
 
 # Setup model parameters and objectives
-## Parameter Functions
+## Parameter Functions `param_fns`
 def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `ElectricMachine`
@@ -285,6 +285,34 @@ def new_frac_pwr_demand_fc_forced_on(sd_dict, new_val) -> Dict:
 def new_frac_of_most_eff_pwr_to_run_fc(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_of_most_eff_pwr_to_run_fc"] = new_val
     return sd_dict
+
+def new_hvac_p_watts_per_kelvin(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['hvac']['LumpedCabin']['p_watts_per_kelvin'] = new_val
+    return sd_dict
+
+def new_hvac_i(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['hvac']['LumpedCabin']['i'] = new_val
+    return sd_dict
+
+# def new_hvac_pwr_i_max_watts(sd_dict, new_val) -> Dict:
+#     sd_dict['veh']['hvac']['LumpedCabin']['pwr_i_max_watts'] = new_val
+#     return sd_dict
+
+# def new_hvac_d(sd_dict, new_val) -> Dict:
+#     sd_dict['veh']['hvac']['LumpedCabin']['d'] = new_val
+#     return sd_dict
+
+# def new_hvac_pwr_thrml_max_watts(sd_dict, new_val) -> Dict:
+#     sd_dict['veh']['hvac']['LumpedCabin']['pwr_thrml_max_watts'] = new_val
+#     return sd_dict
+
+def new_hvac_frac_of_ideal_cop(sd_dict, new_val) -> Dict:
+    sd_dict['veh']['hvac']['LumpedCabin']['frac_of_ideal_cop'] = new_val
+    return sd_dict
+
+# def new_hvac_pwr_aux_for_hvac_max_watt(sd_dict, new_val) -> Dict:
+#     sd_dict['veh']['hvac']['LumpedCabin']['pwr_aux_for_hvac_max_watts'] = new_val
+#     return sd_dict
     
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_meters_per_second
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_coeff
@@ -292,7 +320,7 @@ def new_frac_of_most_eff_pwr_to_run_fc(sd_dict, new_val) -> Dict:
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.temp_fc_forced_on_kelvin
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.temp_fc_allowed_off_kelvin
 
-# Objective Functions
+# Objective Functions -- `obj_fns`
 def get_mod_soc(sd_dict):
     return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
 
@@ -382,6 +410,9 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_fc_min_time_on_seconds,
         new_frac_pwr_demand_fc_forced_on,
         new_frac_of_most_eff_pwr_to_run_fc,
+        new_hvac_p_watts_per_kelvin,
+        new_hvac_i,
+        new_hvac_frac_of_ideal_cop,
         # TODO: make sure this has functions for modifying
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
@@ -416,6 +447,9 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (5, 30),
         (0.3, 0.8),
         (0.1, 1.0),
+        (5, 100),
+        (1, 20),
+        (0.05, 0.25),
     ),
     verbose=False,    
 )
@@ -447,6 +481,9 @@ def perturb_params(pct: float = 0.05):
         veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.fc_min_time_on_seconds'],
         veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_pwr_demand_fc_forced_on'],
         veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_of_most_eff_pwr_to_run_fc'],
+        veh_dict_flat['hvac.LumpedCabin.p_watts_per_kelvin'],
+        veh_dict_flat['hvac.LumpedCabin.i'],
+        veh_dict_flat['hvac.LumpedCabin.frac_of_ideal_cop'],
     ]
 
     print("Verifying that model responds to input parameter changes by individually perturbing parameters")
