@@ -388,6 +388,15 @@ def get_mod_pwr_fuel(sd_dict):
 def get_exp_pwr_fuel(df):
     return df[fuel_column] * lhv_joules_per_gram
 
+def get_mod_energy_fuel(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['energy_fuel_joules'])
+
+def get_exp_energy_fuel(df):
+    pwr_fuel_watts = df[fuel_column] * lhv_joules_per_gram
+    dt = np.diff(df[time_column], prepend=0)
+    energy_fuel_joules = np.cumsum(pwr_fuel_watts * dt)
+    return energy_fuel_joules
+
 def get_mod_pwr_hvac(sd_dict):
     return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts'])
 
@@ -397,6 +406,14 @@ def get_exp_pwr_hvac(df):
     else:
         pwr_hvac = df["HVAC_Power_Hioki_P3[W]"]
     return pwr_hvac
+
+## Constraint functions
+def get_fc_temp_too_hot(sd_dict):
+    te_fc_deg_c = sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] + celsius_to_kelvin_offset
+    if np.any(te_fc_deg_c > 115):
+        return 1
+    else:
+        return -1
 
 save_path = Path(__file__).parent / "pymoo_res" / Path(__file__).stem
 save_path.mkdir(exist_ok=True, parents=True)
@@ -409,6 +426,10 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (
             get_mod_soc,
             get_exp_soc
+        ),
+        (
+            get_mod_energy_fuel,
+            get_exp_energy_fuel
         ),
         (
             get_mod_pwr_fuel,
@@ -497,12 +518,11 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (10, 60), # new_fc_thrml_fc_eff_model_Exponential_lag,
         (0.15, 0.35), # new_fc_thrml_fc_eff_model_Exponential_minimum,
     ),
+    constr_fns=(
+        get_fc_temp_too_hot,
+    ),
     verbose=False,    
 )
-
-print("")
-pprint.pp(cal_mod_obj.params_and_bounds())
-print("")
 
 val_mod_obj = deepcopy(cal_mod_obj)
 val_mod_obj.dfs = dfs_for_val
@@ -574,6 +594,9 @@ def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
     print("Success!")
 
 if __name__ == "__main__":
+    print("")
+    pprint.pp(cal_mod_obj.params_and_bounds())
+    print("")
     perturb_params()
     parser = pymoo_api.get_parser()
     args = parser.parse_args()

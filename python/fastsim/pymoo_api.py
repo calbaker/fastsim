@@ -116,6 +116,7 @@ class ModelObjectives(object):
     obj_fns: Tuple[Callable] | Tuple[Tuple[Callable, Callable]]
     param_fns: Tuple[Callable]
     bounds: Tuple[Tuple[float, float]]
+    constr_fns: Tuple[Callable] 
 
     # if True, prints timing and misc info
     verbose: bool = False
@@ -129,6 +130,7 @@ class ModelObjectives(object):
             self.models), f"{len(self.dfs)} != {len(self.models)}"
         assert len(self.bounds) == len(self.param_fns)
         self.n_obj = len(self.models) * len(self.obj_fns)
+        self.n_obj = len(self.models) * len(self.constr_fns)
 
     def update_params(self, xs: List[Any]):
         """
@@ -180,6 +182,7 @@ class ModelObjectives(object):
         """
 
         objectives: Dict = {}
+        constraint_violations: Dict = {}
         solved_mods: Dict = {}
 
         # loop through all the provided trips
@@ -189,7 +192,8 @@ class ModelObjectives(object):
 
             if not isinstance(sd, fsim.SimDrive):
                 solved_mods[key] = sd
-                objectives[key] = [1.01e12] * len(self.obj_fns)
+                objectives[key] = [1.0e12] * len(self.obj_fns)
+                constraint_violations[key] = [1] * len(self.constr_fns)
                 continue
             
             try:
@@ -209,6 +213,8 @@ class ModelObjectives(object):
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
 
             objectives[key] = []
+            constraint_violations[key] = []
+
             if return_mods:
                 solved_mods[key] = sd_dict
 
@@ -232,7 +238,8 @@ class ModelObjectives(object):
                     # TODO: provision for incomplete simulation in here somewhere
 
                     if not walk_success:
-                        objectives[key].append(0.99e12)
+                        objectives[key].append(1.02e12)
+                        constraint_violations[key].append(1)
                     else:
                         try:
                             objectives[key].append(get_error_val(
@@ -247,18 +254,22 @@ class ModelObjectives(object):
                             # NOTE: instead of appending an arbitrarily large
                             # objective value, we could instead either try passing
                             # `np.nan` or trigger a constraint violation.
-                            objectives[key].append(1e12)
+                            objectives[key].append(1.03e12)
                 else:
                     raise Exception("this is here for debugging and should be deleted")
                     objectives[key].append(mod_sig)                    
+            for constr_fn in self.constr_fns:
+                constraint_violations[key].append(
+                    constr_fn(sd_dict)
+                )
 
             t2 = time.perf_counter()
             if self.verbose:
                 print(f"Time to postprocess: {t2 - t1:.3g} s")
         if return_mods:
-            return objectives, solved_mods
+            return objectives, constraint_violations, solved_mods
         else:
-            return objectives
+            return objectives, constraint_violations
 
     def params_and_bounds(self):
         return [
@@ -276,6 +287,7 @@ if PYMOO_AVAILABLE:
             self,
             mod_obj: ModelObjectives,
             elementwise_runner=LoopedElementwiseEvaluation(),
+            n_constr: int=0,
         ):
             self.mod_obj = mod_obj
             assert len(self.mod_obj.bounds) == len(
@@ -288,13 +300,16 @@ if PYMOO_AVAILABLE:
                 xu=[bounds[1]
                     for bounds in self.mod_obj.bounds],
                 elementwise_runner=elementwise_runner,
+                n_ieq_constr=n_constr,
             )
 
         def _evaluate(self, x, out, *args, **kwargs):
             sim_drives = self.mod_obj.update_params(x)
-            out['F'] = list(self.mod_obj.get_errors(sim_drives).values())
+            (errs, cvs) = self.mod_obj.get_errors(sim_drives)
+            out['F'] = list(errs.values())
+            if self.n_ieq_constr > 0:
+                out['G'] = list(cvs.values()) 
             
-
     class CustomOutput(Output):
         def __init__(self):
             super().__init__()
