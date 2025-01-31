@@ -37,38 +37,37 @@ cyc_folder_path = Path(__file__).parent / "dyno_test_data/2021 Hyundai Sonata Hy
 assert cyc_folder_path.exists()
 
 # See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
-cyc_files: List[str] = [
+cyc_files_dict: Dict[str, Dict] = {
     # The hot and cold cycles must have HVAC active!
     # - wide range of initial and ambient temperatures
     # - good signal quality -- somewhat subjective
 
     # HWYx2, 2 bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
-    "62202004 Test Data.txt", 
+    "62202004 Test Data.txt": {"cell temp [*C]]": 35, "solar load [W/m^2]": 850, "set temp [*C]": 22}, 
 
     # US06x2, 4 (split) bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
-    "62202005 Test Data.txt",
+    "62202005 Test Data.txt": {"cell temp [*C]]": 35, "solar load [W/m^2]": 850, "set temp [*C]": 22},
 
     # UDDS, 2 bag, warm start in ECO mode
     # UDDS x1, room temperature ambient
-    "62201013 Test Data.txt",
+    "62201013 Test Data.txt": {"cell temp [*C]]": 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
 
     # Hwyx2, 2 bag, warm start in ECO mode
     # HWY x2, room temperature ambient
-    "62201014 Test Data.txt",
+    "62201014 Test Data.txt": {"cell temp [*C]]": 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
 
     # UDDSx2, 4 bag (FTP), cold start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202013 Test Data.txt",
+    "62202013 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # UDDS, 2 bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202014 Test Data.txt",
+    "62202014 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # US06x2, 4 (split) bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202016 Test Data.txt",
+    "62202016 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # TODO: check for seat heater usage in cold cycles and account for that in model!
-]
-assert len(cyc_files) > 0
-cyc_files: List[Path] = [cyc_folder_path / cyc_file for cyc_file in cyc_files]
+}
+cyc_files: List[Path] = [cyc_folder_path / cyc_file for cyc_file in cyc_files_dict.keys()]
 print("\ncyc_files:\n", '\n'.join([cf.name for cf in cyc_files]), sep='')
 
 # use random or manual selection to retain ~70% of cycles for calibration,
