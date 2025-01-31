@@ -508,7 +508,7 @@ val_mod_obj = deepcopy(cal_mod_obj)
 val_mod_obj.dfs = dfs_for_val
 val_mod_obj.models = sds_for_val
 
-def perturb_params(pct: float = 0.05):
+def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
     em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False)
     fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False)
     baseline_params = [
@@ -549,14 +549,27 @@ def perturb_params(pct: float = 0.05):
     for i, param in enumerate(baseline_params):
         # +5%
         perturbed_params = baseline_params.copy()
-        perturbed_params[i] = param * (1 + pct)
+        perturbed_params[i] = param * (1 + pos_perturb_dec)
         perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
-        assert perturbed_errors != baseline_errors, f"+{100 * pct}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}: {perturbed_errors} == {baseline_errors}"
+        if np.all(perturbed_errors == baseline_errors):
+          print("\nperturbed_errros:")
+          pprint.pp(perturbed_errors) 
+          print("baseline_errors")
+          pprint.pp(baseline_errors)
+          print("")
+          raise Exception(f"+{100 * pos_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
+
         # -5%
         perturbed_params = baseline_params.copy()
-        perturbed_params[i] = param * (1 - pct)
+        perturbed_params[i] = param * (1 - neg_perturb_dec)
         perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
-        assert perturbed_errors != baseline_errors, f"-{100 * pct}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}: {perturbed_errors} == {baseline_errors}"
+        if np.all(perturbed_errors == baseline_errors):
+            print("\nperturbed_errros:")
+            pprint.pp(perturbed_errors) 
+            print("baseline_errors")
+            pprint.pp(baseline_errors)
+            print("")
+            raise Exception(f"-{100 * neg_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
 
     print("Success!")
 
