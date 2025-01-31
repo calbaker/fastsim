@@ -128,6 +128,10 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     # initialize engine temperature
     vd['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem][eng_clnt_temp_column][0] + celsius_to_kelvin_offset
+    # set HVAC set point temperature
+    te_set = next(iter([v["set temp [*C]"] for k, v in cyc_files_dict.items() if k.replace(".txt", "") == cyc_file_stem]))
+    vd['hvac']['LumpedCabin']['te_set_kelvin'] = te_set
+
     return fsim.Vehicle.from_pydict(vd, skip_init=False)
 
 
