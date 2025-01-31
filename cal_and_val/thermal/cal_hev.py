@@ -1,5 +1,5 @@
 """
-Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
+alibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
 """
 import pprint
 from pathlib import Path
@@ -37,6 +37,13 @@ sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 cyc_folder_path = Path(__file__).parent / "dyno_test_data/2021 Hyundai Sonata Hybrid/Extended Datasets"
 assert cyc_folder_path.exists()
 
+time_column = "Time[s]_RawFacilities"
+speed_column = "Dyno_Spd[mph]"
+cabin_temp_column = "Cabin_Temp[C]"
+eng_clnt_temp_column = "engine_coolant_temp_PCAN__C"
+fuel_column = "Eng_FuelFlow_Direct2[gps]"
+cell_temp_column = "Cell_Temp[C]"
+
 # See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
 cyc_files_dict: Dict[str, Dict] = {
     # The hot and cold cycles must have HVAC active!
@@ -44,27 +51,27 @@ cyc_files_dict: Dict[str, Dict] = {
     # - good signal quality -- somewhat subjective
 
     # HWYx2, 2 bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
-    "62202004 Test Data.txt": {"cell temp [*C]]": 35, "solar load [W/m^2]": 850, "set temp [*C]": 22}, 
+    "62202004 Test Data.txt": {cell_temp_column: 35, "solar load [W/m^2]": 850, "set temp [*C]": 22}, 
 
     # US06x2, 4 (split) bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
-    "62202005 Test Data.txt": {"cell temp [*C]]": 35, "solar load [W/m^2]": 850, "set temp [*C]": 22},
+    "62202005 Test Data.txt": {cell_temp_column: 35, "solar load [W/m^2]": 850, "set temp [*C]": 22},
 
     # UDDS, 2 bag, warm start in ECO mode
     # UDDS x1, room temperature ambient
-    "62201013 Test Data.txt": {"cell temp [*C]]": 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
+    "62201013 Test Data.txt": {cell_temp_column: 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
 
     # Hwyx2, 2 bag, warm start in ECO mode
     # HWY x2, room temperature ambient
-    "62201014 Test Data.txt": {"cell temp [*C]]": 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
+    "62201014 Test Data.txt": {cell_temp_column: 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
 
     # UDDSx2, 4 bag (FTP), cold start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202013 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
+    "62202013 Test Data.txt": {cell_temp_column: -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # UDDS, 2 bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202014 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
+    "62202014 Test Data.txt": {cell_temp_column: -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # US06x2, 4 (split) bag, warm start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
-    "62202016 Test Data.txt": {"cell temp [*C]]": -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
+    "62202016 Test Data.txt": {cell_temp_column: -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
     # TODO: check for seat heater usage in cold cycles and account for that in model!
 }
@@ -91,17 +98,11 @@ cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.
 assert len(cyc_files_for_cal) > 0
 print("\ncyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]), sep='')
 
-time_column = "Time[s]_RawFacilities"
-speed_column = "Dyno_Spd[mph]"
-cabin_temp_column = "Cabin_Temp[C]"
-eng_clnt_temp_column = "engine_coolant_temp_PCAN__C"
-fuel_column = "Eng_FuelFlow_Direct2[gps]"
-
 def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     cyc_dict = {
         "time_seconds": df[time_column].to_list(),
         "speed_meters_per_second": (df[speed_column] * mps_per_mph).to_list(),
-        "temp_amb_air_kelvin": (df["Cell_Temp[C]"] + celsius_to_kelvin_offset).to_list(),
+        "temp_amb_air_kelvin": (df[cell_temp_column] + celsius_to_kelvin_offset).to_list(),
         # TODO: pipe solar load from `Cycle` into cabin thermal model
         # TODO: use something (e.g. regex) to determine solar load
         # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx
@@ -314,6 +315,42 @@ def new_hvac_frac_of_ideal_cop(sd_dict, new_val) -> Dict:
 #     sd_dict['veh']['hvac']['LumpedCabin']['pwr_aux_for_hvac_max_watts'] = new_val
 #     return sd_dict
     
+def new_fc_thrml_heat_capacitance_joules_per_kelvin(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["heat_capacitance_joules_per_kelvin"] = new_val
+    return sd_dict
+
+def new_fc_thrml_length_for_convection_meters(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["length_for_convection_meters"] = new_val
+    return sd_dict
+
+def new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["htc_to_amb_stop_watts_per_square_meter_kelvin"] = new_val
+    return sd_dict
+
+def new_fc_thrml_conductance_from_comb_watts_per_kelvin(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["conductance_from_comb_watts_per_kelvin"] = new_val
+    return sd_dict
+
+def new_fc_thrml_max_frac_from_comb(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["max_frac_from_comb"] = new_val
+    return sd_dict
+
+def new_fc_thrml_radiator_effectiveness(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["radiator_effectiveness"] = new_val
+    return sd_dict
+
+def new_fc_thrml_fc_eff_model_Exponential_offset(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["offset"] = new_val
+    return sd_dict
+
+def new_fc_thrml_fc_eff_model_Exponential_lag(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["lag"] = new_val
+    return sd_dict
+
+def new_fc_thrml_fc_eff_model_Exponential_minimum(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["minimum"] = new_val
+    return sd_dict
+
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_meters_per_second
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_coeff
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_fc_forced_on_meters_per_second
@@ -413,43 +450,52 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_hvac_p_watts_per_kelvin,
         new_hvac_i,
         new_hvac_frac_of_ideal_cop,
+        new_fc_thrml_heat_capacitance_joules_per_kelvin,
+        new_fc_thrml_length_for_convection_meters,
+        new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
+        new_fc_thrml_conductance_from_comb_watts_per_kelvin,
+        # new_fc_thrml_max_frac_from_comb,
+        new_fc_thrml_radiator_effectiveness,
+        new_fc_thrml_fc_eff_model_Exponential_offset,
+        new_fc_thrml_fc_eff_model_Exponential_lag,
+        new_fc_thrml_fc_eff_model_Exponential_minimum,
         # TODO: make sure this has functions for modifying
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
         #     - convection to ambient
         #     - convection to cabin
         # ## HEV specific stuff
-        # - HVAC PID controls for cabin (not for battery because Sonata has
-        #   passive thermal management, but make sure to do battery thermal
-        #   controls for BEV)
-        # - HVAC cop frac
-        # - engine temperature-dependent efficiency parameters
-        # - engine thermal
-        #     - thermal mass
-        #     - convection to ambient when stopped
-        #     - diameter
         # - aux power
     ),
     # must match order and length of `params_fns`
     bounds=(
-        (0.80, 0.99),
-        (0.1, 0.6),
-        (0.32, 0.45),
-        # (0.2, 0.45), # range is not working
-        (10, 250),
-        (10, 250),
-        (100e3, 350e3),
-        (1.5, 7),
-        (5, 50),
-        (0.25, 2.0),
-        (5, 50),
-        (0.25, 2.0),
-        (5, 30),
-        (0.3, 0.8),
-        (0.1, 1.0),
-        (5, 100),
-        (1, 20),
-        (0.05, 0.25),
+        (0.80, 0.99), # new_em_eff_max
+        (0.1, 0.6), # new_em_eff_range
+        (0.32, 0.45), # new_fc_eff_max
+        # (0.2, 0.45), # range is not working # # 
+        (10, 250), # new_cab_shell_htc
+        (10, 250), # new_cab_htc_to_amb_stop
+        (100e3, 350e3), # new_cab_tm
+        (1.5, 7), # new_cab_length
+        (5, 50), # new_speed_soc_disch_buffer_meters_per_second
+        (0.25, 2.0), # new_speed_soc_disch_buffer_coeff
+        (5, 50), # new_speed_soc_fc_on_buffer_meters_per_second
+        (0.25, 2.0), # new_speed_soc_fc_on_buffer_coeff
+        (5, 30), # new_fc_min_time_on_seconds
+        (0.3, 0.8), # new_frac_pwr_demand_fc_forced_on
+        (0.1, 1.0), # new_frac_of_most_eff_pwr_to_run_fc
+        (5, 1000), # new_hvac_p_watts_per_kelvin
+        (1, 50), # new_hvac_i
+        (0.05, 0.25), # new_hvac_frac_of_ideal_cop
+        (50e3, 300e3), # new_fc_thrml_heat_capacitance_joules_per_kelvin,
+        (0.2, 2), # new_fc_thrml_length_for_convection_meters,
+        (10, 100), # new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
+        (10, 1000), # new_fc_thrml_conductance_from_comb_watts_per_kelvin,
+        # (), # new_fc_thrml_max_frac_from_comb,
+        (3, 20), # new_fc_thrml_radiator_effectiveness,
+        (250, 340), # new_fc_thrml_fc_eff_model_Exponential_offset,
+        (10, 40), # new_fc_thrml_fc_eff_model_Exponential_lag,
+        (0.15, 0.35), # new_fc_thrml_fc_eff_model_Exponential_minimum,
     ),
     verbose=False,    
 )
@@ -484,6 +530,15 @@ def perturb_params(pct: float = 0.05):
         veh_dict_flat['hvac.LumpedCabin.p_watts_per_kelvin'],
         veh_dict_flat['hvac.LumpedCabin.i'],
         veh_dict_flat['hvac.LumpedCabin.frac_of_ideal_cop'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.heat_capacitance_joules_per_kelvin'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.length_for_convection_meters'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.htc_to_amb_stop_watts_per_square_meter_kelvin'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.conductance_from_comb_watts_per_kelvin'],
+        # veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.max_frac_from_comb'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.radiator_effectiveness'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.offset'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.lag'],
+        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.minimum']
     ]
 
     print("Verifying that model responds to input parameter changes by individually perturbing parameters")

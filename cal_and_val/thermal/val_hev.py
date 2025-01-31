@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from cal_hev import cal_mod_obj, val_mod_obj, save_path, time_column, mps_per_mph, speed_column
+from cal_hev import cal_mod_obj, val_mod_obj, save_path, time_column, mps_per_mph, speed_column, cyc_files_dict, cell_temp_column
 
 res_df = pd.read_csv(save_path / "pymoo_res_df.csv")
 res_df['euclidean'] = (
@@ -31,7 +31,10 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.it
     assert key == sd_key
     for obj_fn in cal_mod_obj.obj_fns:
         fig, ax = plt.subplots(2, 1, sharex=True)
-        fig.suptitle(key)
+        cell_temp = next(iter(
+            [v[cell_temp_column] for k, v in cyc_files_dict.items() if k.replace(".txt", "") == key]
+        )) 
+        fig.suptitle(f"{key}\ncell temp [*C]: {cell_temp}")
         ax[0].plot(
             sd_cal['veh']['history']['time_seconds'],
             obj_fn[0](sd_cal),

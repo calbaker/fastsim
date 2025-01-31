@@ -80,7 +80,7 @@ pt_type:
           strategy: Linear
           extrapolate: Clamp
       eff_interp_inputs: CRateTemperature
-      min_soc: 0.15
+      min_soc: 0.35
       max_soc: 0.9
       save_interval: 1
     fs:
@@ -109,7 +109,7 @@ pt_type:
                 - 1.0
               strategy: Linear
               extrapolate: Clamp
-          radiator_effectiveness: 0.0
+          radiator_effectiveness: 25.0
           fc_eff_model:
             Exponential:
               offset: 273.15
