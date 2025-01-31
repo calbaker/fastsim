@@ -25,6 +25,7 @@ sns.set()
 
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 veh_dict = veh.to_pydict()
+veh_dict_flat = veh.to_pydict(flatten=True)
 
 sim_params_dict = fsim.SimParams.default().to_pydict()
 sim_params_dict["trace_miss_opts"] = "AllowChecked"
@@ -426,47 +427,52 @@ val_mod_obj = deepcopy(cal_mod_obj)
 val_mod_obj.dfs = dfs_for_val
 val_mod_obj.models = sds_for_val
 
-em_eff_fwd_max = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_max 
-em_eff_fwd_range = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_range 
-fc_eff_max = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False).eff_max 
-# TODO: uncomment this and do it for all the parameters
-# print("Verifying that model responds to input parameter changes by individually perturbing parameters")
-# baseline_errors = cal_mod_obj.get_errors(
-#     cal_mod_obj.update_params([
-#         em_eff_fwd_max,
-#         em_eff_fwd_range,
-#         fc_eff_max,
-#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-#     ])
-# )
-# param0_perturb = cal_mod_obj.get_errors(
-#     cal_mod_obj.update_params([
-#         em_eff_fwd_max + 0.05,
-#         em_eff_fwd_range,
-#         fc_eff_max,
-#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-#     ])
-# )
-# assert np.array(param0_perturb.values()) != np.array(baseline_errors.values()), f"\n{baseline_errors.values()}\n{param0_perturb.values()}"
-# param1_perturb = cal_mod_obj.get_errors(
-#     cal_mod_obj.update_params([
-#         em_eff_fwd_max,
-#         em_eff_fwd_range + 0.1,
-#         fc_eff_max,
-#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-#     ])
-# )
-# assert np.array(param1_perturb.values()) != np.array(baseline_errors.values()), f"\n{baseline_errors.values()}\n{param1_perturb.values()}"
-# param2_perturb = cal_mod_obj.get_errors(
-#     cal_mod_obj.update_params([
-#         em_eff_fwd_max,
-#         em_eff_fwd_range,
-#         fc_eff_max - 0.15,
-#         # veh_dict['pt_type']['HybridElectricVehicle']['fc'],
-#     ])
-# )
-# assert np.array(param2_perturb.values()) != np.array(baseline_errors.values()), f"\n{baseline_errors.values()}\n{param1_perturb.values()}"
-# print("Success!")
+def perturb_params(pct: float = 0.05):
+    em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False)
+    fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False)
+    lumped_cabin = fsim.LumpedCabin.from_pydict(veh_dict['cabin']['LumpedCabin'], skip_init=False)
+    rgwdb = fsim.RESGreedyWithDynamicBuffers.from_pydict(veh_dict["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"])
+    baseline_param_paths = [
+        "cabin.LumpedCabin.cab_shell_htc_to_amb_watts_per_square_meter_kelvin",
+    ]
+    baseline_params = [
+        em.eff_fwd_max,
+        em.eff_fwd_range,
+        fc.eff_max,
+        # fc.eff_range,
+        veh_dict['cabin']['LumpedCabin']['cab_shell_htc_to_amb_watts_per_square_meter_kelvin'],
+        veh_dict['cabin']['LumpedCabin']['cab_htc_to_amb_stop_watts_per_square_meter_kelvin'],
+        lumped_cabin.heat_capacitance_joules_per_kelvin,
+        lumped_cabin.length_meters,
+        rgwdb.speed_soc_disch_buffer_meters_per_second,
+        rgwdb.speed_soc_disch_buffer_coeff,
+        rgwdb.speed_soc_fc_on_buffer_meters_per_second,
+        rgwdb.speed_soc_fc_on_buffer_coeff,
+        rgwdb.fc_min_time_on_seconds,
+        rgwdb.frac_pwr_demand_fc_forced_on,
+        rgwdb.frac_of_most_eff_pwr_to_run_fc,
+    ]
+
+    print("Verifying that model responds to input parameter changes by individually perturbing parameters")
+    baseline_errors = cal_mod_obj.get_errors(
+        cal_mod_obj.update_params(baseline_params)
+    )
+    
+    for i, param in enumerate(baseline_params):
+        # +5%
+        perturbed_params = baseline_params.copy()
+        perturbed_params[i] = param * (1 + pct)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        assert perturbed_errors != baseline_errors, f"+{100 * pct}% perturbation failed for param {i}: {perturbed_errors} == {baseline_errors}"
+        # -5%
+        perturbed_params = baseline_params.copy()
+        perturbed_params[i] = param * (1 - pct)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        assert perturbed_errors != baseline_errors, f"-{100 * pct}% perturbation failed for param {i}: {perturbed_errors} == {baseline_errors}"
+
+    print("Success!")
+
+perturb_params()
 
 if __name__ == "__main__":
     parser = pymoo_api.get_parser()
