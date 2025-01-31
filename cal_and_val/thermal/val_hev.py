@@ -25,6 +25,9 @@ plot_save_path = save_path / "plots"
 plot_save_path.mkdir(exist_ok=True)
 
 for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.items()):
+    if not isinstance(sd_cal, dict):
+        print(f"skipping {key}")
+        continue
     assert key == sd_key
     for obj_fn in cal_mod_obj.obj_fns:
         fig, ax = plt.subplots(2, 1, sharex=True)

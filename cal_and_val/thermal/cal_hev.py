@@ -246,7 +246,41 @@ def new_cab_length(sd_dict, new_val) -> Dict:
     sd_dict['veh']['cabin']['LumpedCabin']['length_meters'] = new_val
     return sd_dict
 
-## Objective Functions
+def new_speed_soc_disch_buffer_meters_per_second(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_meters_per_second"] = new_val
+    return sd_dict
+    
+def new_speed_soc_disch_buffer_coeff(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_coeff"] = new_val
+    return sd_dict
+    
+def new_speed_soc_fc_on_buffer_meters_per_second(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_meters_per_second"] = new_val
+    return sd_dict
+    
+def new_speed_soc_fc_on_buffer_coeff(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_coeff"] = new_val
+    return sd_dict
+    
+def new_fc_min_time_on_seconds(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["fc_min_time_on_seconds"] = new_val
+    return sd_dict
+    
+def new_frac_pwr_demand_fc_forced_on(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_pwr_demand_fc_forced_on"] = new_val
+    return sd_dict
+    
+def new_frac_of_most_eff_pwr_to_run_fc(sd_dict, new_val) -> Dict:
+    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_of_most_eff_pwr_to_run_fc"] = new_val
+    return sd_dict
+    
+# veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_meters_per_second
+# veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_coeff
+# veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_fc_forced_on_meters_per_second
+# veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.temp_fc_forced_on_kelvin
+# veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.temp_fc_allowed_off_kelvin
+
+# Objective Functions
 def get_mod_soc(sd_dict):
     return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
 
@@ -299,48 +333,49 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             get_mod_soc,
             get_exp_soc
         ),
-        (
-            get_mod_pwr_fuel,
-            get_exp_pwr_fuel
-        ),
-        (
-            get_mod_cab_temp,
-            get_exp_cab_temp  
-        ),
-        (
-            get_mod_fc_temp,
-            get_exp_fc_temp  
-        ),
-        (
-            get_mod_spd,
-            get_exp_spd  
-        ),
-        (
-            get_mod_pwr_hvac,
-            get_exp_pwr_hvac  
-        ),
+        # (
+        #     get_mod_pwr_fuel,
+        #     get_exp_pwr_fuel
+        # ),
+        # (
+        #     get_mod_cab_temp,
+        #     get_exp_cab_temp  
+        # ),
+        # (
+        #     get_mod_fc_temp,
+        #     get_exp_fc_temp  
+        # ),
+        # (
+        #     get_mod_spd,
+        #     get_exp_spd  
+        # ),
+        # (
+        #     get_mod_pwr_hvac,
+        #     get_exp_pwr_hvac  
+        # ),
     ),
     param_fns=(
         new_em_eff_max,
         new_em_eff_range,
         new_fc_eff_max,
-        # new_fc_eff_range, 
-        new_cab_shell_htc,
-        new_cab_htc_to_amb_stop,
-        new_cab_tm,
-        new_cab_length,
+        # new_fc_eff_range, # range is not working
+        # new_cab_shell_htc,
+        # new_cab_htc_to_amb_stop,
+        # new_cab_tm,
+        # new_cab_length,
+        # new_speed_soc_disch_buffer_meters_per_second,
+        # new_speed_soc_disch_buffer_coeff,
+        # new_speed_soc_fc_on_buffer_meters_per_second,
+        # new_speed_soc_fc_on_buffer_coeff,
+        # new_fc_min_time_on_seconds,
+        # new_frac_pwr_demand_fc_forced_on,
+        # new_frac_of_most_eff_pwr_to_run_fc,
         # TODO: make sure this has functions for modifying
-        # - cabin thermal
-        #     - thermal mass
-        #     - length
-        #     - htc to amb when stopped
-        #     - set width from vehicle specs -- no need to calibrate
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
         #     - convection to ambient
         #     - convection to cabin
         # ## HEV specific stuff
-        # - powersplit controls
         # - HVAC PID controls for cabin (not for battery because Sonata has
         #   passive thermal management, but make sure to do battery thermal
         #   controls for BEV)
@@ -356,76 +391,25 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.80, 0.99),
         (0.1, 0.6),
         (0.32, 0.45),
-        # (0.2, 0.45),
-        (10, 250),
-        (10, 250),
-        (100e3, 350e3),
-        (1.5, 7),
+        # (0.2, 0.45), # range is not working
+        # (10, 250),
+        # (10, 250),
+        # (100e3, 350e3),
+        # (1.5, 7),
+        # (5, 50),
+        # (0.25, 2.0),
+        # (5, 50),
+        # (0.25, 2.0),
+        # (5, 30),
+        # (0.3, 0.8),
+        # (0.1, 1.0),
     ),
     verbose=False,    
 )
 
-val_mod_obj = pymoo_api.ModelObjectives(
-    models = sds_for_val,
-    dfs = dfs_for_val,
-    obj_fns=(
-        (
-            get_mod_soc,
-            get_exp_soc
-        ),
-        (
-            get_mod_pwr_fuel,
-            get_exp_pwr_fuel
-        ),
-        (
-            get_mod_cab_temp,
-            get_exp_cab_temp  
-        ),
-        (
-            get_mod_fc_temp,
-            get_exp_fc_temp  
-        ),
-        (
-            get_mod_spd,
-            get_exp_spd  
-        ),
-        # TODO: add objectives for:
-        # - battery temperature -- BEV only, if available
-        # - HVAC power for cabin, if available
-    ),
-    param_fns=(
-        new_em_eff_max,
-        new_em_eff_range,
-        new_fc_eff_max,
-        # new_fc_eff_range, 
-        # TODO: make sure this has functions for modifying
-        # - cabin thermal
-        #     - thermal mass
-        #     - length
-        #     - htc to amb when stopped
-        #     - set width from vehicle specs -- no need to valibrate
-        # - battery thermal -- not necessary for HEV because battery temperature has no real effect
-        #     - thermal mass
-        #     - convection to ambient
-        #     - convection to cabin
-        # ## HEV specific stuff
-        # - HVAC PID controls for cabin (not for battery because Sonata has
-        #   passive thermal management, but make sure to do battery thermal
-        #   controls for BEV)
-        # - engine thermal
-        #     - thermal mass
-        #     - convection to ambient when stopped
-        #     - diameter
-    ),
-    # must match order and length of `params_fns`
-    bounds=(
-        (0.80, 0.99),
-        (0.1, 0.6),
-        (0.32, 0.45),
-        # (0.0, 0.45),
-    ),
-    verbose=False,    
-)
+val_mod_obj = cal_mod_obj
+val_mod_obj.dfs = dfs_for_val
+val_mod_obj.models = sds_for_val
 
 em_eff_fwd_max = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_max 
 em_eff_fwd_range = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False).eff_fwd_range 

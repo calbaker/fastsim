@@ -187,22 +187,23 @@ class ModelObjectives(object):
             key: str
             df_exp: pd.DataFrame
 
-            if not isinstance(sd, fsim.SimDrive):
-                solved_mods[key] = sd
-                objectives[key] = [1e12] * len(self.obj_fns)
-                continue
+            # if not isinstance(sd, fsim.SimDrive):
+            #     solved_mods[key] = sd
+            #     objectives[key] = [1e12] * len(self.obj_fns)
+            #     continue
             
             try:
                 t0 = time.perf_counter()
                 sd.walk_once() # type: ignore
                 t1 = time.perf_counter()
                 sd_dict = sd.to_pydict()
-            except RuntimeError as err:
+                walk_success = True
+            except RuntimeError as _err:
                 t1 = time.perf_counter()
                 sd_dict = sd.to_pydict()
-                if sd_dict['veh']['state']['time_seconds'] < 50:
-                    print(f"key: {key}")
-                    raise(err)
+                walk_success = True
+                if len(sd_dict['veh']['history']['time_seconds']) < np.floor(len(df_exp) / 2):
+                    walk_success = True
 
             if self.verbose:
                 print(f"Time to simulate {key}: {t1 - t0:.3g}")
@@ -230,27 +231,31 @@ class ModelObjectives(object):
                     time_s = sd_dict['veh']['history']['time_seconds']
                     # TODO: provision for incomplete simulation in here somewhere
 
-                    try:
-                        objectives[key].append(get_error_val(
-                            mod_sig,
-                            ref_sig,
-                            time_s,
-                        ))
-                    except AssertionError:
-                        # `get_error_val` checks for length equality with an assertion
-                        # If length equality is not satisfied, this design is
-                        # invalid because the cycle could not be completed.
-                        # NOTE: instead of appending an arbitrarily large
-                        # objective value, we could instead either try passing
-                        # `np.nan` or trigger a constraint violation.
+                    if walk_success:
                         objectives[key].append(1e12)
+                    else:
+                        try:
+                            objectives[key].append(get_error_val(
+                                mod_sig,
+                                ref_sig,
+                                time_s,
+                            ))
+                        except AssertionError:
+                            # `get_error_val` checks for length equality with an assertion
+                            # If length equality is not satisfied, this design is
+                            # invalid because the cycle could not be completed.
+                            # NOTE: instead of appending an arbitrarily large
+                            # objective value, we could instead either try passing
+                            # `np.nan` or trigger a constraint violation.
+                            objectives[key].append(1e12)
                 else:
+                    raise Exception("this is here for debugging and should be deleted")
                     objectives[key].append(mod_sig)                    
 
             t2 = time.perf_counter()
             if self.verbose:
                 print(f"Time to postprocess: {t2 - t1:.3g} s")
-
+        print(f'\n{objectives}\n')
         if return_mods:
             return objectives, solved_mods
         else:
