@@ -138,17 +138,23 @@ class ModelObjectives(object):
 
         t0 = time.perf_counter()
 
+        # Instantiate SimDrive objects
+        sim_drives = {}
+
         # Update all model parameters
         for key, pydict in self.models.items():
-            for (param_fn, new_val) in zip(self.param_fns, xs):
-                pydict = param_fn(pydict, new_val)
+            try:
+                for (param_fn, new_val) in zip(self.param_fns, xs):
+                    pydict = param_fn(pydict, new_val)
+            except Exception as err:
+                sim_drives[key] = err
             # this assignement may be redundant, but `pydict` is probably **not** mutably modified.
             # If this is correct, then this assignment is necessary
             self.models[key] = pydict
 
-        # Instantiate SimDrive objects
-        sim_drives = {}
         for key, pydict in self.models.items():
+            if key in list(sim_drives.keys()):
+                continue
             try:
                 sim_drives[key] = fsim.SimDrive.from_pydict(pydict, skip_init=False) 
             except Exception as err:
@@ -188,7 +194,7 @@ class ModelObjectives(object):
 
             if not isinstance(sd, fsim.SimDrive):
                 solved_mods[key] = sd
-                objectives[key] = [1e12] * len(self.obj_fns) * len(self.dfs)
+                objectives[key] = [1e12] * len(self.obj_fns)
                 continue
             
             try:

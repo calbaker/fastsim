@@ -301,15 +301,12 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             get_mod_pwr_hvac,
             get_exp_pwr_hvac  
         ),
-        # TODO: add objectives for:
-        # - battery temperature -- BEV only, if available
-        # - HVAC power for cabin, if available
     ),
     param_fns=(
         new_em_eff_max,
         new_em_eff_range,
         new_fc_eff_max,
-        # new_fc_eff_range, 
+        new_fc_eff_range, 
         # TODO: make sure this has functions for modifying
         # - cabin thermal
         #     - thermal mass
@@ -337,7 +334,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (0.80, 0.99),
         (0.1, 0.6),
         (0.32, 0.45),
-        # (0.0, 0.45),
+        (0.2, 0.45),
     ),
     verbose=False,    
 )
