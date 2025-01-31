@@ -2,7 +2,6 @@
 Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
 """
 from pathlib import Path
-
 import numpy as np  # noqa: F401
 import matplotlib.pyplot as plt  # noqa: F401
 import seaborn as sns
@@ -407,7 +406,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
     verbose=False,    
 )
 
-val_mod_obj = cal_mod_obj
+val_mod_obj = deepcopy(cal_mod_obj)
 val_mod_obj.dfs = dfs_for_val
 val_mod_obj.models = sds_for_val
 
