@@ -271,7 +271,6 @@ impl FuelConverter {
             )
         );
         self.state.pwr_prop = pwr_out_req;
-        // TODO: make this temperature dependent
         self.state.eff = if fc_on {
             uc::R
                 * self
@@ -772,17 +771,12 @@ impl FuelConverterThermal {
                 offset,
                 lag,
                 minimum,
-            }) => ((1.0
-                - f64::exp({
-                    (-1.0 / {
-                        let exp_denom: si::Ratio =
-                            (lag / uc::KELVIN) * (self.state.temperature - offset);
-                        exp_denom
-                    })
-                    .get::<si::ratio>()
-                }))
-                * uc::R)
-                .max(minimum),
+            }) => {
+                let dte: si::TemperatureInterval = (self.state.temperature.get::<si::kelvin_abs>()
+                    - offset.get::<si::kelvin_abs>())
+                    * uc::KELVIN_INT;
+                ((1.0 - f64::exp((-dte / lag).get::<si::ratio>())) * uc::R).max(minimum)
+            }
         };
         Ok(())
     }
@@ -931,9 +925,9 @@ impl Default for FCTempEffModelLinear {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct FCTempEffModelExponential {
     /// temperature at which `fc_eta_temp_coeff` begins to grow
-    pub offset: si::TemperatureInterval,
+    pub offset: si::Temperature,
     /// exponential lag parameter [K^-1]
-    pub lag: f64,
+    pub lag: si::TemperatureInterval,
     /// minimum value that `fc_eta_temp_coeff` can take
     pub minimum: si::Ratio,
 }
@@ -941,8 +935,8 @@ pub struct FCTempEffModelExponential {
 impl Default for FCTempEffModelExponential {
     fn default() -> Self {
         Self {
-            offset: 0.0 * uc::KELVIN_INT,
-            lag: 25.0,
+            offset: 0.0 * uc::KELVIN,
+            lag: 25.0 * uc::KELVIN_INT,
             minimum: 0.2 * uc::R,
         }
     }

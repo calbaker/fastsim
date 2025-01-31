@@ -20,7 +20,7 @@ param_vals_euclidean = res_df.iloc[
     :len(cal_mod_obj.param_fns)].to_numpy()
 
 # getting the solved models
-(errors_cal, sds_cal) = cal_mod_obj.get_errors(
+(errors_cal, cvs_cal, sds_cal) = cal_mod_obj.get_errors(
     sim_drives=cal_mod_obj.update_params(param_vals_fuel_energy),
     return_mods=True,
 )

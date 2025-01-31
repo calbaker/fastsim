@@ -409,7 +409,7 @@ def get_exp_pwr_hvac(df):
 
 ## Constraint functions
 def get_fc_temp_too_hot(sd_dict):
-    te_fc_deg_c = sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] + celsius_to_kelvin_offset
+    te_fc_deg_c = sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] - celsius_to_kelvin_offset
     if np.any(te_fc_deg_c > 115):
         return 1
     else:
@@ -513,11 +513,12 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (10, 100), # new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
         (10, 1000), # new_fc_thrml_conductance_from_comb_watts_per_kelvin,
         # (), # new_fc_thrml_max_frac_from_comb,
-        (3, 20), # new_fc_thrml_radiator_effectiveness,
-        (220, 380), # new_fc_thrml_fc_eff_model_Exponential_offset,
+        (3, 200), # new_fc_thrml_radiator_effectiveness,
+        (220, 300), # new_fc_thrml_fc_eff_model_Exponential_offset,
         (10, 60), # new_fc_thrml_fc_eff_model_Exponential_lag,
         (0.15, 0.35), # new_fc_thrml_fc_eff_model_Exponential_minimum,
     ),
+    # TODO: make `constr_fns` accept both `sd_dict` and `df`
     constr_fns=(
         get_fc_temp_too_hot,
     ),
@@ -564,13 +565,13 @@ def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
     print("Verifying that model responds to input parameter changes by individually perturbing parameters")
     baseline_errors = cal_mod_obj.get_errors(
         cal_mod_obj.update_params(baseline_params)
-    )
+    )[0]
     
     for i, param in enumerate(baseline_params):
         # +5%
         perturbed_params = baseline_params.copy()
         perturbed_params[i] = param * (1 + pos_perturb_dec)
-        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))[0]
         if np.all(perturbed_errors == baseline_errors):
           print("\nperturbed_errros:")
           pprint.pp(perturbed_errors) 
@@ -582,7 +583,7 @@ def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
         # -5%
         perturbed_params = baseline_params.copy()
         perturbed_params[i] = param * (1 - neg_perturb_dec)
-        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))[0]
         if np.all(perturbed_errors == baseline_errors):
             print("\nperturbed_errros:")
             pprint.pp(perturbed_errors) 
