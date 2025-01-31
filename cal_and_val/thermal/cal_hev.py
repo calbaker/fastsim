@@ -560,9 +560,8 @@ def perturb_params(pct: float = 0.05):
 
     print("Success!")
 
-perturb_params()
-
 if __name__ == "__main__":
+    perturb_params()
     parser = pymoo_api.get_parser()
     args = parser.parse_args()
 
