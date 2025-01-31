@@ -551,12 +551,12 @@ def perturb_params(pct: float = 0.05):
         perturbed_params = baseline_params.copy()
         perturbed_params[i] = param * (1 + pct)
         perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
-        assert perturbed_errors != baseline_errors, f"+{100 * pct}% perturbation failed for param {i}: {perturbed_errors} == {baseline_errors}"
+        assert perturbed_errors != baseline_errors, f"+{100 * pct}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}: {perturbed_errors} == {baseline_errors}"
         # -5%
         perturbed_params = baseline_params.copy()
         perturbed_params[i] = param * (1 - pct)
         perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
-        assert perturbed_errors != baseline_errors, f"-{100 * pct}% perturbation failed for param {i}: {perturbed_errors} == {baseline_errors}"
+        assert perturbed_errors != baseline_errors, f"-{100 * pct}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}: {perturbed_errors} == {baseline_errors}"
 
     print("Success!")
 
