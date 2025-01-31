@@ -8,6 +8,7 @@ pub use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecBoolWrapper, Pyo
 pub use crate::vehicle::cabin::{
     CabinOption, LumpedCabin, LumpedCabinState, LumpedCabinStateHistoryVec,
 };
+pub use crate::vehicle::hev::RESGreedyWithDynamicBuffers;
 pub use crate::vehicle::hvac::{
     HVACOption, HVACSystemForLumpedCabin, HVACSystemForLumpedCabinAndRES,
     HVACSystemForLumpedCabinAndRESState, HVACSystemForLumpedCabinAndRESStateHistoryVec,

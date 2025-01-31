@@ -35,6 +35,7 @@ fn fastsim(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<ElectricMachine>()?;
     m.add_class::<ElectricMachineState>()?;
     m.add_class::<ElectricMachineStateHistoryVec>()?;
+    m.add_class::<RESGreedyWithDynamicBuffers>()?;
     m.add_class::<Cycle>()?;
     m.add_class::<CycleElement>()?;
     m.add_class::<Vehicle>()?;
