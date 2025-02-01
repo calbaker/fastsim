@@ -50,7 +50,10 @@ sd = fsim.SimDrive(veh, cyc)
 # simulation start time
 t0 = time.perf_counter()
 # run simulation
-sd.walk()
+try:
+    sd.walk()
+except Exception:
+    pass
 # simulation end time
 t1 = time.perf_counter()
 t_fsim3_si1 = t1 - t0

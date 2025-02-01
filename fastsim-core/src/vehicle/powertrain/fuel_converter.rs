@@ -935,6 +935,7 @@ pub struct FCTempEffModelExponential {
 impl Default for FCTempEffModelExponential {
     fn default() -> Self {
         Self {
+            // TODO: update after reasonable calibration
             offset: 0.0 * uc::KELVIN,
             lag: 25.0 * uc::KELVIN_INT,
             minimum: 0.2 * uc::R,

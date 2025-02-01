@@ -186,6 +186,7 @@ class ModelObjectives(object):
         objectives: Dict = {}
         constraint_violations: Dict = {}
         solved_mods: Dict = {}
+        unsolved_mods: Dict = {}
 
         # loop through all the provided trips
         for ((key, df_exp), sd) in zip(self.dfs.items(), sim_drives.values()):
@@ -197,6 +198,9 @@ class ModelObjectives(object):
             #     objectives[key] = [1.0e12] * len(self.obj_fns)
             #     continue
             
+            if return_mods:
+                unsolved_mods[key] = sd.to_pydict()
+
             try:
                 t0 = time.perf_counter()
                 sd.walk_once() # type: ignore
@@ -270,7 +274,7 @@ class ModelObjectives(object):
         # pprint.pp(objectives)
         # print("")
         if return_mods:
-            return objectives, constraint_violations, solved_mods
+            return objectives, constraint_violations, solved_mods, unsolved_mods
         else:
             return objectives, constraint_violations
 

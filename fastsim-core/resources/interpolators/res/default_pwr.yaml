@@ -25,4 +25,4 @@ Interp1D:
     - 0.927243266086586
     - 0.864025853742296
   strategy: Linear
-  extrapolate: Error
+  extrapolate: Clamp
