@@ -48,10 +48,7 @@ cell_temp_column = "Cell_Temp[C]"
 
 # See 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx for cycle-level data
 cyc_files_dict: Dict[str, Dict] = {
-    # The hot and cold cycles must have HVAC active!
-    # - wide range of initial and ambient temperatures
-    # - good signal quality -- somewhat subjective
-
+    # TODO: pipe in solar load
     # HWYx2, 2 bag in 95°F test cell with solar @850W/m^2, HVAC-ON-AUTO-72°F, ECO drive mode
     "62202004 Test Data.txt": {cell_temp_column: 35, "solar load [W/m^2]": 850, "set temp [*C]": 22}, 
 
@@ -66,6 +63,7 @@ cyc_files_dict: Dict[str, Dict] = {
     # HWY x2, room temperature ambient
     "62201014 Test Data.txt": {cell_temp_column: 25, "solar load [W/m^2]": 0, "set temp [*C]": None},
 
+    # TODO: trim this to stop at ~1400 s
     # UDDSx2, 4 bag (FTP), cold start, in COLD (20°F) test cell, HVAC-AUTO-72°F, ECO drive mode
     "62202013 Test Data.txt": {cell_temp_column: -6.7, "solar load [W/m^2]": 0, "set temp [*C]": 22},
 
@@ -106,14 +104,11 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
         "speed_meters_per_second": (df[speed_column] * mps_per_mph).to_list(),
         "temp_amb_air_kelvin": (df[cell_temp_column] + celsius_to_kelvin_offset).to_list(),
         # TODO: pipe solar load from `Cycle` into cabin thermal model
-        # TODO: use something (e.g. regex) to determine solar load
-        # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx
         # "pwr_solar_load_watts": df[],
     }
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
-    # TODO: turn off HVAC for 22*C ambient
     vd = deepcopy(veh_dict)
     # initialize SOC
     vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
@@ -146,7 +141,7 @@ def resample_df(df: pd.DataFrame) -> pd.DataFrame:
     df['cumu. dist [mph*s]'] = (dt * df[speed_column]).cumsum()
     init_speed = df[speed_column].iloc[0]
     init_fuel = df[fuel_column].iloc[0]
-    df = df[::10] # convert to ~ Hz
+    df = df[::10] # convert to ~1 Hz
     df.reset_index(inplace=True)
     dt_new = np.diff(df[time_column])
     df[speed_column] = np.concat(([init_speed], np.diff(df['cumu. dist [mph*s]']) / dt_new))
@@ -519,7 +514,6 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (10, 60), # new_fc_thrml_fc_eff_model_Exponential_lag,
         (0.15, 0.35), # new_fc_thrml_fc_eff_model_Exponential_minimum,
     ),
-    # TODO: make `constr_fns` accept both `sd_dict` and `df`
     constr_fns=(
         get_fc_temp_too_hot,
     ),
