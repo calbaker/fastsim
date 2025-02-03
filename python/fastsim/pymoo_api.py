@@ -223,6 +223,9 @@ class ModelObjectives(object):
             if return_mods:
                 solved_mods[key] = sd_dict
 
+            # trim dataframe to match length of cycle completed by vehicle
+            df_exp = df_exp[:len(sd_dict['veh']['history']['time_seconds'])]
+
             # loop through the objectives for each trip
             for i_obj, obj_fn in enumerate(self.obj_fns):
                 i_obj: int
@@ -230,7 +233,7 @@ class ModelObjectives(object):
                 if len(obj_fn) == 2:
                     # objective and reference passed
                     mod_sig = obj_fn[0](sd_dict)  
-                    ref_sig = obj_fn[1](df_exp)[:len(sd_dict['veh']['history']['time_seconds'])]
+                    ref_sig = obj_fn[1](df_exp)
                 elif len(obj_fn) == 1:
                     # minimizing scalar objective 
                     mod_sig = obj_fn[0](sd_dict)  

@@ -50,6 +50,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
         print(f"skipping {key}")
         continue
     assert key == sd_key
+    df_cal = df_cal[:len(sd_cal['veh']['history']['time_seconds'])]
 
     for obj_fn in cal_mod_obj.obj_fns:
         fig, ax = plt.subplots(2, 1, sharex=True)
@@ -57,7 +58,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
             [v[cell_temp_column]
                 for k, v in cyc_files_dict.items() if k.replace(".txt", "") == key]
         ))
-        fig.suptitle(f"{key}\ncell temp [*C]: {cell_temp}")
+        fig.suptitle(f"{key}\ncell temp [*C]: {cell_temp}, calibration")
         ax[0].plot(
             sd_cal['veh']['history']['time_seconds'],
             obj_fn[0](sd_cal),
@@ -79,7 +80,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
         ax[1].plot(
             df_cal[time_column],
             df_cal[speed_column] * mps_per_mph,
-            label='exp',
+            label="exp",
         )
         ax[1].legend()
         ax[1].set_ylabel("Speed [m/s]")
@@ -91,13 +92,15 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_so
         continue
     assert key == sd_key
 
+    df_val = df_val[:len(sd_val['veh']['history']['time_seconds'])]
+
     for obj_fn in val_mod_obj.obj_fns:
         fig, ax = plt.subplots(2, 1, sharex=True)
         cell_temp = next(iter(
             [v[cell_temp_column]
                 for k, v in cyc_files_dict.items() if k.replace(".txt", "") == key]
         ))
-        fig.suptitle(f"{key}\ncell temp [*C]: {cell_temp}")
+        fig.suptitle(f"{key}\ncell temp [*C]: {cell_temp}, validation")
         ax[0].plot(
             sd_val['veh']['history']['time_seconds'],
             obj_fn[0](sd_val),
