@@ -24,14 +24,14 @@ def test_pydict():
 
     t0 = time.perf_counter_ns()
     sd_dict_msg = sd.to_pydict(flatten=False, data_fmt="msg_pack")            
-    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt="msg_pack")
+    sd_msg = fsim.SimDrive.from_pydict(sd_dict_msg, data_fmt="msg_pack", skip_init=True)
     t1 = time.perf_counter_ns()
     t_msg = t1 - t0
     print(f"\nElapsed time for MessagePack: {t_msg:.3e} ns ")
 
     t0 = time.perf_counter_ns()
     sd_dict_yaml = sd.to_pydict(flatten=False, data_fmt="yaml")            
-    sd_yaml = fsim.SimDrive.from_pydict(sd_dict_yaml, data_fmt="yaml")
+    sd_yaml = fsim.SimDrive.from_pydict(sd_dict_yaml, data_fmt="yaml", skip_init=True)
     t1 = time.perf_counter_ns()
     t_yaml = t1 - t0
     print(f"Elapsed time for YAML: {t_yaml:.3e} ns ")
@@ -39,7 +39,7 @@ def test_pydict():
 
     t0 = time.perf_counter_ns()
     sd_dict_json = sd.to_pydict(flatten=False, data_fmt="json")            
-    _sd_json = fsim.SimDrive.from_pydict(sd_dict_json, data_fmt="json")
+    _sd_json = fsim.SimDrive.from_pydict(sd_dict_json, data_fmt="json", skip_init=True)
     t1 = time.perf_counter_ns()
     t_json = t1 - t0
     print(f"Elapsed time for json: {t_json:.3e} ns ")

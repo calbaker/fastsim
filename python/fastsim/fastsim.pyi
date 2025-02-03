@@ -15,7 +15,7 @@ class SerdeAPI(object):
     def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict: ...
 
     @classmethod
-    def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = True) -> Self:
+    def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self: ...
 
 class SimDrive(SerdeAPI):
     ... # TODO: flesh out more
