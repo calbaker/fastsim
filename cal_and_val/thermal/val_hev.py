@@ -127,194 +127,208 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_so
         ax[1].legend()
         ax[1].set_ylabel("Speed [m/s]")
         plt.savefig(plot_save_path / f"{key}_{obj_fn[0].__name__}_val.svg")
+# %%
+# function for plot formatting
+def draw_error_zones(ax):
+    """Draw 0%, ±5%, ±10% error regions on MPL Axes object"""
+    xl, xu = ax.get_xlim()
+    yl, yu = ax.get_ylim()
+    l = min(xl, yl)
+    u = max(xu, yu)
+    lims = np.array([0, u * 1.01])
 
-    # %%
+    # Plot 0% error diagonalx
+    ax.plot(lims, lims, linestyle="dotted", color="g", label="0% error")
 
-    def draw_error_zones(ax):
-        """Draw 0%, ±5%, ±10% error regions on MPL Axes object"""
-        xl, xu = ax.get_xlim()
-        yl, yu = ax.get_ylim()
-        l = min(xl, yl)
-        u = max(xu, yu)
-        lims = np.array([0, 200])
-
-        # Plot 0% error diagonalx
-        ax.plot(lims, lims, linestyle="dotted", color="g", label="0% error")
-
-        # Plot ±5%, ±10% error regions with transparencies
-        counter = 0
-        error_1 = 0
-        error_2 = 0
-        error_3 = 0
-        for err, alpha in zip((0.05, 0.10, 0.15), (0.35, 0.2, 0.15)):
-            error = ax.fill_between(
-                lims,
-                lims * (1 - err),
-                lims * (1 + err),
-                alpha=alpha,
-                color="g",
-                label=f"±{err*100:.0f}% error",
-            )
-
-        ax.set_xlim(left=l, right=u)
-        ax.set_ylim(bottom=l, top=u)
-        # ax.legend(loc="lower right", framealpha=0.5, fontsize=8, borderpad=0.25)
-
-        return error
-
-    # %%
-    # Scatter plots with temperature effects
-
-    fuel_energy_exp_cal = []
-    fuel_energy_mod_cal = []
-    for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_solved.items()):
-        if not isinstance(sd_cal, dict):
-            print(f"skipping {key}")
-            continue
-        assert key == sd_key
-
-        fuel_energy_mod_cal.append(
-            sd_cal['veh']['pt_type']['HybridElectricVehicle']['fc']['state']['energy_fuel_joules'] * 1e-6
-        )
-        df_cal = df_cal[df_cal[time_column] <=
-                        sd_cal['veh']['state']['time_seconds']]
-        fuel_energy_exp_cal.append(
-            get_exp_energy_fuel(df_cal).iloc[-1] * 1e-6
+    # Plot ±5%, ±10% error regions with transparencies
+    counter = 0
+    error_1 = 0
+    error_2 = 0
+    error_3 = 0
+    for err, alpha in zip((0.05, 0.10, 0.15), (0.35, 0.2, 0.15)):
+        error = ax.fill_between(
+            lims,
+            lims * (1 - err),
+            lims * (1 + err),
+            alpha=alpha,
+            color="g",
+            label=f"±{err*100:.0f}% error",
         )
 
-    fuel_energy_exp_val = []
-    fuel_energy_mod_val = []
+    ax.set_xlim(left=l, right=u)
+    ax.set_ylim(bottom=l, top=u)
+    # ax.legend(loc="lower right", framealpha=0.5, fontsize=8, borderpad=0.25)
 
-    for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_solved.items()):
-        if not isinstance(sd_val, dict):
-            print(f"skipping {key}")
-            continue
-        assert key == sd_key
+    return error
 
-        fuel_energy_mod_val.append(
-            sd_val['veh']['pt_type']['HybridElectricVehicle']['fc']['state']['energy_fuel_joules'] * 1e-6
-        )
-        df_val = df_val[df_val[time_column] <=
-                        sd_val['veh']['state']['time_seconds']]
-        fuel_energy_exp_val.append(
-            get_exp_energy_fuel(df_val).iloc[-1] * 1e-6
-        )
+# %%
+# Scatter plots with temperature effects
 
-    fig, ax = plt.subplots()
-    fig.suptitle("Model v. Test Data With Thermal Effects")
-    ax.scatter(
-        fuel_energy_exp_cal,
-        fuel_energy_mod_cal,
-        label='cal',
+fuel_energy_exp_cal = []
+fuel_energy_mod_cal = []
+for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_solved.items()):
+    if not isinstance(sd_cal, dict):
+        print(f"skipping {key}")
+        continue
+    assert key == sd_key
+
+    df_cal = df_cal[:len(sd_cal['veh']['history']['time_seconds'])]
+
+    mod_energy_fuel = get_mod_energy_fuel(sd_cal)
+    exp_energy_fuel = get_exp_energy_fuel(df_cal)
+    assert len(mod_energy_fuel) == len(exp_energy_fuel)
+
+    fuel_energy_mod_cal.append(
+        mod_energy_fuel[-1]
     )
-    ax.scatter(
-        fuel_energy_exp_val,
-        fuel_energy_mod_val,
-        label='val',
+    fuel_energy_exp_cal.append(
+        exp_energy_fuel.iloc[-1]
     )
-    draw_error_zones(ax)
-    ax.set_xlabel("Test Data Fuel Used [MJ]")
-    ax.set_ylabel("FASTSim Fuel Used [MJ]")
-    ax.set_xlim(0, 55)
-    ax.set_ylim(0, 55)
-    ax.legend()
-    plt.savefig(plot_save_path / "scatter with thrml effects.svg")
 
-    # %%
+fuel_energy_exp_val = []
+fuel_energy_mod_val = []
 
-    # Scatter plots without temperature effects
+for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_solved.items()):
+    if not isinstance(sd_val, dict):
+        print(f"skipping {key}")
+        continue
+    assert key == sd_key
 
-    fuel_energy_mod_cal_no_thrml = []
-    fuel_energy_exp_cal_no_thrml = []
-    for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.items()):
-        if not isinstance(sd_cal, dict):
-            print(f"skipping {key}")
-            continue
-        assert key == sd_key
+    df_val = df_val[:len(sd_val['veh']['history']['time_seconds'])]
 
-        sd_cal_no_thrml = deepcopy(sd_cal)
+    mod_energy_fuel = get_mod_energy_fuel(sd_val)
+    exp_energy_fuel = get_exp_energy_fuel(df_val)
+    assert len(mod_energy_fuel) == len(exp_energy_fuel)
 
-        sd_cal_no_thrml['veh']['hvac'] = 'None'
-        sd_cal_no_thrml['veh']['cabin'] = 'None'
-        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml'] = 'None'
-        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res']['thrml'] = 'None'
-        res = fsim.ReversibleEnergyStorage.from_pydict(
-            sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'], skip_init=False)
-        res.set_default_pwr_interp()
-        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'] = res.to_pydict()
-        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_allowed_off_kelvin'] = None
-        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_forced_on_kelvin'] = None
-
-        sd_cal_no_thrml = fsim.SimDrive.from_pydict(
-            sd_cal_no_thrml, skip_init=False)
-        try:
-            sd_cal_no_thrml.walk_once()
-        except:
-            pass
-        sd_cal_no_thrml = sd_cal_no_thrml.to_pydict()
-
-        fuel_energy_mod_cal_no_thrml.append(
-            sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['state']['energy_fuel_joules'] * 1e-6
-        )
-        df_cal = df_cal[df_cal[time_column] <=
-                        sd_cal_no_thrml['veh']['state']['time_seconds']]
-        fuel_energy_exp_cal_no_thrml.append(
-            get_exp_energy_fuel(df_cal)
-        )
-
-    fuel_energy_exp_val_no_thrml = []
-    fuel_energy_mod_val_no_thrml = []
-    for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val.items()):
-        if not isinstance(sd_val, dict):
-            print(f"skipping {key}")
-            continue
-        assert key == sd_key
-
-        sd_val_no_thrml = deepcopy(sd_val)
-
-        sd_val_no_thrml['veh']['hvac'] = 'None'
-        sd_val_no_thrml['veh']['cabin'] = 'None'
-        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml'] = 'None'
-        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res']['thrml'] = 'None'
-        res = fsim.ReversibleEnergyStorage.from_pydict(
-            sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'], skip_init=False)
-        res.set_default_pwr_interp()
-        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'] = res.to_pydict()
-        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_allowed_off_kelvin'] = None
-        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_forced_on_kelvin'] = None
-        sd_val_no_thrml = fsim.SimDrive.from_pydict(
-            sd_val_no_thrml, skip_init=False)
-        try:
-            sd_val_no_thrml.walk_once()
-        except:
-            pass
-        sd_val_no_thrml = sd_val_no_thrml.to_pydict()
-
-        fuel_energy_mod_val_no_thrml.append(
-            sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['state']['energy_fuel_joules'] * 1e-6
-        )
-        df_val = df_val[df_val[time_column] <=
-                        sd_val_no_thrml['veh']['state']['time_seconds']]
-        fuel_energy_exp_val_no_thrml.append(
-            get_exp_energy_fuel(df_val)
-        )
-
-    fig, ax = plt.subplots()
-    fig.suptitle("Model v. Test Data Without Thermal Effects")
-    ax.scatter(
-        fuel_energy_exp_cal,
-        fuel_energy_mod_cal_no_thrml,
-        label='cal',
+    fuel_energy_mod_val.append(
+        mod_energy_fuel[-1]
     )
-    ax.scatter(
-        fuel_energy_exp_val,
-        fuel_energy_mod_val_no_thrml,
-        label='val',
+    fuel_energy_exp_val.append(
+        exp_energy_fuel.iloc[-1]
     )
-    draw_error_zones(ax)
-    ax.set_xlabel("Test Data Fuel Used [MJ]")
-    ax.set_ylabel("FASTSim Fuel Used [MJ]")
-    ax.set_xlim(0, 55)
-    ax.set_ylim(0, 55)
-    ax.legend()
-    plt.savefig(plot_save_path / "scatter without thrml effects.svg")
+
+
+fig, ax = plt.subplots()
+fig.suptitle("Model v. Test Data With Thermal Effects")
+ax.scatter(
+    fuel_energy_exp_cal,
+    fuel_energy_mod_cal,
+    label='cal',
+)
+ax.scatter(
+    fuel_energy_exp_val,
+    fuel_energy_mod_val,
+    label='val',
+)
+draw_error_zones(ax)
+ax.set_xlabel("Test Data Fuel Used [MJ]")
+ax.set_ylabel("FASTSim Fuel Used [MJ]")
+ax.legend()
+plt.savefig(plot_save_path / "scatter with thrml effects.svg")
+
+# %%
+
+# Scatter plots without temperature effects
+
+fuel_energy_mod_cal_no_thrml = []
+fuel_energy_exp_cal_no_thrml = []
+for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.items()):
+    if not isinstance(sd_cal, dict):
+        print(f"skipping {key}")
+        continue
+    assert key == sd_key
+
+    sd_cal_no_thrml = deepcopy(sd_cal)
+
+    sd_cal_no_thrml['veh']['hvac'] = 'None'
+    sd_cal_no_thrml['veh']['cabin'] = 'None'
+    sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml'] = 'None'
+    sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res']['thrml'] = 'None'
+    res = fsim.ReversibleEnergyStorage.from_pydict(
+        sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'], skip_init=False)
+    res.set_default_pwr_interp()
+    sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'] = res.to_pydict()
+    sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_allowed_off_kelvin'] = None
+    sd_cal_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_forced_on_kelvin'] = None
+
+    sd_cal_no_thrml = fsim.SimDrive.from_pydict(
+        sd_cal_no_thrml, skip_init=False)
+    try:
+        sd_cal_no_thrml.walk_once()
+    except:
+        pass
+    sd_cal_no_thrml = sd_cal_no_thrml.to_pydict()
+
+    df_cal = df_cal[:len(sd_cal_no_thrml['veh']['history']['time_seconds'])]
+
+    mod_energy_fuel = get_mod_energy_fuel(sd_cal_no_thrml)
+    exp_energy_fuel = get_exp_energy_fuel(df_cal)
+    assert len(mod_energy_fuel) == len(exp_energy_fuel)
+
+    fuel_energy_mod_cal_no_thrml.append(
+        mod_energy_fuel[-1]
+    )
+    fuel_energy_exp_cal_no_thrml.append(
+        exp_energy_fuel.iloc[-1]
+    )
+
+fuel_energy_exp_val_no_thrml = []
+fuel_energy_mod_val_no_thrml = []
+for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val.items()):
+    if not isinstance(sd_val, dict):
+        print(f"skipping {key}")
+        continue
+    assert key == sd_key
+
+    sd_val_no_thrml = deepcopy(sd_val)
+
+    sd_val_no_thrml['veh']['hvac'] = 'None'
+    sd_val_no_thrml['veh']['cabin'] = 'None'
+    sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml'] = 'None'
+    sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res']['thrml'] = 'None'
+    res = fsim.ReversibleEnergyStorage.from_pydict(
+        sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'], skip_init=False)
+    res.set_default_pwr_interp()
+    sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['res'] = res.to_pydict()
+    sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_allowed_off_kelvin'] = None
+    sd_val_no_thrml['veh']['pt_type']['HybridElectricVehicle']['pt_cntrl']['RGWDB']['temp_fc_forced_on_kelvin'] = None
+    sd_val_no_thrml = fsim.SimDrive.from_pydict(
+        sd_val_no_thrml, skip_init=False)
+    try:
+        sd_val_no_thrml.walk_once()
+    except:
+        pass
+    sd_val_no_thrml = sd_val_no_thrml.to_pydict()
+
+    df_val = df_val[:len(sd_val_no_thrml['veh']['history']['time_seconds'])]
+
+    mod_energy_fuel = get_mod_energy_fuel(sd_val_no_thrml)
+    exp_energy_fuel = get_exp_energy_fuel(df_val)
+    assert len(mod_energy_fuel) == len(exp_energy_fuel)
+
+    fuel_energy_mod_val_no_thrml.append(
+        mod_energy_fuel[-1]
+    )
+    fuel_energy_exp_val_no_thrml.append(
+        exp_energy_fuel.iloc[-1]
+    )
+
+fig, ax = plt.subplots()
+fig.suptitle("Model v. Test Data Without Thermal Effects")
+ax.scatter(
+    fuel_energy_exp_cal,
+    fuel_energy_mod_cal_no_thrml,
+    label='cal',
+)
+ax.scatter(
+    fuel_energy_exp_val,
+    fuel_energy_mod_val_no_thrml,
+    label='val',
+)
+draw_error_zones(ax)
+ax.set_xlabel("Test Data Fuel Used [MJ]")
+ax.set_ylabel("FASTSim Fuel Used [MJ]")
+ax.legend()
+plt.savefig(plot_save_path / "scatter without thrml effects.svg")
+
+# %%
