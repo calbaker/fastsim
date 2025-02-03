@@ -255,7 +255,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.it
         sd_cal_no_thrml, skip_init=False)
     try:
         sd_cal_no_thrml.walk_once()
-    except:
+    except Exception:
         pass
     sd_cal_no_thrml = sd_cal_no_thrml.to_pydict()
 
@@ -296,7 +296,7 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val.it
         sd_val_no_thrml, skip_init=False)
     try:
         sd_val_no_thrml.walk_once()
-    except:
+    except Exception:
         pass
     sd_val_no_thrml = sd_val_no_thrml.to_pydict()
 
