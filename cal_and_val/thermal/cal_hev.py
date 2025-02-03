@@ -245,23 +245,23 @@ def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
     return sd_dict
 
-def new_cab_shell_htc(sd_dict, new_val) -> Dict:
+def new_cab_shell_htc_w_per_m2_k(sd_dict, new_val) -> Dict:
     sd_dict['veh']['cabin']['LumpedCabin']['cab_shell_htc_to_amb_watts_per_square_meter_kelvin'] = new_val
     return sd_dict
 
-def new_cab_htc_to_amb_stop(sd_dict, new_val) -> Dict:
+def new_cab_htc_to_amb_stop_w_per_m2_k(sd_dict, new_val) -> Dict:
     sd_dict['veh']['cabin']['LumpedCabin']['cab_htc_to_amb_stop_watts_per_square_meter_kelvin'] = new_val
     return sd_dict
 
-def new_cab_tm(sd_dict, new_val) -> Dict:
+def new_cab_tm_j_per_k(sd_dict, new_val) -> Dict:
     sd_dict['veh']['cabin']['LumpedCabin']['heat_capacitance_joules_per_kelvin'] = new_val
     return sd_dict
 
-def new_cab_length(sd_dict, new_val) -> Dict:
+def new_cab_length_m(sd_dict, new_val) -> Dict:
     sd_dict['veh']['cabin']['LumpedCabin']['length_meters'] = new_val
     return sd_dict
 
-def new_speed_soc_disch_buffer_meters_per_second(sd_dict, new_val) -> Dict:
+def new_speed_soc_disch_buffer_m_per_s(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_meters_per_second"] = new_val
     return sd_dict
     
@@ -269,7 +269,7 @@ def new_speed_soc_disch_buffer_coeff(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_coeff"] = new_val
     return sd_dict
     
-def new_speed_soc_fc_on_buffer_meters_per_second(sd_dict, new_val) -> Dict:
+def new_speed_soc_fc_on_buffer_m_per_s(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_meters_per_second"] = new_val
     return sd_dict
     
@@ -277,7 +277,7 @@ def new_speed_soc_fc_on_buffer_coeff(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_coeff"] = new_val
     return sd_dict
     
-def new_fc_min_time_on_seconds(sd_dict, new_val) -> Dict:
+def new_fc_min_time_on_s(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["fc_min_time_on_seconds"] = new_val
     return sd_dict
     
@@ -289,11 +289,12 @@ def new_frac_of_most_eff_pwr_to_run_fc(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_of_most_eff_pwr_to_run_fc"] = new_val
     return sd_dict
 
-def new_hvac_p_watts_per_kelvin(sd_dict, new_val) -> Dict:
+def new_hvac_p_w_per_k(sd_dict, new_val) -> Dict:
     sd_dict['veh']['hvac']['LumpedCabin']['p_watts_per_kelvin'] = new_val
     return sd_dict
 
 def new_hvac_i(sd_dict, new_val) -> Dict:
+    """Set `new_val` for HVAC integral control gain"""
     sd_dict['veh']['hvac']['LumpedCabin']['i'] = new_val
     return sd_dict
 
@@ -317,19 +318,19 @@ def new_hvac_frac_of_ideal_cop(sd_dict, new_val) -> Dict:
 #     sd_dict['veh']['hvac']['LumpedCabin']['pwr_aux_for_hvac_max_watts'] = new_val
 #     return sd_dict
     
-def new_fc_thrml_heat_capacitance_joules_per_kelvin(sd_dict, new_val) -> Dict:
+def new_fc_thrml_heat_capacitance_j_per_k(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["heat_capacitance_joules_per_kelvin"] = new_val
     return sd_dict
 
-def new_fc_thrml_length_for_convection_meters(sd_dict, new_val) -> Dict:
+def new_fc_thrml_length_for_convection_m(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["length_for_convection_meters"] = new_val
     return sd_dict
 
-def new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin(sd_dict, new_val) -> Dict:
+def new_fc_thrml_htc_to_amb_stop_w_per_m2_k(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["htc_to_amb_stop_watts_per_square_meter_kelvin"] = new_val
     return sd_dict
 
-def new_fc_thrml_conductance_from_comb_watts_per_kelvin(sd_dict, new_val) -> Dict:
+def new_fc_thrml_conductance_from_comb_w_per_k(sd_dict, new_val) -> Dict:
     sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["conductance_from_comb_watts_per_kelvin"] = new_val
     return sd_dict
 
@@ -366,47 +367,47 @@ def get_mod_soc(sd_dict):
 def get_exp_soc(df):
     return df['HVBatt_SOC_high_precision_PCAN__per'] / 100
 
-def get_mod_fc_temp(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['history']['temperature_kelvin'])
+def get_mod_fc_temp_celsius(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['history']['temperature_kelvin']) - celsius_to_kelvin_offset
 
-def get_exp_fc_temp(df):
-    return df[eng_clnt_temp_column] + celsius_to_kelvin_offset
+def get_exp_fc_temp_celsius(df):
+    return df[eng_clnt_temp_column] 
 
-def get_mod_cab_temp(sd_dict):
-    return np.array(sd_dict['veh']['cabin']['LumpedCabin']['history']['temperature_kelvin'])
+def get_mod_cab_temp_celsius(sd_dict):
+    return np.array(sd_dict['veh']['cabin']['LumpedCabin']['history']['temperature_kelvin']) - celsius_to_kelvin_offset
 
-def get_exp_cab_temp(df):
-    return df[cabin_temp_column] + celsius_to_kelvin_offset
+def get_exp_cab_temp_celsius(df):
+    return df[cabin_temp_column]
 
-def get_mod_spd(sd_dict):
+def get_mod_speed_m_per_s(sd_dict):
     return np.array(sd_dict['veh']['history']['speed_ach_meters_per_second'])
 
-def get_exp_spd(df):
+def get_exp_speed_m_per_s(df):
     return df[speed_column] * mps_per_mph
 
-def get_mod_pwr_fuel(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['pwr_fuel_watts'])
+def get_mod_pwr_fuel_kw(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['pwr_fuel_watts']) / 1e3
 
-def get_exp_pwr_fuel(df):
-    return df[fuel_column] * lhv_joules_per_gram
+def get_exp_pwr_fuel_kw(df):
+    return df[fuel_column] * lhv_joules_per_gram / 1e3
 
-def get_mod_energy_fuel(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['energy_fuel_joules'])
+def get_mod_energy_fuel_megajoules(sd_dict):
+    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['energy_fuel_joules']) / 1e6
 
-def get_exp_energy_fuel(df):
+def get_exp_energy_fuel_megajoules(df):
     pwr_fuel_watts = df[fuel_column] * lhv_joules_per_gram
     dt = np.diff(df[time_column], prepend=0)
-    energy_fuel_joules = np.cumsum(pwr_fuel_watts * dt)
+    energy_fuel_joules = np.cumsum(pwr_fuel_watts * dt) / 1e6
     return energy_fuel_joules
 
-def get_mod_pwr_hvac(sd_dict):
-    return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts'])
+def get_mod_pwr_hvac_kw(sd_dict):
+    return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts']) / 1e3
 
-def get_exp_pwr_hvac(df):
+def get_exp_pwr_hvac_kw(df):
     if df[cell_temp_column].mean() < 15:
         pwr_hvac = [0] * len(df)
     else:
-        pwr_hvac = df["HVAC_Power_Hioki_P3[W]"]
+        pwr_hvac = df["HVAC_Power_Hioki_P3[W]"] / 1e3
     return pwr_hvac
 
 ## Constraint functions
@@ -430,28 +431,28 @@ cal_mod_obj = pymoo_api.ModelObjectives(
             get_exp_soc
         ),
         (
-            get_mod_energy_fuel,
-            get_exp_energy_fuel
+            get_mod_energy_fuel_megajoules,
+            get_exp_energy_fuel_megajoules
         ),
         (
-            get_mod_pwr_fuel,
-            get_exp_pwr_fuel
+            get_mod_pwr_fuel_kw,
+            get_exp_pwr_fuel_kw
         ),
         (
-            get_mod_cab_temp,
-            get_exp_cab_temp  
+            get_mod_cab_temp_celsius,
+            get_exp_cab_temp_celsius  
         ),
         (
-            get_mod_fc_temp,
-            get_exp_fc_temp  
+            get_mod_fc_temp_celsius,
+            get_exp_fc_temp_celsius  
         ),
         (
-            get_mod_spd,
-            get_exp_spd  
+            get_mod_speed_m_per_s,
+            get_exp_speed_m_per_s  
         ),
         (
-            get_mod_pwr_hvac,
-            get_exp_pwr_hvac  
+            get_mod_pwr_hvac_kw,
+            get_exp_pwr_hvac_kw  
         ),
     ),
     param_fns=(
@@ -459,24 +460,24 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_em_eff_range,
         new_fc_eff_max,
         # new_fc_eff_range, # range is not working
-        new_cab_shell_htc,
-        new_cab_htc_to_amb_stop,
-        new_cab_tm,
-        new_cab_length,
-        new_speed_soc_disch_buffer_meters_per_second,
+        new_cab_shell_htc_w_per_m2_k,
+        new_cab_htc_to_amb_stop_w_per_m2_k,
+        new_cab_tm_j_per_k,
+        new_cab_length_m,
+        new_speed_soc_disch_buffer_m_per_s,
         new_speed_soc_disch_buffer_coeff,
-        new_speed_soc_fc_on_buffer_meters_per_second,
+        new_speed_soc_fc_on_buffer_m_per_s,
         new_speed_soc_fc_on_buffer_coeff,
-        new_fc_min_time_on_seconds,
+        new_fc_min_time_on_s,
         new_frac_pwr_demand_fc_forced_on,
         new_frac_of_most_eff_pwr_to_run_fc,
-        new_hvac_p_watts_per_kelvin,
+        new_hvac_p_w_per_k,
         new_hvac_i,
         new_hvac_frac_of_ideal_cop,
-        new_fc_thrml_heat_capacitance_joules_per_kelvin,
-        new_fc_thrml_length_for_convection_meters,
-        new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
-        new_fc_thrml_conductance_from_comb_watts_per_kelvin,
+        new_fc_thrml_heat_capacitance_j_per_k,
+        new_fc_thrml_length_for_convection_m,
+        new_fc_thrml_htc_to_amb_stop_w_per_m2_k,
+        new_fc_thrml_conductance_from_comb_w_per_k,
         # new_fc_thrml_max_frac_from_comb,
         new_fc_thrml_radiator_effectiveness,
         new_fc_thrml_fc_eff_model_Exponential_offset,

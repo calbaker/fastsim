@@ -8,7 +8,7 @@ import fastsim as fsim
 from cal_hev import cal_mod_obj, val_mod_obj, save_path,  cyc_files_dict 
 from cal_hev import time_column, speed_column, cell_temp_column 
 from cal_hev import  mps_per_mph 
-from cal_hev import get_exp_energy_fuel, get_mod_energy_fuel
+from cal_hev import get_exp_energy_fuel_megajoules, get_mod_energy_fuel_megajoules
 
 res_df = pd.read_csv(save_path / "pymoo_res_df.csv")
 res_df_fuel_energy = res_df.filter(regex="get_mod_energy_fuel")
@@ -174,8 +174,8 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
 
     df_cal = df_cal[:len(sd_cal['veh']['history']['time_seconds'])]
 
-    mod_energy_fuel = get_mod_energy_fuel(sd_cal)
-    exp_energy_fuel = get_exp_energy_fuel(df_cal)
+    mod_energy_fuel = get_mod_energy_fuel_megajoules(sd_cal)
+    exp_energy_fuel = get_exp_energy_fuel_megajoules(df_cal)
     assert len(mod_energy_fuel) == len(exp_energy_fuel)
 
     fuel_energy_mod_cal.append(
@@ -196,8 +196,8 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_so
 
     df_val = df_val[:len(sd_val['veh']['history']['time_seconds'])]
 
-    mod_energy_fuel = get_mod_energy_fuel(sd_val)
-    exp_energy_fuel = get_exp_energy_fuel(df_val)
+    mod_energy_fuel = get_mod_energy_fuel_megajoules(sd_val)
+    exp_energy_fuel = get_exp_energy_fuel_megajoules(df_val)
     assert len(mod_energy_fuel) == len(exp_energy_fuel)
 
     fuel_energy_mod_val.append(
@@ -261,8 +261,8 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal.it
 
     df_cal = df_cal[:len(sd_cal_no_thrml['veh']['history']['time_seconds'])]
 
-    mod_energy_fuel = get_mod_energy_fuel(sd_cal_no_thrml)
-    exp_energy_fuel = get_exp_energy_fuel(df_cal)
+    mod_energy_fuel = get_mod_energy_fuel_megajoules(sd_cal_no_thrml)
+    exp_energy_fuel = get_exp_energy_fuel_megajoules(df_cal)
     assert len(mod_energy_fuel) == len(exp_energy_fuel)
 
     fuel_energy_mod_cal_no_thrml.append(
@@ -302,8 +302,8 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val.it
 
     df_val = df_val[:len(sd_val_no_thrml['veh']['history']['time_seconds'])]
 
-    mod_energy_fuel = get_mod_energy_fuel(sd_val_no_thrml)
-    exp_energy_fuel = get_exp_energy_fuel(df_val)
+    mod_energy_fuel = get_mod_energy_fuel_megajoules(sd_val_no_thrml)
+    exp_energy_fuel = get_exp_energy_fuel_megajoules(df_val)
     assert len(mod_energy_fuel) == len(exp_energy_fuel)
 
     fuel_energy_mod_val_no_thrml.append(
