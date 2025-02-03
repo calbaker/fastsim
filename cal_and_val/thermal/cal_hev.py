@@ -138,20 +138,27 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
 
     return fsim.Vehicle.from_pydict(vd, skip_init=False)
 
+def resample_df(df: pd.DataFrame) -> pd.DataFrame:
+    # filter out "before" time
+    df = df[df[time_column] >= 0.0]
+    dt = np.diff(df[time_column], prepend=1)
+    df['cumu. fuel [g]'] = (dt * df[fuel_column]).cumsum()
+    df['cumu. dist [mph*s]'] = (dt * df[speed_column]).cumsum()
+    init_speed = df[speed_column].iloc[0]
+    init_fuel = df[fuel_column].iloc[0]
+    df = df[::10] # convert to ~ Hz
+    df.reset_index(inplace=True)
+    dt_new = np.diff(df[time_column])
+    df[speed_column] = np.concat(([init_speed], np.diff(df['cumu. dist [mph*s]']) / dt_new))
+    df[fuel_column] = np.concat(([init_fuel], np.diff(df['cumu. fuel [g]']) / dt_new))
+
+    return df
+
 
 dfs_for_cal: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
-    cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_cal
+    cyc_file.stem: resample_df(pd.read_csv(cyc_file, delimiter="\t")) for cyc_file in cyc_files_for_cal
 }
-for key, df_for_cal in dfs_for_cal.items():
-    # filter out "before" time
-    df_for_cal = df_for_cal[df_for_cal[time_column] >= 0.0]
-    # TODO: figure out if we should use an integrator for resampling rate vars
-    # df_for_cal = df_for_cal.set_index(time_column)
-    # df_for_cal = df_for_cal.resample("1s", origin="start").bfill()
-    df_for_cal = df_for_cal[::10]
-    df_for_cal.reset_index(inplace=True)
-    dfs_for_cal[key] = df_for_cal
     
 cycs_for_cal: Dict[str, fsim.Cycle] = {}
 # populate `cycs_for_cal`
@@ -178,17 +185,8 @@ print("\ncyc_files_for_val:\n", '\n'.join([cf.name for cf in cyc_files_for_val])
 
 dfs_for_val: Dict[str, pd.DataFrame] = {
     # `delimiter="\t"` should work for tab separated variables
-    cyc_file.stem: pd.read_csv(cyc_file, delimiter="\t") for cyc_file in cyc_files_for_val
+    cyc_file.stem: resample_df(pd.read_csv(cyc_file, delimiter="\t")) for cyc_file in cyc_files_for_val
 }
-for key, df_for_val in dfs_for_val.items():
-    # filter out "before" time
-    df_for_val = df_for_val[df_for_val[time_column] >= 0.0]
-    # TODO: figure out if we should use an integrator for resampling rate vars
-    # df_for_val = df_for_val.set_index(time_column)
-    # df_for_val = df_for_val.resample("1s", origin="start").bfill()
-    df_for_val = df_for_val[::10]
-    df_for_val.reset_index(inplace=True)
-    dfs_for_val[key] = df_for_val
 
 cycs_for_val: Dict[str, fsim.Cycle] = {}
 # populate `cycs_for_val`
