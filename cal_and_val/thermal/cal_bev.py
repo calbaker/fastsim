@@ -15,6 +15,7 @@ from copy import deepcopy
 import fastsim as fsim
 from fastsim import pymoo_api
 
+# Unit conversion constants
 mps_per_mph = 0.447
 celsius_to_kelvin_offset = 273.15
 
@@ -33,6 +34,13 @@ sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 # and then copy it to the local folder below
 cyc_folder_path = Path(__file__).parent / "dyno_test_data/2020 Chevrolet Bolt EV/Extended Datasets"
 assert cyc_folder_path.exists(), cyc_folder_path
+
+# Test data columns
+time_column = "Time[s]_RawFacilities"
+speed_column = "Dyno_Spd[mph]"
+cabin_temp_column = "Cabin_Temp[C]"
+eng_clnt_temp_column = "engine_coolant_temp_PCAN__C"
+cell_temp_column = "Cell_Temp[C]"
 
 # See 2020_Chevrolet_Bolt_TestSummary_201005.xlsm for cycle-level data
 cyc_files: List[str] = [
@@ -77,7 +85,7 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     cyc_dict = {
         "time_seconds": df["Time[s]_RawFacilities"].to_list(),
         "speed_meters_per_second": (df["Dyno_Spd[mph]"] * mps_per_mph).to_list(),
-        "temp_amb_air_kelvin": (df["Cell_Temp[C]"] + celsius_to_kelvin_offset).to_list(),
+        "temp_amb_air_kelvin": (df[cell_temp_column] + celsius_to_kelvin_offset).to_list(),
         # TODO: pipe solar load from `Cycle` into cabin thermal model
         # TODO: use something (e.g. regex) to determine solar load
         # see column J comments in 2021_Hyundai_Sonata_Hybrid_TestSummary_2022-03-01_D3.xlsx

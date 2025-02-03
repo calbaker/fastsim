@@ -15,6 +15,7 @@ from copy import deepcopy
 import fastsim as fsim
 from fastsim import pymoo_api
 
+# Unit conversion constants
 mps_per_mph = 0.447
 celsius_to_kelvin_offset = 273.15
 lhv_btu_per_lbm = 18_575 
@@ -37,6 +38,7 @@ sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 cyc_folder_path = Path(__file__).parent / "dyno_test_data/2021 Hyundai Sonata Hybrid/Extended Datasets"
 assert cyc_folder_path.exists()
 
+# Test data columns
 time_column = "Time[s]_RawFacilities"
 speed_column = "Dyno_Spd[mph]"
 cabin_temp_column = "Cabin_Temp[C]"
@@ -401,7 +403,7 @@ def get_mod_pwr_hvac(sd_dict):
     return np.array(sd_dict['veh']['hvac']['LumpedCabin']['history']['pwr_aux_for_hvac_watts'])
 
 def get_exp_pwr_hvac(df):
-    if df["Cell_Temp[C]"].mean() < 15:
+    if df[cell_temp_column].mean() < 15:
         pwr_hvac = [0] * len(df)
     else:
         pwr_hvac = df["HVAC_Power_Hioki_P3[W]"]
