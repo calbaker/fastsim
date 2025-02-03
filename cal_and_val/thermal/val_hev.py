@@ -19,8 +19,8 @@ param_vals_fuel_energy = res_df.iloc[
     best_row_fuel_energy,
     :len(cal_mod_obj.param_fns)].to_numpy()
 
-res_df['euclidean'] = (
-    res_df.iloc[:, len(cal_mod_obj.param_fns):] ** 2).sum(1).pow(1/2)
+# res_df['euclidean'] = (
+#     res_df.iloc[:, len(cal_mod_obj.param_fns):] ** 2).sum(1).pow(1/2)
 best_row = res_df["euclidean"].argmin()
 best_df = res_df.iloc[best_row, :]
 param_vals_euclidean = res_df.iloc[

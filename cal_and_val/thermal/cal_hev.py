@@ -499,23 +499,23 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (10, 250), # new_cab_htc_to_amb_stop
         (100e3, 350e3), # new_cab_tm
         (1.5, 7), # new_cab_length
-        (5, 50), # new_speed_soc_disch_buffer_meters_per_second
+        (5, 100), # new_speed_soc_disch_buffer_meters_per_second
         (0.25, 5.0), # new_speed_soc_disch_buffer_coeff
         (5, 100), # new_speed_soc_fc_on_buffer_meters_per_second
-        (0.25, 2.0), # new_speed_soc_fc_on_buffer_coeff
-        (5, 30), # new_fc_min_time_on_seconds
+        (0.25, 5.0), # new_speed_soc_fc_on_buffer_coeff
+        (3, 30), # new_fc_min_time_on_seconds
         (0.3, 0.8), # new_frac_pwr_demand_fc_forced_on
         (0.1, 1.0), # new_frac_of_most_eff_pwr_to_run_fc
-        (5, 1000), # new_hvac_p_watts_per_kelvin
+        (5, 1_000), # new_hvac_p_watts_per_kelvin
         (1, 100), # new_hvac_i
-        (0.05, 0.25), # new_hvac_frac_of_ideal_cop
+        (0.05, 0.35), # new_hvac_frac_of_ideal_cop
         (50e3, 300e3), # new_fc_thrml_heat_capacitance_joules_per_kelvin,
-        (0.2, 2), # new_fc_thrml_length_for_convection_meters,
-        (10, 100), # new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
-        (10, 1000), # new_fc_thrml_conductance_from_comb_watts_per_kelvin,
+        (0.2, 3), # new_fc_thrml_length_for_convection_meters,
+        (5, 100), # new_fc_thrml_htc_to_amb_stop_watts_per_square_meter_kelvin,
+        (5, 5_000), # new_fc_thrml_conductance_from_comb_watts_per_kelvin,
         # (), # new_fc_thrml_max_frac_from_comb,
-        (3, 200), # new_fc_thrml_radiator_effectiveness,
-        (220, 300), # new_fc_thrml_fc_eff_model_Exponential_offset,
+        (3, 300), # new_fc_thrml_radiator_effectiveness,
+        (220, 350), # new_fc_thrml_fc_eff_model_Exponential_offset,
         (10, 60), # new_fc_thrml_fc_eff_model_Exponential_lag,
         (0.15, 0.35), # new_fc_thrml_fc_eff_model_Exponential_minimum,
     ),
