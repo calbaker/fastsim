@@ -533,72 +533,91 @@ val_mod_obj.dfs = dfs_for_val
 val_mod_obj.models = sds_for_val
 
 def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
+    """
+    # Arguments:
+    # - `pos_perturb_doc`: perturbation percentage added to all params.  Can be overridden invididually
+    # - `neg_perturb_doc`: perturbation percentage subtracted from all params.  Can be overridden invididually
+    """
     em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False)
     fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False)
-    baseline_params = [
-        em.eff_fwd_max,
-        em.eff_fwd_range,
-        fc.eff_max,
-        # fc.eff_range,
-        veh_dict_flat['cabin.LumpedCabin.cab_shell_htc_to_amb_watts_per_square_meter_kelvin'],
-        veh_dict_flat['cabin.LumpedCabin.cab_htc_to_amb_stop_watts_per_square_meter_kelvin'],
-        veh_dict_flat['cabin.LumpedCabin.heat_capacitance_joules_per_kelvin'],
-        veh_dict_flat['cabin.LumpedCabin.length_meters'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_meters_per_second'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_coeff'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_meters_per_second'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_coeff'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.fc_min_time_on_seconds'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_pwr_demand_fc_forced_on'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_of_most_eff_pwr_to_run_fc'],
-        veh_dict_flat['hvac.LumpedCabin.p_watts_per_kelvin'],
-        veh_dict_flat['hvac.LumpedCabin.i'],
-        veh_dict_flat['hvac.LumpedCabin.frac_of_ideal_cop'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.heat_capacitance_joules_per_kelvin'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.length_for_convection_meters'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.htc_to_amb_stop_watts_per_square_meter_kelvin'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.conductance_from_comb_watts_per_kelvin'],
-        # veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.max_frac_from_comb'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.radiator_effectiveness'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.offset'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.lag'],
-        veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.minimum']
+    baseline_params_and_bounds = [
+        (em.eff_fwd_max, None),
+        (em.eff_fwd_range, None),
+        (fc.eff_max, None),
+        # (fc.eff_range, None),
+        (veh_dict_flat['cabin.LumpedCabin.cab_shell_htc_to_amb_watts_per_square_meter_kelvin'], None),
+        (veh_dict_flat['cabin.LumpedCabin.cab_htc_to_amb_stop_watts_per_square_meter_kelvin'], None),
+        (veh_dict_flat['cabin.LumpedCabin.heat_capacitance_joules_per_kelvin'], None),
+        (veh_dict_flat['cabin.LumpedCabin.length_meters'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_meters_per_second'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_disch_buffer_coeff'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_meters_per_second'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_fc_on_buffer_coeff'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.fc_min_time_on_seconds'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_pwr_demand_fc_forced_on'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.frac_of_most_eff_pwr_to_run_fc'], None),
+        (veh_dict_flat['hvac.LumpedCabin.p_watts_per_kelvin'], None),
+        (veh_dict_flat['hvac.LumpedCabin.i'], None),
+        (veh_dict_flat['hvac.LumpedCabin.frac_of_ideal_cop'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.heat_capacitance_joules_per_kelvin'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.length_for_convection_meters'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.htc_to_amb_stop_watts_per_square_meter_kelvin'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.conductance_from_comb_watts_per_kelvin'], None),
+        # (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.max_frac_from_comb'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.radiator_effectiveness'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.offset'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.lag'], None),
+        (veh_dict_flat['pt_type.HybridElectricVehicle.fc.thrml.FuelConverterThermal.fc_eff_model.Exponential.minimum'], None)
     ]
+
+    baseline_params = [bpb[0] for bpb in baseline_params_and_bounds]
 
     print("Verifying that model responds to input parameter changes by individually perturbing parameters")
     baseline_errors = cal_mod_obj.get_errors(
-        cal_mod_obj.update_params(baseline_params)
+        cal_mod_obj.update_params([param for param in baseline_params])
     )[0]
     
-    for i, param in enumerate(baseline_params):
+    for i, param_and_bounds in enumerate(baseline_params_and_bounds):
+        param = param_and_bounds[0]
+        bounds = param_and_bounds[1]
         # +5%
+        if bounds is not None:
+            param_pos_perturb_dec = bounds[0]
+            param_neg_perturb_dec = bounds[1]
+        else:
+            param_pos_perturb_dec = pos_perturb_dec
+            param_neg_perturb_dec = neg_perturb_dec
+
+        assert param_pos_perturb_dec >= 0
+        assert param_neg_perturb_dec >= 0
+
         perturbed_params = baseline_params.copy()
-        perturbed_params[i] = param * (1 + pos_perturb_dec)
-        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))[0]
+        perturbed_params[i] = param * (1 + param_pos_perturb_dec)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
         if np.all(perturbed_errors == baseline_errors):
           print("\nperturbed_errros:")
           pprint.pp(perturbed_errors) 
           print("baseline_errors")
           pprint.pp(baseline_errors)
           print("")
-          raise Exception(f"+{100 * pos_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
+          raise Exception(f"+{100 * param_pos_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
 
         # -5%
         perturbed_params = baseline_params.copy()
-        perturbed_params[i] = param * (1 - neg_perturb_dec)
-        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))[0]
+        perturbed_params[i] = param * (1 - param_neg_perturb_dec)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
         if np.all(perturbed_errors == baseline_errors):
             print("\nperturbed_errros:")
             pprint.pp(perturbed_errors) 
             print("baseline_errors")
             pprint.pp(baseline_errors)
             print("")
-            raise Exception(f"-{100 * neg_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
+            raise Exception(f"-{100 * param_neg_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
 
     print("Success!")
 
 if __name__ == "__main__":
-    print("")
+    print("Params and bounds:")
     pprint.pp(cal_mod_obj.params_and_bounds())
     print("")
     perturb_params()
