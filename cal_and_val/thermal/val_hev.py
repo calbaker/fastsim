@@ -70,7 +70,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
             label='exp',
         )
         ax[0].legend()
-        ax[0].set_ylabel(obj_fn[0].__name__)
+        ax[0].set_ylabel(obj_fn[0].__name__.replace('get_mod_', ''))
 
         ax[1].plot(
             sd_cal['veh']['history']['time_seconds'],
@@ -84,7 +84,7 @@ for ((key, df_cal), (sd_key, sd_cal)) in zip(cal_mod_obj.dfs.items(), sds_cal_so
         )
         ax[1].legend()
         ax[1].set_ylabel("Speed [m/s]")
-        plt.savefig(plot_save_path / f"{key}_{obj_fn[0].__name__}_cal.svg")
+        plt.savefig(plot_save_path / f"{key}_{obj_fn[0].__name__.replace('get_mod_', '')}_cal.svg")
 
 for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_solved.items()):
     if not isinstance(sd_val, dict):
@@ -112,7 +112,7 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_so
             label='exp',
         )
         ax[0].legend()
-        ax[0].set_ylabel(obj_fn[0].__name__)
+        ax[0].set_ylabel(obj_fn[0].__name__.replace('get_mod_', ''))
 
         ax[1].plot(
             sd_val['veh']['history']['time_seconds'],
@@ -126,7 +126,7 @@ for ((key, df_val), (sd_key, sd_val)) in zip(val_mod_obj.dfs.items(), sds_val_so
         )
         ax[1].legend()
         ax[1].set_ylabel("Speed [m/s]")
-        plt.savefig(plot_save_path / f"{key}_{obj_fn[0].__name__}_val.svg")
+        plt.savefig(plot_save_path / f"{key}_{obj_fn[0].__name__.replace('get_mod_', '')}_val.svg")
 # %%
 # function for plot formatting
 def draw_error_zones(ax):
