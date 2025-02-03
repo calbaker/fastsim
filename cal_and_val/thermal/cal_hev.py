@@ -1,5 +1,5 @@
 """
-alibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
+Calibration script for 2021_Hyundai_Sonata_Hybrid_Blue    
 """
 import pprint
 from pathlib import Path

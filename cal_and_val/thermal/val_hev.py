@@ -5,7 +5,10 @@ import numpy as np
 from copy import deepcopy
 
 import fastsim as fsim
-from cal_hev import cal_mod_obj, val_mod_obj, save_path, time_column, mps_per_mph, speed_column, cyc_files_dict, cell_temp_column, get_exp_energy_fuel
+from cal_hev import cal_mod_obj, val_mod_obj, save_path,  cyc_files_dict 
+from cal_hev import time_column, speed_column, cell_temp_column 
+from cal_hev import  mps_per_mph 
+from cal_hev import get_exp_energy_fuel, get_mod_energy_fuel
 
 res_df = pd.read_csv(save_path / "pymoo_res_df.csv")
 res_df_fuel_energy = res_df.filter(regex="get_mod_energy_fuel")
