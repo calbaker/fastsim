@@ -235,7 +235,7 @@ cabin:
 hvac:
   LumpedCabin:
     te_set_kelvin: 295.15
-    te_deadband_kelvin: 1.5
+    te_deadband_kelvin: 0.5
     p_watts_per_kelvin: 100.0
     i: 50.0
     # TODO: bump this up

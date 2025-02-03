@@ -47,7 +47,7 @@ impl Default for HVACSystemForLumpedCabin {
     fn default() -> Self {
         Self {
             te_set: Some(*TE_STD_AIR),
-            te_deadband: 1.5 * uc::KELVIN_INT,
+            te_deadband: 0.5 * uc::KELVIN_INT,
             p: Default::default(),
             i: Default::default(),
             d: Default::default(),
