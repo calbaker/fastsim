@@ -83,6 +83,8 @@ pt_type:
       min_soc: 0.35
       max_soc: 0.9
       save_interval: 1
+      state:
+        soc: 0.50003
     fs:
       pwr_out_max_watts: 2000000.0
       pwr_ramp_lag_seconds: 1.1
@@ -92,29 +94,29 @@ pt_type:
     fc:
       thrml:
         FuelConverterThermal:
-          heat_capacitance_joules_per_kelvin: 200000.0
-          length_for_convection_meters: 1.0
-          htc_to_amb_stop_watts_per_square_meter_kelvin: 50.0
-          conductance_from_comb_watts_per_kelvin: 5.0
+          heat_capacitance_joules_per_kelvin: 72132.17831078888
+          length_for_convection_meters: 0.5427107485587468
+          htc_to_amb_stop_watts_per_square_meter_kelvin: 60.7820169953251
+          conductance_from_comb_watts_per_kelvin: 2178.965385428629
           max_frac_from_comb: 0.5
           tstat_te_sto_kelvin: 358.15
           tstat_te_delta_kelvin: 5.0
           tstat_interp:
             Interp1D:
               x:
-                - 358.15
-                - 363.15
+                - 85.0
+                - 90.0
               f_x:
                 - 0.0
                 - 1.0
               strategy: Linear
               extrapolate: Clamp
-          radiator_effectiveness: 25.0
+          radiator_effectiveness: 168.06311964877182
           fc_eff_model:
             Exponential:
-              offset: 273.15
-              lag: 25.0
-              minimum: 0.2
+              offset: 320.1873803210462
+              lag: 24.998774179607892
+              minimum: 0.1927168135089094
       mass_kilograms: ~
       specific_pwr_watts_per_kilogram: ~
       pwr_out_max_watts: 112000.0
@@ -136,18 +138,18 @@ pt_type:
             - 0.8
             - 1.0
           f_x:
-            - 0.1
-            - 0.12
-            - 0.28
-            - 0.35
-            - 0.375
-            - 0.39
-            - 0.4
-            - 0.4
-            - 0.38
-            - 0.37
-            - 0.36
-            - 0.35
+            - 0.0900547945263104
+            - 0.10806575343157247
+            - 0.25215342467366914
+            - 0.3151917808420864
+            - 0.337705479473664
+            - 0.35121369865261054
+            - 0.3602191781052416
+            - 0.3602191781052416
+            - 0.3422082191999795
+            - 0.3332027397473485
+            - 0.32419726029471746
+            - 0.3151917808420864
           strategy: Linear
           extrapolate: Error
       pwr_idle_fuel_watts: 0.0
@@ -168,17 +170,45 @@ pt_type:
             - 0.8
             - 1.0
           f_x:
-            - 0.83
-            - 0.85
-            - 0.87
-            - 0.89
-            - 0.9
-            - 0.91
-            - 0.93
-            - 0.94
-            - 0.94
-            - 0.93
-            - 0.92
+            - 0.8210591042476243
+            - 0.844018240527504
+            - 0.8669773768073834
+            - 0.889936513087263
+            - 0.9014160812272026
+            - 0.9128956493671425
+            - 0.935854785647022
+            - 0.9473343537869616
+            - 0.9473343537869616
+            - 0.935854785647022
+            - 0.9243752175070823
+          strategy: Linear
+          extrapolate: Error
+      eff_interp_at_max_input:
+        Interp1D:
+          x:
+            - 0.0
+            - 0.023696170342835454
+            - 0.0461373053900192
+            - 0.06742053968755037
+            - 0.08874924872772037
+            - 0.10954154515833676
+            - 0.21370836914802546
+            - 0.42223740583354036
+            - 0.6333561087503105
+            - 0.8548334765921018
+            - 1.0818117806066543
+          f_x:
+            - 0.8210591042476243
+            - 0.844018240527504
+            - 0.8669773768073834
+            - 0.889936513087263
+            - 0.9014160812272026
+            - 0.9128956493671425
+            - 0.935854785647022
+            - 0.9473343537869616
+            - 0.9473343537869616
+            - 0.935854785647022
+            - 0.9243752175070823
           strategy: Linear
           extrapolate: Error
       pwr_out_max_watts: 39000.0
@@ -187,16 +217,16 @@ pt_type:
       save_interval: 1
     pt_cntrl:
       RGWDB:
-        speed_soc_disch_buffer_meters_per_second: 17.8816
-        speed_soc_disch_buffer_coeff: 1.0
-        speed_soc_fc_on_buffer_meters_per_second: 19.66976
-        speed_soc_fc_on_buffer_coeff: 1.0
+        speed_soc_disch_buffer_meters_per_second: 59.54927794431647
+        speed_soc_disch_buffer_coeff: 1.4370740568117162
+        speed_soc_fc_on_buffer_meters_per_second: 5.115023553506799
+        speed_soc_fc_on_buffer_coeff: 3.7567020585006974
         speed_soc_regen_buffer_meters_per_second: 13.4112
         speed_soc_regen_buffer_coeff: 1.0
-        fc_min_time_on_seconds: 5.0
+        fc_min_time_on_seconds: 12.722580080119371
         speed_fc_forced_on_meters_per_second: 33.528
-        frac_pwr_demand_fc_forced_on: 0.46357615894039733
-        frac_of_most_eff_pwr_to_run_fc: 1.0
+        frac_pwr_demand_fc_forced_on: 0.4216108997716131
+        frac_of_most_eff_pwr_to_run_fc: 0.9464819140013936
         frac_res_chrg_for_fc: 0.0
         frac_res_dschrg_for_fc: 1.0
         temp_fc_forced_on_kelvin: 335.15
@@ -226,25 +256,22 @@ chassis:
   cargo_mass_kilograms: ~
 cabin:
   LumpedCabin:
-    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 0.05
-    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
-    heat_capacitance_joules_per_kelvin: 200000.0
-    length_meters: 2.5
-    # 1.86 meters (73.2 in). Source: https://www.edmunds.com/hyundai/sonata-hybrid/2021/st-401867551/features-specs/
+    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 10.111988385072632
+    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 153.22457193685642
+    heat_capacitance_joules_per_kelvin: 133887.55278894224
+    length_meters: 3.261651382829292
     width_meters: 1.86
 hvac:
   LumpedCabin:
     te_set_kelvin: 295.15
     te_deadband_kelvin: 0.5
-    p_watts_per_kelvin: 100.0
-    i: 50.0
-    # TODO: bump this up
+    p_watts_per_kelvin: 489.34499608760177
+    i: 36.77964270414921
     pwr_i_max_watts: 10000.0
     d: 5.0
     pwr_thrml_max_watts: 15000.0
-    frac_of_ideal_cop: 0.15
+    frac_of_ideal_cop: 0.0778419513178728
     heat_source: FuelConverter
-    # TODO: bump this up
     pwr_aux_for_hvac_max_watts: 8000.0
 mass_kilograms: 1508.195
 pwr_aux_base_watts: 500.0
