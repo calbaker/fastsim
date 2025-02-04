@@ -22,7 +22,7 @@ lhv_btu_per_lbm = 18_575
 lhv_joules_per_gram = 43_205.450 
 
 # Initialize seaborn plot configuration
-sns.set_style()
+sns.set_style("darkgrid")
 
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2020 Chevrolet Bolt EV.yaml")
 veh_dict = veh.to_pydict()
@@ -188,7 +188,7 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
 
 # Setup model objectives
 ## Parameter Functions
-
+# `param_fns`
 def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `ElectricMachine`
@@ -356,8 +356,81 @@ val_mod_obj.dfs = dfs_for_val
 val_mod_obj.models = sds_for_val
 
 # TODO: put in parameter perturbation here
+def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
+    """
+    # Arguments:
+    # - `pos_perturb_doc`: perturbation percentage added to all params.  Can be overridden invididually
+    # - `neg_perturb_doc`: perturbation percentage subtracted from all params.  Can be overridden invididually
+    """
+    em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type'][pt_type_var]['em'], skip_init=False)
+    baseline_params_and_bounds = [
+        (em.eff_fwd_max, None),
+        (em.eff_fwd_range, None),
+        (veh_dict['cabin'][cabin_type_var]['cab_shell_htc_to_amb_watts_per_square_meter_kelvin'], None),
+        (veh_dict['cabin'][cabin_type_var]['cab_htc_to_amb_stop_watts_per_square_meter_kelvin'], None),
+        (veh_dict['cabin'][cabin_type_var]['heat_capacitance_joules_per_kelvin'], None),
+        (veh_dict['cabin'][cabin_type_var]['length_meters'], None),
+        (veh_dict["pt_type"][pt_type_var]["res"]["thrml"]["RESLumpedThermal"]["conductance_to_amb_watts_per_kelvin"], None), 
+        (veh_dict["pt_type"][pt_type_var]["res"]["thrml"]["RESLumpedThermal"]["conductance_to_cab_watts_per_kelvin"], None), 
+        (veh_dict["pt_type"][pt_type_var]["res"]["thrml"]["RESLumpedThermal"]["heat_capacitance_joules_per_kelvin"], None), 
+        (veh_dict['hvac'][hvac_type_var]['p_res_watts_per_kelvin'], None),
+        (veh_dict['hvac'][hvac_type_var]['i_res'], None),
+        (veh_dict['hvac'][hvac_type_var]['p_cabin_watts_per_kelvin'], None),
+        (veh_dict['hvac'][hvac_type_var]['i_cabin'], None),
+        (veh_dict['hvac'][hvac_type_var]['frac_of_ideal_cop'] , None), 
+    ]
+
+    baseline_params = [bpb[0] for bpb in baseline_params_and_bounds]
+
+    print("Verifying that model responds to input parameter changes by individually perturbing parameters")
+    baseline_errors = cal_mod_obj.get_errors(
+        cal_mod_obj.update_params([param for param in baseline_params])
+    )[0]
+    
+    for i, param_and_bounds in enumerate(baseline_params_and_bounds):
+        param = param_and_bounds[0]
+        bounds = param_and_bounds[1]
+        # +5%
+        if bounds is not None:
+            param_pos_perturb_dec = bounds[0]
+            param_neg_perturb_dec = bounds[1]
+        else:
+            param_pos_perturb_dec = pos_perturb_dec
+            param_neg_perturb_dec = neg_perturb_dec
+
+        assert param_pos_perturb_dec >= 0
+        assert param_neg_perturb_dec >= 0
+
+        perturbed_params = baseline_params.copy()
+        perturbed_params[i] = param * (1 + param_pos_perturb_dec)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        if np.all(perturbed_errors == baseline_errors):
+          print("\nperturbed_errros:")
+          pprint.pp(perturbed_errors) 
+          print("baseline_errors")
+          pprint.pp(baseline_errors)
+          print("")
+          raise Exception(f"+{100 * param_pos_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
+
+        # -5%
+        perturbed_params = baseline_params.copy()
+        perturbed_params[i] = param * (1 - param_neg_perturb_dec)
+        perturbed_errors = cal_mod_obj.get_errors(cal_mod_obj.update_params(perturbed_params))
+        if np.all(perturbed_errors == baseline_errors):
+            print("\nperturbed_errros:")
+            pprint.pp(perturbed_errors) 
+            print("baseline_errors")
+            pprint.pp(baseline_errors)
+            print("")
+            raise Exception(f"-{100 * param_neg_perturb_dec}% perturbation failed for param {cal_mod_obj.param_fns[i].__name__}")
+
+    print("Success!") 
 
 if __name__ == "__main__":
+    print("Params and bounds:")
+    pprint.pp(cal_mod_obj.params_and_bounds())
+    print("")
+    perturb_params()
     parser = pymoo_api.get_parser()
     args = parser.parse_args()
 

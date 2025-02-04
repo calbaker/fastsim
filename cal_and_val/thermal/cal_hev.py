@@ -22,7 +22,7 @@ lhv_btu_per_lbm = 18_575
 lhv_joules_per_gram = 43_205.450 
 
 # Initialize seaborn plot configuration
-sns.set_style()
+sns.set_style("darkgrid")
 
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 veh_dict = veh.to_pydict()
