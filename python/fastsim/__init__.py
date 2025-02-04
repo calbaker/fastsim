@@ -181,14 +181,8 @@ def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool =
             obj = cls.from_yaml(yaml.dump(pydict), skip_init=skip_init)
         case "msg_pack":
             import msgpack
-            try:
-                obj = cls.from_msg_pack(
-                    msgpack.packb(pydict), skip_init=skip_init)
-            except Exception as err:
-                print(
-                    f"{err}\nFalling back to YAML.")
-                obj = cls.from_pydict(
-                    pydict, data_fmt="yaml", skip_init=skip_init)
+            obj = cls.from_msg_pack(
+                msgpack.packb(pydict), skip_init=skip_init)
         case "json":
             from json import dumps
             obj = cls.from_json(dumps(pydict), skip_init=skip_init)

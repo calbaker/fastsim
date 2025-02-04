@@ -36,13 +36,13 @@ sim_params = fsim.SimParams.from_pydict(sim_params_dict, skip_init=False)
 # Obtain the data from
 # https://nrel.sharepoint.com/:f:/r/sites/EEMSCoreModelingandDecisionSupport2022-2024/Shared%20Documents/FASTSim/DynoTestData?csf=1&web=1&e=F4FEBp
 # and then copy it to the local folder below
-cyc_folder_path = Path(__file__).parent / "dyno_test_data/2020 Chevrolet Bolt EV/Extended Datasets"
+cyc_folder_path = Path(__file__).parent / "dyno_test_data/2020 Chevrolet Bolt/Extended Datasets"
 assert cyc_folder_path.exists(), cyc_folder_path
 
 # Test data columns
 time_column = "Time[s]_RawFacilities"
 speed_column = "Dyno_Spd[mph]"
-cabin_temp_column = "Cabin_Temp[C]"
+cabin_temp_column = "Cabin_Driver_Headrest_Temp__C"
 eng_clnt_temp_column = "engine_coolant_temp_PCAN__C"
 cell_temp_column = "Cell_Temp[C]"
 soc_column = "HVBatt_SOC_CAN4__per"
@@ -82,7 +82,7 @@ cyc_files_for_cal: List[str] = [
     "62009040 Test Data.txt"
     # "62009041 Test Data.txt"
 ]
-cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files_dict if cyc_file.name in cyc_files_for_cal]
+cyc_files_for_cal: List[Path] = [cyc_file for cyc_file in cyc_files if cyc_file.name in cyc_files_for_cal]
 assert len(cyc_files_for_cal) > 0, cyc_files_for_cal
 print("\ncyc_files_for_cal:\n", '\n'.join([cf.name for cf in cyc_files_for_cal]), sep='')
 
@@ -97,19 +97,18 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
 pt_type_var = "BatteryElectricVehicle"
+cabin_type_var = 'LumpedCabin'
+hvac_type_var = 'LumpedCabinAndRES'
 
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
-
     vd = deepcopy(veh_dict)
     
     # initialize SOC
-    # 
     vd['pt_type'][pt_type_var]['res']['state']['soc'] = \
         dfs[cyc_file_stem][soc_column].iloc[1] / 100
     assert 0 < vd['pt_type'][pt_type_var]['res']['state']['soc'] < 1, "\ninit soc: {}\nhead: {}".format(
         vd['pt_type'][pt_type_var]['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_CAN4__per"].head())
     # initialize cabin temp
-    # not using `"Cabin_Lower_Vent_Temp__C"` because vent tempertature is way different from cabin temp!
     vd['cabin'][cabin_type_var]['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem][cabin_temp_column][0] + celsius_to_kelvin_offset
 
@@ -123,7 +122,7 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
 
     # set HVAC set point temperature
     te_set = next(iter([v["set temp [*C]"] for k, v in cyc_files_dict.items() if k.replace(".txt", "") == cyc_file_stem]))
-    vd['hvac'][cabin_type_var]['te_set_kelvin'] = te_set + celsius_to_kelvin_offset if te_set is not None else None
+    vd['hvac'][hvac_type_var]['te_set_kelvin'] = te_set + celsius_to_kelvin_offset if te_set is not None else None
 
     return fsim.Vehicle.from_pydict(vd, skip_init=False)
 
@@ -189,9 +188,6 @@ for (cyc_file_stem, cyc) in cycs_for_val.items():
 
 # Setup model objectives
 ## Parameter Functions
-
-cabin_type_var = 'LumpedCabin'
-hvac_type_var = 'LumpedCabinAndRES'
 
 def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """

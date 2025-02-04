@@ -12,7 +12,7 @@ use super::*;
 /// HVAC system for [LumpedCabin] and [ReversibleEnergyStorage::thrml]
 pub struct HVACSystemForLumpedCabinAndRES {
     /// set point temperature
-    pub te_set: si::Temperature,
+    pub te_set: Option<si::Temperature>,
     /// Deadband range.  Any cabin temperature within this range of `te_set`
     /// results in no HVAC power draw
     pub te_deadband: si::TemperatureInterval,
@@ -62,7 +62,7 @@ pub struct HVACSystemForLumpedCabinAndRES {
 impl Default for HVACSystemForLumpedCabinAndRES {
     fn default() -> Self {
         Self {
-            te_set: *TE_STD_AIR,
+            te_set: Some(*TE_STD_AIR),
             te_deadband: 1.5 * uc::KELVIN_INT,
             p_cabin: Default::default(),
             i_cabin: Default::default(),
@@ -300,44 +300,49 @@ impl HVACSystemForLumpedCabinAndRES {
         cab_heat_cap: si::HeatCapacity,
         dt: si::Time,
     ) -> anyhow::Result<si::Power> {
-        let pwr_thrml_hvac_to_cabin = if cab_state.temperature <= (self.te_set + self.te_deadband)
-            && cab_state.temperature >= (self.te_set - self.te_deadband)
+        let te_set = match self.te_set {
+            Some(te_set) => te_set,
+            None => return Ok(si::Power::ZERO),
+        };
+        let pwr_thrml_hvac_to_cabin = if cab_state.temperature <= (te_set + self.te_deadband)
+            && cab_state.temperature >= (te_set - self.te_deadband)
         {
             // inside deadband; no hvac power is needed
 
-            self.state.pwr_i = si::Power::ZERO; // reset to 0.0
-            self.state.pwr_p = si::Power::ZERO;
-            self.state.pwr_d = si::Power::ZERO;
+            self.state.pwr_i_cab = si::Power::ZERO; // reset to 0.0
+            self.state.pwr_p_cab = si::Power::ZERO;
+            self.state.pwr_d_cab = si::Power::ZERO;
             si::Power::ZERO
         } else {
             // outside deadband
             let te_delta_vs_set = (cab_state.temperature.get::<si::degree_celsius>()
-                - self.te_set.get::<si::degree_celsius>())
+                - te_set.get::<si::degree_celsius>())
                 * uc::KELVIN_INT;
 
-            self.state.pwr_p = -self.p_cabin * te_delta_vs_set;
-            self.state.pwr_i -= self.i_cabin * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
-            self.state.pwr_i = self
+            self.state.pwr_p_cab = -self.p_cabin * te_delta_vs_set;
+            self.state.pwr_i_cab -=
+                self.i_cabin * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
+            self.state.pwr_i_cab = self
                 .state
-                .pwr_i
+                .pwr_i_cab
                 .max(-self.pwr_i_max_cabin)
                 .min(self.pwr_i_max_cabin);
-            self.state.pwr_d = -self.d_cabin * uc::J / uc::KELVIN
+            self.state.pwr_d_cab = -self.d_cabin * uc::J / uc::KELVIN
                 * ((cab_state.temperature.get::<si::degree_celsius>()
                     - cab_state.temp_prev.get::<si::degree_celsius>())
                     * uc::KELVIN_INT
                     / dt);
 
-            let pwr_thrml_hvac_to_cabin: si::Power =
-                if cab_state.temperature > self.te_set + self.te_deadband {
+            let pwr_thrml_hvac_to_cab: si::Power =
+                if cab_state.temperature > te_set + self.te_deadband {
                     // COOLING MODE; cabin is hotter than set point
 
-                    if self.state.pwr_i > si::Power::ZERO {
+                    if self.state.pwr_i_cab > si::Power::ZERO {
                         // If `pwr_i` is greater than zero, reset to switch from heating to cooling
-                        self.state.pwr_i = si::Power::ZERO;
+                        self.state.pwr_i_cab = si::Power::ZERO;
                     }
                     let mut pwr_thrml_hvac_to_cab =
-                        (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
+                        (self.state.pwr_p_cab + self.state.pwr_i_cab + self.state.pwr_d_cab)
                             .max(-self.pwr_thrml_max);
 
                     if (-pwr_thrml_hvac_to_cab / self.state.cop) > self.pwr_aux_for_hvac_max {
@@ -347,16 +352,21 @@ impl HVACSystemForLumpedCabinAndRES {
                     } else {
                         self.state.pwr_aux_for_hvac = pwr_thrml_hvac_to_cab / self.state.cop;
                     }
+                    ensure!(
+                        pwr_thrml_hvac_to_cab < si::Power::ZERO,
+                        "{}\nHVAC should be cooling cabin",
+                        format_dbg!(pwr_thrml_hvac_to_cab)
+                    );
                     pwr_thrml_hvac_to_cab
                 } else {
                     // HEATING MODE; cabin is colder than set point
 
-                    if self.state.pwr_i < si::Power::ZERO {
+                    if self.state.pwr_i_cab < si::Power::ZERO {
                         // If `pwr_i` is less than zero reset to switch from cooling to heating
-                        self.state.pwr_i = si::Power::ZERO;
+                        self.state.pwr_i_cab = si::Power::ZERO;
                     }
                     let mut pwr_thrml_hvac_to_cabin: si::Power =
-                        (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
+                        (self.state.pwr_p_cab + self.state.pwr_i_cab + self.state.pwr_d_cab)
                             .min(self.pwr_thrml_max);
 
                     // Assumes blower has negligible impact on aux load, may want to revise later
@@ -370,7 +380,12 @@ impl HVACSystemForLumpedCabinAndRES {
                     .with_context(|| format_dbg!())?;
                     pwr_thrml_hvac_to_cabin
                 };
-            pwr_thrml_hvac_to_cabin
+            ensure!(
+                pwr_thrml_hvac_to_cab >= si::Power::ZERO,
+                "{}\nHVAC should be heating cabin",
+                format_dbg!(pwr_thrml_hvac_to_cab)
+            );
+            pwr_thrml_hvac_to_cab
         };
         Ok(pwr_thrml_hvac_to_cabin)
     }
@@ -383,8 +398,12 @@ impl HVACSystemForLumpedCabinAndRES {
         res_temp_prev: si::Temperature,
         dt: si::Time,
     ) -> anyhow::Result<si::Power> {
-        let pwr_thrml_hvac_to_res = if res_temp <= self.te_set + self.te_deadband
-            && res_temp >= self.te_set - self.te_deadband
+        let te_set = match self.te_set {
+            Some(te_set) => te_set,
+            None => return Ok(si::Power::ZERO),
+        };
+        let pwr_thrml_hvac_to_res = if res_temp <= te_set + self.te_deadband
+            && res_temp >= te_set - self.te_deadband
         {
             // inside deadband; no hvac power is needed
 
@@ -395,7 +414,7 @@ impl HVACSystemForLumpedCabinAndRES {
         } else {
             // outside deadband
             let te_delta_vs_set = (res_temp.get::<si::degree_celsius>()
-                - self.te_set.get::<si::degree_celsius>())
+                - te_set.get::<si::degree_celsius>())
                 * uc::KELVIN_INT;
             self.state.pwr_p_res = -self.p_res * te_delta_vs_set;
             self.state.pwr_i_res -= self.i_res * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
@@ -410,7 +429,7 @@ impl HVACSystemForLumpedCabinAndRES {
                     * uc::KELVIN_INT
                     / dt);
 
-            let pwr_thrml_hvac_to_res: si::Power = if res_temp > self.te_set + self.te_deadband {
+            let pwr_thrml_hvac_to_res: si::Power = if res_temp > te_set + self.te_deadband {
                 // COOLING MODE; Reversible Energy Storage is hotter than set point
 
                 if self.state.pwr_i_res > si::Power::ZERO {
@@ -493,17 +512,17 @@ pub struct HVACSystemForLumpedCabinAndRESState {
     /// time step counter
     pub i: u32,
     /// portion of total HVAC cooling/heating (negative/positive) power due to proportional gain
-    pub pwr_p: si::Power,
+    pub pwr_p_cab: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to proportional gain
-    pub energy_p: si::Energy,
+    pub energy_p_cab: si::Energy,
     /// portion of total HVAC cooling/heating (negative/positive) power due to integral gain
-    pub pwr_i: si::Power,
+    pub pwr_i_cab: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to integral gain
-    pub energy_i: si::Energy,
+    pub energy_i_cab: si::Energy,
     /// portion of total HVAC cooling/heating (negative/positive) power due to derivative gain
-    pub pwr_d: si::Power,
+    pub pwr_d_cab: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy due to derivative gain
-    pub energy_d: si::Energy,
+    pub energy_d_cab: si::Energy,
     /// portion of total HVAC cooling/heating (negative/positive) power to [ReversibleEnergyStorage::thrml] due to proportional gain
     pub pwr_p_res: si::Power,
     /// portion of total HVAC cooling/heating (negative/positive) cumulative energy to [ReversibleEnergyStorage::thrml] due to proportional gain
