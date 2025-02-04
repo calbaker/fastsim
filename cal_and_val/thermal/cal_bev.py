@@ -347,6 +347,7 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         (1, 100), #new_hvac_i_cabin,
         (0.15, 0.35), # new_hvac_frac_of_ideal_cop,
     ),
+    constr_fns=(),
     verbose=False,    
 )
 
