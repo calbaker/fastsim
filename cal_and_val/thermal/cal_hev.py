@@ -477,12 +477,11 @@ cal_mod_obj = pymoo_api.ModelObjectives(
         new_fc_thrml_fc_eff_model_Exponential_lag,
         new_fc_thrml_fc_eff_model_Exponential_minimum,
         # TODO: make sure this has functions for modifying
+        # - aux power
         # - battery thermal -- not necessary for HEV because battery temperature has no real effect
         #     - thermal mass
         #     - convection to ambient
         #     - convection to cabin
-        # ## HEV specific stuff
-        # - aux power
     ),
     # must match order and length of `params_fns`
     bounds=(
