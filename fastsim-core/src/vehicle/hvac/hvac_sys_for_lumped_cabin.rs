@@ -10,11 +10,11 @@ use super::*;
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, HistoryMethods)]
 /// HVAC system for [LumpedCabin]
 pub struct HVACSystemForLumpedCabin {
-    /// set point temperature
-    pub te_set: si::Temperature,
+    /// set point temperature, `None` means HVAC is inactive
+    pub te_set: Option<si::Temperature>,
     /// deadband range.  any cabin temperature within this range of
     /// `te_set` results in no HVAC power draw
-    pub te_deadband: si::Temperature,
+    pub te_deadband: si::TemperatureInterval,
     /// HVAC proportional gain
     pub p: si::ThermalConductance,
     /// HVAC integral gain [W / K / s], resets at zero crossing events
@@ -26,7 +26,7 @@ pub struct HVACSystemForLumpedCabin {
     /// NOTE: `uom` crate does not have this unit, but it may be possible to make a custom unit for this
     pub d: f64,
     /// max HVAC thermal power
-    pub pwr_thermal_max: si::Power,
+    pub pwr_thrml_max: si::Power,
     /// coefficient between 0 and 1 to calculate HVAC efficiency by multiplying by
     /// coefficient of performance (COP)
     pub frac_of_ideal_cop: f64,
@@ -35,7 +35,7 @@ pub struct HVACSystemForLumpedCabin {
     /// max allowed aux load for HVAC
     pub pwr_aux_for_hvac_max: si::Power,
     /// coefficient of performance of vapor compression cycle
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: HVACSystemForLumpedCabinState,
     #[serde(
         default,
@@ -46,19 +46,24 @@ pub struct HVACSystemForLumpedCabin {
 impl Default for HVACSystemForLumpedCabin {
     fn default() -> Self {
         Self {
-            te_set: *TE_STD_AIR,
-            te_deadband: 1.5 * uc::KELVIN,
+            te_set: Some(*TE_STD_AIR),
+            te_deadband: 0.5 * uc::KELVIN_INT,
             p: Default::default(),
             i: Default::default(),
             d: Default::default(),
             pwr_i_max: 5. * uc::KW,
-            pwr_thermal_max: 10. * uc::KW,
+            pwr_thrml_max: 10. * uc::KW,
             frac_of_ideal_cop: 0.15,
             heat_source: CabinHeatSource::ResistanceHeater,
             pwr_aux_for_hvac_max: uc::KW * 5.,
             state: Default::default(),
             history: Default::default(),
         }
+    }
+}
+impl SetCumulative for HVACSystemForLumpedCabin {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        self.state.set_cumulative(dt);
     }
 }
 impl Init for HVACSystemForLumpedCabin {}
@@ -81,29 +86,45 @@ impl HVACSystemForLumpedCabin {
         cab_heat_cap: si::HeatCapacity,
         dt: si::Time,
     ) -> anyhow::Result<(si::Power, si::Power)> {
+        let te_set = match self.te_set {
+            Some(te_set) => te_set,
+            None => return Ok((si::Power::ZERO, si::Power::ZERO)),
+        };
         let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) = if cab_state.temperature
-            <= self.te_set + self.te_deadband
-            && cab_state.temperature >= self.te_set - self.te_deadband
+            <= te_set + self.te_deadband
+            && cab_state.temperature >= te_set - self.te_deadband
         {
             // inside deadband; no hvac power is needed
 
             self.state.pwr_i = si::Power::ZERO; // reset to 0.0
             self.state.pwr_p = si::Power::ZERO;
             self.state.pwr_d = si::Power::ZERO;
-            (si::Power::ZERO, si::Power::ZERO, f64::NAN * uc::R)
+            let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) =
+                (si::Power::ZERO, si::Power::ZERO, f64::NAN * uc::R);
+            (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop)
         } else {
             // outside deadband
-            let te_delta_vs_set = cab_state.temperature - self.te_set;
-            let te_delta_vs_amb: si::Temperature = cab_state.temperature - te_amb_air;
+            let te_delta_vs_set = (cab_state.temperature.get::<si::degree_celsius>()
+                - te_set.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
+            let te_delta_vs_amb: si::TemperatureInterval =
+                (cab_state.temperature.get::<si::degree_celsius>()
+                    - te_amb_air.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT;
 
             self.state.pwr_p = -self.p * te_delta_vs_set;
+            ensure!(self.state.pwr_p != si::Power::ZERO, format_dbg!());
             self.state.pwr_i -= self.i * uc::W / uc::KELVIN / uc::S * te_delta_vs_set * dt;
             self.state.pwr_i = self.state.pwr_i.max(-self.pwr_i_max).min(self.pwr_i_max);
-            self.state.pwr_d =
-                -self.d * uc::J / uc::KELVIN * ((cab_state.temperature - cab_state.temp_prev) / dt);
+            ensure!(self.state.pwr_i != si::Power::ZERO, format_dbg!());
+            self.state.pwr_d = -self.d * uc::J / uc::KELVIN
+                * ((cab_state.temperature.get::<si::degree_celsius>()
+                    - cab_state.temp_prev.get::<si::degree_celsius>())
+                    * uc::KELVIN_INT
+                    / dt);
 
             let (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop) =
-                if cab_state.temperature > self.te_set + self.te_deadband {
+                if cab_state.temperature > te_set + self.te_deadband {
                     // COOLING MODE; cabin is hotter than set point
 
                     // https://en.wikipedia.org/wiki/Coefficient_of_performance#Theoretical_performance_limits
@@ -111,7 +132,7 @@ impl HVACSystemForLumpedCabin {
                     // cop_ideal is t_c / (t_h - t_c) for cooling
 
                     // divide-by-zero protection and realistic limit on COP
-                    let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                    let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
                         // cabin is cooler than ambient + threshold
                         // TODO: make this `5.0` not hardcoded
                         cab_state.temperature / (5.0 * uc::KELVIN)
@@ -119,7 +140,7 @@ impl HVACSystemForLumpedCabin {
                         cab_state.temperature / te_delta_vs_amb.abs()
                     };
                     let cop = cop_ideal * self.frac_of_ideal_cop;
-                    assert!(cop > 0.0 * uc::R);
+                    ensure!(cop > 0.0 * uc::R, format_dbg!(cop));
 
                     if self.state.pwr_i > si::Power::ZERO {
                         // If `pwr_i` is greater than zero, reset to switch from heating to cooling
@@ -127,14 +148,41 @@ impl HVACSystemForLumpedCabin {
                     }
                     let mut pwr_thrml_hvac_to_cab =
                         (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
-                            .max(-self.pwr_thermal_max);
+                            .max(-self.pwr_thrml_max);
 
-                    if (-pwr_thrml_hvac_to_cab / self.state.cop) > self.pwr_aux_for_hvac_max {
+                    ensure!(
+                        pwr_thrml_hvac_to_cab < si::Power::ZERO,
+                        "{}\nHVAC should be cooling cabin",
+                        format_dbg!(pwr_thrml_hvac_to_cab)
+                    );
+
+                    if (pwr_thrml_hvac_to_cab / cop).abs() > self.pwr_aux_for_hvac_max {
                         self.state.pwr_aux_for_hvac = self.pwr_aux_for_hvac_max;
                         // correct if limit is exceeded
-                        pwr_thrml_hvac_to_cab = -self.state.pwr_aux_for_hvac * self.state.cop;
+                        pwr_thrml_hvac_to_cab = -self.state.pwr_aux_for_hvac * cop;
+                        ensure!(
+                            pwr_thrml_hvac_to_cab < si::Power::ZERO,
+                            "{}\nHVAC should be cooling cabin",
+                            format_dbg!(pwr_thrml_hvac_to_cab)
+                        );
+                        ensure!(
+                            self.state.pwr_aux_for_hvac > si::Power::ZERO,
+                            format_dbg!(self.state.pwr_aux_for_hvac)
+                        );
+                        ensure!(
+                            !self.state.pwr_aux_for_hvac.is_nan(),
+                            format_dbg!(self.state.pwr_aux_for_hvac)
+                        );
                     } else {
-                        self.state.pwr_aux_for_hvac = -pwr_thrml_hvac_to_cab / self.state.cop;
+                        self.state.pwr_aux_for_hvac = -pwr_thrml_hvac_to_cab / cop;
+                        ensure!(
+                            self.state.pwr_aux_for_hvac > si::Power::ZERO,
+                            format_dbg!(self.state.pwr_aux_for_hvac)
+                        );
+                        ensure!(
+                            !self.state.pwr_aux_for_hvac.is_nan(),
+                            format_dbg!(self.state.pwr_aux_for_hvac)
+                        );
                     }
                     let pwr_thrml_fc_to_cabin = si::Power::ZERO;
                     (pwr_thrml_hvac_to_cab, pwr_thrml_fc_to_cabin, cop)
@@ -145,34 +193,49 @@ impl HVACSystemForLumpedCabin {
                         // If `pwr_i` is less than zero reset to switch from cooling to heating
                         self.state.pwr_i = si::Power::ZERO;
                     }
-                    let mut pwr_thrml_hvac_to_cabin =
-                        (-self.state.pwr_p - self.state.pwr_i - self.state.pwr_d)
-                            .min(self.pwr_thermal_max);
+                    let mut pwr_thrml_hvac_to_cab =
+                        (self.state.pwr_p + self.state.pwr_i + self.state.pwr_d)
+                            .min(self.pwr_thrml_max);
+                    ensure!(
+                        pwr_thrml_hvac_to_cab > si::Power::ZERO,
+                        "{}\nHVAC should be heating cabin",
+                        format_dbg!(pwr_thrml_hvac_to_cab)
+                    );
 
                     // Assumes blower has negligible impact on aux load, may want to revise later
                     let (pwr_thrml_fc_to_cabin, cop) = self
                         .handle_heat_source(
                             te_fc,
                             te_delta_vs_amb,
-                            &mut pwr_thrml_hvac_to_cabin,
+                            &mut pwr_thrml_hvac_to_cab,
                             cab_heat_cap,
                             cab_state,
                             dt,
                         )
                         .with_context(|| format_dbg!())?;
-                    (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop)
+                    ensure!(
+                        pwr_thrml_hvac_to_cab >= si::Power::ZERO,
+                        "{}\nHVAC should be heating cabin",
+                        format_dbg!(pwr_thrml_hvac_to_cab)
+                    );
+                    (pwr_thrml_hvac_to_cab, pwr_thrml_fc_to_cabin, cop)
                 };
             (pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin, cop)
         };
         self.state.cop = cop;
-        Ok((pwr_thrml_hvac_to_cabin, pwr_thrml_fc_to_cabin))
+        self.state.pwr_thrml_hvac_to_cabin = pwr_thrml_hvac_to_cabin;
+        self.state.pwr_thrml_fc_to_cabin = pwr_thrml_fc_to_cabin;
+        Ok((
+            self.state.pwr_thrml_hvac_to_cabin,
+            self.state.pwr_thrml_fc_to_cabin,
+        ))
     }
 
     fn handle_heat_source(
         &mut self,
         te_fc: Option<si::Temperature>,
-        te_delta_vs_amb: si::Temperature,
-        pwr_thrml_hvac_to_cabin: &mut si::Power,
+        te_delta_vs_amb: si::TemperatureInterval,
+        pwr_thrml_hvac_to_cab: &mut si::Power,
         cab_heat_cap: si::HeatCapacity,
         cab_state: LumpedCabinState,
         dt: si::Time,
@@ -184,18 +247,30 @@ impl HVACSystemForLumpedCabin {
                     "{}\nExpected vehicle with [FuelConverter] with thermal plant model.",
                     format_dbg!()
                 );
-                // limit heat transfer to be substantially less than what is physically possible
-                // i.e. the engine can't drop below cabin temperature to heat the cabin
-                *pwr_thrml_hvac_to_cabin = pwr_thrml_hvac_to_cabin
-                    .min(
-                        cab_heat_cap *
-                    (te_fc.unwrap() - cab_state.temperature)
-                        * 0.1 // so that it's substantially less
-                        / dt,
-                    )
-                    .max(si::Power::ZERO);
+                ensure!(
+                    *pwr_thrml_hvac_to_cab > si::Power::ZERO,
+                    "{}\nHVAC should be heating cabin",
+                    format_dbg!(pwr_thrml_hvac_to_cab)
+                );
+                // limit heat transfer to be substantially less (hence the 0.1)
+                // than what is physically possible i.e. the engine can't drop
+                // below cabin temperature to heat the cabin
+                *pwr_thrml_hvac_to_cab = pwr_thrml_hvac_to_cab.min(
+                    (cab_heat_cap
+                        * (te_fc.unwrap().get::<si::degree_celsius>()
+                            - cab_state.temperature.get::<si::degree_celsius>())
+                        * uc::KELVIN_INT
+                        * 0.1
+                        / dt)
+                        .max(si::Power::ZERO),
+                );
+                ensure!(
+                    *pwr_thrml_hvac_to_cab >= si::Power::ZERO,
+                    "{}\nHVAC should be heating cabin",
+                    format_dbg!(pwr_thrml_hvac_to_cab)
+                );
                 let cop = f64::NAN * uc::R;
-                let pwr_thrml_fc_to_cabin = *pwr_thrml_hvac_to_cabin;
+                let pwr_thrml_fc_to_cabin = *pwr_thrml_hvac_to_cab;
                 // Assumes aux power needed for heating is incorporated into based aux load.
                 // TODO: refine this, perhaps by making aux power
                 // proportional to heating power, to account for blower power
@@ -204,7 +279,11 @@ impl HVACSystemForLumpedCabin {
             }
             CabinHeatSource::ResistanceHeater => {
                 let cop = uc::R;
-                self.state.pwr_aux_for_hvac = *pwr_thrml_hvac_to_cabin; // COP is 1 so does not matter
+                self.state.pwr_aux_for_hvac = *pwr_thrml_hvac_to_cab; // COP is 1 so does not matter
+                ensure!(
+                    self.state.pwr_aux_for_hvac > si::Power::ZERO,
+                    format_dbg!(self.state.pwr_aux_for_hvac)
+                );
                 #[allow(clippy::let_and_return)] // for readability
                 let pwr_thrml_fc_to_cabin = si::Power::ZERO;
                 (pwr_thrml_fc_to_cabin, cop)
@@ -216,7 +295,7 @@ impl HVACSystemForLumpedCabin {
 
                 // divide-by-zero protection and realistic limit on COP
                 // TODO: make sure this is consist with above commented equation for heating!
-                let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN {
+                let cop_ideal = if te_delta_vs_amb.abs() < 5.0 * uc::KELVIN_INT {
                     // cabin is cooler than ambient + threshold
                     // TODO: make this `5.0` not hardcoded
                     cab_state.temperature / (5.0 * uc::KELVIN)
@@ -224,13 +303,13 @@ impl HVACSystemForLumpedCabin {
                     cab_state.temperature / te_delta_vs_amb.abs()
                 };
                 let cop = cop_ideal * self.frac_of_ideal_cop;
-                assert!(cop > 0.0 * uc::R);
-                if (*pwr_thrml_hvac_to_cabin / self.state.cop) > self.pwr_aux_for_hvac_max {
+                ensure!(cop > 0.0 * uc::R, format_dbg!(cop));
+                if (*pwr_thrml_hvac_to_cab / cop) > self.pwr_aux_for_hvac_max {
                     self.state.pwr_aux_for_hvac = self.pwr_aux_for_hvac_max;
                     // correct if limit is exceeded
-                    *pwr_thrml_hvac_to_cabin = -self.state.pwr_aux_for_hvac * self.state.cop;
+                    *pwr_thrml_hvac_to_cab = -self.state.pwr_aux_for_hvac * cop;
                 } else {
-                    self.state.pwr_aux_for_hvac = *pwr_thrml_hvac_to_cabin / self.state.cop;
+                    self.state.pwr_aux_for_hvac = *pwr_thrml_hvac_to_cab / cop;
                 }
                 #[allow(clippy::let_and_return)] // for readability
                 let pwr_thrml_fc_to_cabin = si::Power::ZERO;
@@ -253,7 +332,13 @@ pub enum CabinHeatSource {
 impl Init for CabinHeatSource {}
 impl SerdeAPI for CabinHeatSource {}
 
-#[fastsim_api]
+#[fastsim_api(
+    #[pyo3(name = "default")]
+    #[staticmethod]
+    fn default_py() -> Self {
+        Self::default()
+    }
+)]
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative,
 )]
@@ -278,9 +363,15 @@ pub struct HVACSystemForLumpedCabinState {
     /// Aux power demand from [Vehicle::hvac] system
     pub pwr_aux_for_hvac: si::Power,
     /// Cumulative aux energy for HVAC system
-    pub energy_aux: si::Energy,
-    /// Cumulative energy demand by HVAC system from thermal component (e.g. [FuelConverter])
-    pub energy_thermal_req: si::Energy,
+    pub energy_aux_for_hvac: si::Energy,
+    /// Thermal power from HVAC system to cabin, positive is heating the cabin
+    pub pwr_thrml_hvac_to_cabin: si::Power,
+    /// Cumulative thermal energy from HVAC system to cabin, positive is heating the cabin
+    pub energy_thrml_hvac_to_cabin: si::Energy,
+    /// Thermal power from [FuelConverter] to [Cabin]
+    pub pwr_thrml_fc_to_cabin: si::Power,
+    /// Cumulative thermal energy from [FuelConverter] to [Cabin]
+    pub energy_thrml_fc_to_cabin: si::Energy,
 }
 impl Init for HVACSystemForLumpedCabinState {}
 impl SerdeAPI for HVACSystemForLumpedCabinState {}

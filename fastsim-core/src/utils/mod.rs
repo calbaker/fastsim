@@ -5,11 +5,6 @@ use regex::Regex;
 pub mod interp;
 pub use interp::*;
 
-impl Init for ninterp::Interpolator {}
-impl SerdeAPI for ninterp::Interpolator {
-    const RESOURCE_PREFIX: &'static str = "interpolators";
-}
-
 /// Error message for when user attempts to set value in a nested struct.
 pub const DIRECT_SET_ERR: &str =
     "Setting field value directly not allowed. Please use fastsim.set_param_from_path() method.";

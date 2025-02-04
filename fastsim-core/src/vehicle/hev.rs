@@ -1,6 +1,7 @@
 use super::{vehicle_model::VehicleState, *};
 use crate::prelude::ElectricMachineState;
 
+#[fastsim_api]
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, HistoryMethods)]
 #[non_exhaustive]
 /// Hybrid vehicle with both engine and reversible energy storage (aka battery)
@@ -25,7 +26,7 @@ pub struct HybridElectricVehicle {
     #[serde(default)]
     pub sim_params: HEVSimulationParams,
     /// field for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: HEVState,
     /// vector of [Self::state]
     #[serde(default, skip_serializing_if = "HEVStateHistoryVec::is_empty")]
@@ -59,6 +60,8 @@ impl Init for HybridElectricVehicle {
         Ok(())
     }
 }
+
+impl SerdeAPI for HybridElectricVehicle {}
 
 impl Powertrain for Box<HybridElectricVehicle> {
     fn set_curr_pwr_prop_out_max(
@@ -161,7 +164,7 @@ impl Powertrain for Box<HybridElectricVehicle> {
     fn get_curr_pwr_prop_out_max(&self) -> anyhow::Result<(si::Power, si::Power)> {
         Ok((
             self.em.state.pwr_mech_fwd_out_max + self.fc.state.pwr_prop_max,
-            self.em.state.pwr_mech_bwd_out_max,
+            self.em.state.pwr_mech_regen_max,
         ))
     }
 
@@ -204,11 +207,12 @@ impl Powertrain for Box<HybridElectricVehicle> {
         Ok(())
     }
 
+    /// Regen braking power, positive means braking is happening
     fn pwr_regen(&self) -> si::Power {
         // When `pwr_mech_prop_out` is negative, regen is happening.  First, clip it at 0, and then negate it.
         // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e8f7af5a6e436dd1163fa3c70931d18d
         // for example
-        -self.em.state.pwr_mech_prop_out.min(0. * uc::W)
+        -(self.em.state.pwr_mech_prop_out.max(si::Power::ZERO))
     }
 }
 
@@ -555,9 +559,18 @@ impl Init for HEVPowertrainControls {
 }
 
 impl HEVPowertrainControls {
+    /// Determines power split between engine and electric machine
+    ///
+    /// # Arguments
+    /// - `pwr_prop_req`: tractive power required
+    /// - `veh_state`: vehicle state
+    /// - `hev_state`: HEV powertrain state
+    /// - `fc`: fuel converter
+    /// - `em_state`: electric machine state
+    /// - `res`: reversible energy storage (e.g. high voltage battery)
     fn get_pwr_fc_and_em(
         &mut self,
-        pwr_out_req: si::Power,
+        pwr_prop_req: si::Power,
         veh_state: VehicleState,
         hev_state: &mut HEVState,
         fc: &FuelConverter,
@@ -565,142 +578,222 @@ impl HEVPowertrainControls {
         res: &ReversibleEnergyStorage,
     ) -> anyhow::Result<(si::Power, si::Power)> {
         let fc_state = &fc.state;
-        if pwr_out_req >= si::Power::ZERO {
-            ensure!(
-                almost_le_uom(
-                    &pwr_out_req,
-                    &(em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max),
-                    None
-                ),
-                "{}
+        ensure!(
+            // `almost` is in case of negligible numerical precision discrepancies
+            almost_le_uom(
+                &pwr_prop_req,
+                &(em_state.pwr_mech_fwd_out_max + fc_state.pwr_prop_max),
+                None
+            ),
+            "{}
 `pwr_out_req`: {} kW
 `em_state.pwr_mech_fwd_out_max`: {} kW
-`fc_state.pwr_prop_max`: {} kW",
-                format_dbg!(),
-                pwr_out_req.get::<si::kilowatt>(),
-                em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
-                fc_state.pwr_prop_max.get::<si::kilowatt>()
-            );
+`fc_state.pwr_prop_max`: {} kW
+`res.state.soc`: {}",
+            format_dbg!(),
+            pwr_prop_req.get::<si::kilowatt>(),
+            em_state.pwr_mech_fwd_out_max.get::<si::kilowatt>(),
+            fc_state.pwr_prop_max.get::<si::kilowatt>(),
+            res.state.soc.get::<si::ratio>()
+        );
 
-            // positive net power out of the powertrain
-            let (fc_pwr, em_pwr) = match self {
-                HEVPowertrainControls::RGWDB(ref mut rgwdb) => {
-                    match (
-                        fc.temperature(),
-                        fc.temp_prev(),
-                        rgwdb.temp_fc_forced_on,
-                        rgwdb.temp_fc_allowed_off,
-                    ) {
-                        (None, None, None, None) => {}
-                        (
-                            Some(temperature),
-                            Some(temp_prev),
-                            Some(temp_fc_forced_on),
-                            Some(temp_fc_allowed_off),
-                        ) => {
-                            if
-                            // temperature is currently below forced on threshold
-                            temperature < temp_fc_forced_on ||
-                            // temperature was below forced on threshold and still has not exceeded allowed off threshold
-                            (temp_prev < temp_fc_forced_on && temperature < temp_fc_allowed_off)
-                            {
-                                hev_state.fc_on_causes.push(FCOnCause::FCTemperatureTooLow);
-                            }
-                        }
-                        _ => {
-                            bail!(
-                                "{}\n`fc.temperature()`, `fc.temp_prev()`, `rgwdb.temp_fc_forced_on`, and 
-`rgwdb.temp_fc_allowed_off` must all be `None` or `Some`", 
-                                format_dbg!()
-                            );
-                        }
-                    }
-                    // cannot exceed ElectricMachine max output power. Excess demand will be handled by `fc`
-                    let em_pwr = pwr_out_req.min(em_state.pwr_mech_fwd_out_max);
-                    let frac_pwr_demand_fc_forced_on: si::Ratio = rgwdb
-                        .frac_pwr_demand_fc_forced_on
-                        .with_context(|| format_dbg!())?;
-                    let frac_of_most_eff_pwr_to_run_fc: si::Ratio = rgwdb
+        // # Brain dump for thermal stuff
+        // TODO: engine on/off w.r.t. thermal stuff should not come into play
+        // if there is no component (e.g. cabin) demanding heat from the engine.  My 2019
+        // Hyundai Ioniq will turn the engine off if there is no heat demand regardless of
+        // the coolant temperature
+        // TODO: make sure idle fuel gets converted to heat correctly
+        let (fc_pwr, em_pwr) = match self {
+            Self::RGWDB(ref mut rgwdb) => {
+                handle_fc_on_causes_for_temp(fc, rgwdb, hev_state)?;
+                handle_fc_on_causes_for_speed(veh_state, rgwdb, hev_state)?;
+                handle_fc_on_causes_for_low_soc(res, rgwdb, hev_state, veh_state)?;
+                // `handle_fc_*` below here are asymmetrical for positive tractive power only
+                handle_fc_on_causes_for_pwr_demand(
+                    rgwdb,
+                    pwr_prop_req,
+                    em_state,
+                    fc_state,
+                    hev_state,
+                )?;
+
+                // Tractive power `em` must provide before deciding power
+                // split, cannot exceed ElectricMachine max output power.
+                // Excess demand will be handled by `fc`.  Favors drawing
+                // power from `em` before engine
+                let em_pwr = pwr_prop_req
+                    .min(em_state.pwr_mech_fwd_out_max)
+                    .max(-em_state.pwr_mech_regen_max);
+                // tractive power handled by fc
+                if hev_state.fc_on_causes.is_empty() {
+                    // engine is off, and `em_pwr` has already been limited within bounds
+                    (si::Power::ZERO, em_pwr)
+                } else {
+                    // engine has been forced on
+                    let frac_of_pwr_for_peak_eff: si::Ratio = rgwdb
                         .frac_of_most_eff_pwr_to_run_fc
                         .with_context(|| format_dbg!())?;
-                    // If the motor cannot produce more than the required power times a
-                    // `fc_pwr_frac_demand_forced_on`, then the engine should be on
-                    if pwr_out_req
-                        > frac_pwr_demand_fc_forced_on
-                            * (em_state.pwr_mech_fwd_out_max + fc_state.pwr_out_max)
-                    {
-                        hev_state
-                            .fc_on_causes
-                            .push(FCOnCause::PropulsionPowerDemandSoft);
-                    }
-
-                    if veh_state.speed_ach
-                        > rgwdb.speed_fc_forced_on.with_context(|| format_dbg!())?
-                    {
-                        hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
-                    }
-
-                    rgwdb.state.soc_fc_on_buffer = {
-                        let energy_delta_to_buffer_speed = 0.5
-                            * veh_state.mass
-                            * (rgwdb
-                                .speed_soc_fc_on_buffer
-                                .with_context(|| format_dbg!())?
-                                .powi(typenum::P2::new())
-                                - veh_state.speed_ach.powi(typenum::P2::new()));
-                        energy_delta_to_buffer_speed.max(si::Energy::ZERO)
-                            * rgwdb
-                                .speed_soc_fc_on_buffer_coeff
-                                .with_context(|| format_dbg!())?
-                    } / res.energy_capacity_usable()
-                        + res.min_soc;
-
-                    if res.state.soc < rgwdb.state.soc_fc_on_buffer {
-                        hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
-                    }
-                    if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
-                        hev_state
-                            .fc_on_causes
-                            .push(FCOnCause::PropulsionPowerDemand);
-                    }
-
-                    let fc_pwr: si::Power = if hev_state.fc_on_causes.is_empty() {
-                        si::Power::ZERO
+                    let fc_pwr = if pwr_prop_req < si::Power::ZERO {
+                        // negative tractive power
+                        // max power system can receive from engine during negative traction
+                        (em_state.pwr_mech_regen_max + pwr_prop_req)
+                            // or peak efficiency power if it's lower than above
+                            .min(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
+                            // but not negative
+                            .max(si::Power::ZERO)
                     } else {
-                        let fc_pwr_req = pwr_out_req - em_pwr;
-                        // if the engine is on, load it up to get closer to peak efficiency
-                        fc_pwr_req
-                            .max(fc.pwr_for_peak_eff * frac_of_most_eff_pwr_to_run_fc)
-                            .min(fc.state.pwr_out_max)
-                            .max(pwr_out_req)
-                    };
+                        // positive tractive power
+                        if pwr_prop_req - em_pwr > fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff {
+                            // engine needs to run higher than peak efficiency point
+                            pwr_prop_req - em_pwr
+                        } else {
+                            // engine does not need to run higher than peak
+                            // efficiency point to make tractive demand
+
+                            // fc handles all power not covered by em
+                            (pwr_prop_req - em_pwr)
+                                // and if that's less than the
+                                // efficiency-focused value, then operate at
+                                // that value
+                                .max(fc.pwr_for_peak_eff * frac_of_pwr_for_peak_eff)
+                                // but don't exceed what what the battery can
+                                // absorb + tractive demand
+                                .min(pwr_prop_req + em_state.pwr_mech_regen_max)
+                        }
+                    }
+                    // and don't exceed what the fc can do
+                    .min(fc_state.pwr_prop_max);
+
                     // recalculate `em_pwr` based on `fc_pwr`
-                    let em_pwr = pwr_out_req - fc_pwr;
-
-                    ensure!(
-                        fc_pwr >= si::Power::ZERO,
-                        format_dbg!(fc_pwr >= si::Power::ZERO)
-                    );
-                    (fc_pwr, em_pwr)
+                    let em_pwr_corrected =
+                        (pwr_prop_req - fc_pwr).max(-em_state.pwr_mech_regen_max);
+                    (fc_pwr, em_pwr_corrected)
                 }
-                HEVPowertrainControls::Placeholder => todo!(),
-            };
+            }
+            Self::Placeholder => todo!(),
+        };
 
-            Ok((fc_pwr, em_pwr))
-        } else {
-            // negative net power out of the powertrain -- i.e. positive net
-            // power _into_ powertrain, aka regen
-            // if `em_pwr` is less than magnitude of `pwr_out_req`, friction brakes can handle excess
-            let em_pwr = -em_state.pwr_mech_bwd_out_max.min(-pwr_out_req);
-            Ok((0. * uc::W, em_pwr))
+        Ok((fc_pwr, em_pwr))
+    }
+}
+
+/// Determines whether power demand requires engine to be on.  Not needed during
+/// negative traction.
+fn handle_fc_on_causes_for_pwr_demand(
+    rgwdb: &mut Box<RESGreedyWithDynamicBuffers>,
+    pwr_out_req: si::Power,
+    em_state: &ElectricMachineState,
+    fc_state: &FuelConverterState,
+    hev_state: &mut HEVState,
+) -> Result<(), anyhow::Error> {
+    let frac_pwr_demand_fc_forced_on: si::Ratio = rgwdb
+        .frac_pwr_demand_fc_forced_on
+        .with_context(|| format_dbg!())?;
+    if pwr_out_req
+        > frac_pwr_demand_fc_forced_on * (em_state.pwr_mech_fwd_out_max + fc_state.pwr_out_max)
+    {
+        hev_state
+            .fc_on_causes
+            .push(FCOnCause::PropulsionPowerDemandSoft);
+    }
+    if pwr_out_req - em_state.pwr_mech_fwd_out_max >= si::Power::ZERO {
+        hev_state
+            .fc_on_causes
+            .push(FCOnCause::PropulsionPowerDemand);
+    }
+    Ok(())
+}
+
+/// Detemrines whether engine must be on to charge battery
+fn handle_fc_on_causes_for_low_soc(
+    res: &ReversibleEnergyStorage,
+    rgwdb: &mut Box<RESGreedyWithDynamicBuffers>,
+    hev_state: &mut HEVState,
+    veh_state: VehicleState,
+) -> anyhow::Result<()> {
+    rgwdb.state.soc_fc_on_buffer = {
+        let energy_delta_to_buffer_speed = 0.5
+            * veh_state.mass
+            * (rgwdb
+                .speed_soc_fc_on_buffer
+                .with_context(|| format_dbg!())?
+                .powi(typenum::P2::new())
+                - veh_state.speed_ach.powi(typenum::P2::new()));
+        energy_delta_to_buffer_speed.max(si::Energy::ZERO)
+            * rgwdb
+                .speed_soc_fc_on_buffer_coeff
+                .with_context(|| format_dbg!())?
+    } / res.energy_capacity_usable()
+        + res.min_soc;
+    if res.state.soc < rgwdb.state.soc_fc_on_buffer {
+        hev_state.fc_on_causes.push(FCOnCause::ChargingForLowSOC)
+    }
+    Ok(())
+}
+
+/// Determines whether enigne must be on for high speed
+fn handle_fc_on_causes_for_speed(
+    veh_state: VehicleState,
+    rgwdb: &mut Box<RESGreedyWithDynamicBuffers>,
+    hev_state: &mut HEVState,
+) -> anyhow::Result<()> {
+    if veh_state.speed_ach > rgwdb.speed_fc_forced_on.with_context(|| format_dbg!())? {
+        hev_state.fc_on_causes.push(FCOnCause::VehicleSpeedTooHigh);
+    }
+    Ok(())
+}
+
+/// Determines whether engine needs to be on due to low temperature and pushes
+/// appropriate variant to `fc_on_causes`
+fn handle_fc_on_causes_for_temp(
+    fc: &FuelConverter,
+    rgwdb: &mut Box<RESGreedyWithDynamicBuffers>,
+    hev_state: &mut HEVState,
+) -> anyhow::Result<()> {
+    match (
+        fc.temperature(),
+        fc.temp_prev(),
+        rgwdb.temp_fc_forced_on,
+        rgwdb.temp_fc_allowed_off,
+    ) {
+        (None, None, None, None) => {}
+        (
+            Some(temperature),
+            Some(temp_prev),
+            Some(temp_fc_forced_on),
+            Some(temp_fc_allowed_off),
+        ) => {
+            if
+            // temperature is currently below forced on threshold
+            temperature < temp_fc_forced_on ||
+            // temperature was below forced on threshold and still has not exceeded allowed off threshold
+            (temp_prev < temp_fc_forced_on && temperature < temp_fc_allowed_off)
+            {
+                hev_state.fc_on_causes.push(FCOnCause::FCTemperatureTooLow);
+            }
+        }
+        _ => {
+            bail!(
+                "{}\n`fc.temperature()`, `fc.temp_prev()`, `rgwdb.temp_fc_forced_on`, and 
+`rgwdb.temp_fc_allowed_off` must all be `None` or `Some` because these controls are necessary
+for an HEV equipped with thermal models or superfluous otherwise",
+                format_dbg!((
+                    fc.temperature(),
+                    fc.temp_prev(),
+                    rgwdb.temp_fc_forced_on,
+                    rgwdb.temp_fc_allowed_off
+                ))
+            );
         }
     }
+    Ok(())
 }
 
 /// Greedily uses [ReversibleEnergyStorage] with buffers that derate charge
 /// and discharge power inside of static min and max SOC range.  Also, includes
 /// buffer for forcing [FuelConverter] to be active/on. See [Self::init] for
 /// default values.
+#[fastsim_api]
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Default)]
 #[non_exhaustive]
 pub struct RESGreedyWithDynamicBuffers {
@@ -745,13 +838,13 @@ pub struct RESGreedyWithDynamicBuffers {
     /// engine efficiently.
     pub frac_res_dschrg_for_fc: si::Ratio,
     /// temperature at which engine is forced on to warm up
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub temp_fc_forced_on: Option<si::Temperature>,
     /// temperature at which engine is allowed to turn off due to being sufficiently warm
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub temp_fc_allowed_off: Option<si::Temperature>,
     /// current state of control variables
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: RGWDBState,
     #[serde(default, skip_serializing_if = "RGWDBStateHistoryVec::is_empty")]
     /// history of current state
@@ -773,12 +866,12 @@ impl Init for RESGreedyWithDynamicBuffers {
         self.speed_fc_forced_on = self.speed_fc_forced_on.or(Some(uc::MPH * 75.));
         self.frac_pwr_demand_fc_forced_on =
             self.frac_pwr_demand_fc_forced_on.or(Some(uc::R * 0.75));
-        // TODO: consider changing this default
         self.frac_of_most_eff_pwr_to_run_fc =
             self.frac_of_most_eff_pwr_to_run_fc.or(Some(1.0 * uc::R));
         Ok(())
     }
 }
+impl SerdeAPI for RESGreedyWithDynamicBuffers {}
 
 #[fastsim_api]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, HistoryVec, SetCumulative)]

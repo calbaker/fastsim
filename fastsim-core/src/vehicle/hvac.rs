@@ -38,3 +38,29 @@ impl Init for HVACOption {
     }
 }
 impl SerdeAPI for HVACOption {}
+impl SaveState for HVACOption {
+    fn save_state(&mut self) {
+        match self {
+            Self::LumpedCabin(lc) => lc.save_state(),
+            Self::LumpedCabinAndRES(lcr) => lcr.save_state(),
+            Self::LumpedCabinWithShell => {
+                todo!()
+            }
+            Self::ReversibleEnergyStorageOnly => todo!(),
+            Self::None => {}
+        }
+    }
+}
+impl Step for HVACOption {
+    fn step(&mut self) {
+        match self {
+            Self::LumpedCabin(lc) => lc.step(),
+            Self::LumpedCabinAndRES(lcr) => lcr.step(),
+            Self::LumpedCabinWithShell => {
+                todo!()
+            }
+            Self::ReversibleEnergyStorageOnly => todo!(),
+            Self::None => {}
+        }
+    }
+}

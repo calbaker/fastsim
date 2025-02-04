@@ -7,6 +7,8 @@ pt_type:
       pwr_out_max_watts: 1000000.0
       pwr_ramp_lag_seconds: 1.0
       energy_capacity_joules: 2124000000.0
+      specific_energy_joules_per_kilogram: ~
+      mass_kilograms: ~
     fc:
       mass_kilograms: ~
       specific_pwr_watts_per_kilogram: ~
@@ -221,12 +223,35 @@ pt_type:
           extrapolate: Error
       pwr_idle_fuel_watts: 0.0
       save_interval: 1
+      state:
+        i: 0
+        pwr_out_max_watts: 0.0
+        pwr_prop_max_watts: 0.0
+        eff: 0.0
+        pwr_prop_watts: 0.0
+        energy_prop_joules: 0.0
+        pwr_aux_watts: 0.0
+        energy_aux_joules: 0.0
+        pwr_fuel_watts: 0.0
+        energy_fuel_joules: 0.0
+        pwr_loss_watts: 0.0
+        energy_loss_joules: 0.0
+        fc_on: false
+        time_on_seconds: 0.0
     transmission:
       mass_kilograms: ~
       eff_interp:
         Interp0D: 0.875
       save_interval: 1
-    mass: ~
+      state:
+        i: 0
+        eff: 0.0
+        pwr_out_watts: 0.0
+        pwr_in_watts: 0.0
+        pwr_loss_watts: 0.0
+        energy_out_joules: 0.0
+        energy_loss_joules: 0.0
+    mass_kilograms: ~
     alt_eff: 1.0
 chassis:
   drag_coef: 0.393
@@ -235,17 +260,22 @@ chassis:
   wheel_inertia_kilogram_square_meters: 0.82
   num_wheels: 4
   wheel_radius_meters: 0.326
+  tire_code: ~
   cg_height_meters: 0.53
   wheel_fric_coef: 0.7
   drive_type: FWD
   drive_axle_weight_frac: 0.59
   wheel_base_meters: 2.72
+  mass_kilograms: ~
+  glider_mass_kilograms: ~
+  cargo_mass_kilograms: ~
 mass_kilograms: 1644.2724500334996
 pwr_aux_base_watts: 700.0
 trans_eff: 0.875
 save_interval: 1
 state:
   i: 0
+  time_seconds: 0.0
   pwr_prop_fwd_max_watts: 0.0
   pwr_prop_bwd_max_watts: 0.0
   pwr_tractive_watts: 0.0

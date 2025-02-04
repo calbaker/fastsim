@@ -4,7 +4,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
 import shutil
+import datetime
+
 import fastsim as fsim
+
+def print_dt():
+    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 def set_log_level(level: Union[str, int]) -> int:
     """

@@ -1,18 +1,19 @@
+# https://www.anl.gov/taps/d3-2020-chevrolet-bolt
 ---
 name: 2020 Chevrolet Bolt EV
 year: 2020
 cabin: 
   LumpedCabin:
     # 0.05 is Chad's uncalibrated estimate
-    cab_shell_htc_to_amb_watts_per_square_meter_degree_celsius: 0.05
+    cab_shell_htc_to_amb_watts_per_square_meter_kelvin: 0.05
     # 0.05 is Chad's uncalibrated estimate
-    cab_htc_to_amb_stop_watts_per_square_meter_degree_celsius: 0.05
+    cab_htc_to_amb_stop_watts_per_square_meter_kelvin: 0.05
     # 200,000 is Chad's uncalibrated estimate
     heat_capacitance_joules_per_kelvin: 200000
     # TODO: get actual vehicle length, but calibrate this later
     length_meters: 2.5
-    # TODO: get actual vehicle width, but calibrate this later
-    width_meters: 2
+    # 1.765 meters (69.5 in). Source: https://www.edmunds.com/chevrolet/bolt-ev/2020/features-specs/
+    width_meters: 1.765
 hvac: 
   LumpedCabinAndRES:
     te_set_kelvin: 295.15
@@ -25,7 +26,7 @@ hvac:
     i_res: 0.0
     pwr_i_max_res_watts: 5000.0
     d_res: 0.0
-    pwr_thermal_max_watts: 10000.0
+    pwr_thrml_max_watts: 10000.0
     frac_of_ideal_cop: 0.15
     cabin_heat_source: ResistanceHeater
     res_heat_source: ResistanceHeater
@@ -47,7 +48,72 @@ pt_type:
       pwr_out_max_watts: 165000.0
       energy_capacity_joules: 237600000.0
       eff_interp:
-        Interp0D: 0.9848857801796105
+        Interp2D:
+          x:
+            - -5.0
+            - -3.0
+            - -1.0
+            - -0.5
+            - -0.1
+            - 0.1
+            - 0.5
+            - 1.0
+            - 2.0
+            - 3.0
+            - 5.0
+          y:
+            - 23.0
+            - 30.0
+            - 45.0
+            - 55.0
+          f_xy:
+            - - 0.892085814015878
+              - 0.91092
+              - 0.929788
+              - 0.929788
+            - - 0.935630351894604
+              - 0.946773
+              - 0.957986
+              - 0.957986
+            - - 0.978612548997097
+              - 0.982298
+              - 0.986015
+              - 0.986015
+            - - 0.989309767361546
+              - 0.991151
+              - 0.993009
+              - 0.993009
+            - - 0.997862182940346
+              - 0.99823
+              - 0.998602
+              - 0.998602
+            - - 0.997883658588665
+              - 0.998247
+              - 0.998645
+              - 0.998618
+            - - 0.989234853052088
+              - 0.991108
+              - 0.993153
+              - 0.993014
+            - - 0.977987897893482
+              - 0.98189
+              - 0.986113
+              - 0.985827
+            - - 0.953873809588552
+              - 0.962378
+              - 0.971415
+              - 0.970809
+            - - 0.927243266086586
+              - 0.941245
+              - 0.955812
+              - 0.954845
+            - - 0.864025853742296
+              - 0.892934
+              - 0.921423
+              - 0.919576
+          strategy: Linear
+          extrapolate: Clamp
+      eff_interp_inputs: CRateTemperature
       min_soc: 0.0
       max_soc: 1.0
       save_interval: 1
@@ -67,46 +133,18 @@ pt_type:
             - 0.8
             - 1.0
           f_x:
-            - 0.84
-            - 0.86
-            - 0.88
+            - 0.83
+            - 0.85
+            - 0.87
+            - 0.89
             - 0.9
             - 0.91
-            - 0.92
+            - 0.93
             - 0.94
-            - 0.95
-            - 0.95
             - 0.94
             - 0.93
-          strategy: LeftNearest
-          extrapolate: Error
-      eff_interp_at_max_input:
-        Interp1D:
-          x:
-            - 0.0
-            - 0.023255813953488372
-            - 0.045454545454545456
-            - 0.06666666666666667
-            - 0.0879120879120879
-            - 0.10869565217391304
-            - 0.21276595744680854
-            - 0.4210526315789474
-            - 0.631578947368421
-            - 0.8510638297872342
-            - 1.075268817204301
-          f_x:
-            - 0.84
-            - 0.86
-            - 0.88
-            - 0.9
-            - 0.91
             - 0.92
-            - 0.94
-            - 0.95
-            - 0.95
-            - 0.94
-            - 0.93
-          strategy: LeftNearest
+          strategy: Linear
           extrapolate: Error
       pwr_out_max_watts: 149139.974
       specific_pwr_watts_per_kilogram: ~

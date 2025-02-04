@@ -24,7 +24,7 @@ SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 # `fastsim3` -- load vehicle and cycle, build simulation, and run 
 # %%
 
-# load 2012 Ford Fusion from file
+# load 2020 Chevrolet Bolt BEV from file
 veh = fsim.Vehicle.from_file(
     fsim.package_root() / "../../cal_and_val/thermal/f3-vehicles/2020 Chevrolet Bolt EV.yaml"
 )
@@ -51,61 +51,41 @@ df = sd.to_dataframe()
 # # Visualize results
 
 def plot_res_pwr() -> Tuple[Figure, Axes]:
-    fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
+    fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Reversible Energy Storage Power")
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df['cyc.time_seconds'],
         df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_electrical_watts"] / 1e3,
-        label="f3 electrical out",
-    )
-    ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.ess_kw_out_ach.tolist()),
-        label="f2 electrical out",
+        label="electrical out",
     )
     ax[0].set_ylabel("RES Power [kW]")
     ax[0].legend()
 
-    ax[1].set_prop_cycle(get_uni_cycler())
+    ax[1].set_prop_cycle(get_paired_cycler())
     ax[1].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.pwr_out_electrical_watts"] /
-            1e3 - np.array(sd2.ess_kw_out_ach.tolist()),
-        label="f3 res kw out",
+        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"],
+        label="soc",
     )
-    ax[1].set_ylabel("RES Power\nDelta (f3-f2) [kW]")
+    ax[1].set_ylabel("SOC")
     ax[1].legend()
-
-    ax[2].set_prop_cycle(get_paired_cycler())
-    ax[2].plot(
-        df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] - (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
-        label="f3 soc",
-    )
-    ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.soc.tolist()),
-        label="f2 soc",
-    )
-    ax[2].set_ylabel("SOC")
-    ax[2].legend()
     
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
         df['cyc.time_seconds'],
         df["veh.history.speed_ach_meters_per_second"],
-        label="f3",
+        label="ach",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
-        label="f2",
+        df['cyc.time_seconds'],
+        df["cyc.speed_meters_per_second"],
+        label="cyc",
     )
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
-    ax[-1].set_ylabel("Ach Speed [m/s]")
+    ax[-1].set_ylabel("Speed [m/s]")
 
     plt.tight_layout()
     if SAVE_FIGS:
@@ -115,62 +95,37 @@ def plot_res_pwr() -> Tuple[Figure, Axes]:
     return fig, ax
 
 def plot_res_energy() -> Tuple[Figure, Axes]:
-    fig, ax = plt.subplots(4, 1, sharex=True, figsize=figsize_3_stacked)
+    fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Reversible Energy Storage Energy")
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
         df['cyc.time_seconds'],
         df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"] / 1e3,
-        label="f3 electrical out",
-    )
-    ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) * np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
-        label="f2 electrical out",
+        label="electrical out",
     )
     ax[0].set_ylabel("RES Energy [kW]")
     ax[0].legend()
 
-    ax[1].set_prop_cycle(get_uni_cycler())
+    ax[1].set_prop_cycle(get_paired_cycler())
     ax[1].plot(
         df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.energy_out_electrical_joules"
-            ] / 1e3 - np.cumsum(np.array(sd2.ess_kw_out_ach.tolist()) *
-            np.diff(sd2.cyc.time_s.tolist(), prepend=0)),
-        label="electrical out",
+        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"],
+        label="soc",
     )
-    ax[1].set_ylim(
-       -np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1,
-        np.max(np.abs(sd.veh.res.history.energy_out_electrical_joules)) * 1e-3 * 0.1
-    )
-    ax[1].set_ylabel("RES Energy\nDelta (f3-f2) [kJ]\n+/- 10% Range")
+    ax[1].set_ylabel("SOC")
     ax[1].legend()
-
-    ax[2].set_prop_cycle(get_paired_cycler())
-    ax[2].plot(
-        df['cyc.time_seconds'],
-        df["veh.pt_type.BatteryElectricVehicle.res.history.soc"] - (df["veh.pt_type.BatteryElectricVehicle.res.history.soc"][0] - np.array(sd2.soc.tolist())[0]),
-        label="f3 soc",
-    )
-    ax[2].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.soc.tolist()),
-        label="f2 soc",
-    )
-    ax[2].set_ylabel("SOC")
-    ax[2].legend()
     
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
         df['cyc.time_seconds'],
         df["veh.history.speed_ach_meters_per_second"],
-        label="f3",
+        label="ach",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
-        label="f2",
+        df['cyc.time_seconds'],
+        df["cyc.speed_meters_per_second"],
+        label="cyc",
     )
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
@@ -184,63 +139,33 @@ def plot_res_energy() -> Tuple[Figure, Axes]:
     return fig, ax
 
 def plot_road_loads() -> Tuple[Figure, Axes]: 
-    fig, ax = plt.subplots(3, 1, sharex=True, figsize=figsize_3_stacked)
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=figsize_3_stacked)
     plt.suptitle("Road Loads")
 
     ax[0].set_prop_cycle(get_paired_cycler())
     ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_drag_watts) / 1e3,
-        label="f3 drag",
+        df["cyc.time_seconds"][::veh.save_interval],
+        df["veh.history.pwr_drag_watts"] / 1e3,
+        label="drag",
     )
     ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.drag_kw.tolist()),
-        label="f2 drag",
-    )
-    ax[0].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_rr_watts) / 1e3,
-        label="f3 rr",
-    )
-    ax[0].plot(
-        np.array(sd2.cyc.time_s.tolist())[::veh.save_interval],
-        np.array(sd2.rr_kw.tolist()),
-        label="f2 rr",
+        df["cyc.time_seconds"][::veh.save_interval],
+        df["veh.history.pwr_rr_watts"] / 1e3,
+        label="rr",
     )
     ax[0].set_ylabel("Power [kW]")
     ax[0].legend()
 
-    ax[1].set_prop_cycle(get_uni_cycler())
-    ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_drag_watts) /
-        1e3 - np.array(sd2.drag_kw.tolist()),
-        label="drag",
-        linestyle=BASE_LINE_STYLES[0],
-    )
-    ax[1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.pwr_rr_watts) /
-        1e3 - np.array(sd2.rr_kw.tolist()),
-        label="rr",
-        linestyle=BASE_LINE_STYLES[1],
-    )
-    # ax[1].text(
-    #     500, -0.125, "Drag error is due to more\naccurate air density model .")
-    ax[1].set_ylabel("Power\nDelta (f3-f2) [kW]")
-    ax[1].legend()
-
     ax[-1].set_prop_cycle(get_paired_cycler())
     ax[-1].plot(
-        np.array(sd.cyc.time_seconds)[::veh.save_interval],
-        np.array(sd.veh.history.speed_ach_meters_per_second),
-        label="f3",
+        df["cyc.time_seconds"][::veh.save_interval],
+        df["veh.history.speed_ach_meters_per_second"],
+        label="ach",
     )
     ax[-1].plot(
-        np.array(sd2.cyc.time_s.tolist()),
-        np.array(sd2.mps_ach.tolist()),
-        label="f2",
+        df['cyc.time_seconds'],
+        df["cyc.speed_meters_per_second"],
+        label="cyc",
     )
     ax[-1].legend()
     ax[-1].set_xlabel("Time [s]")
@@ -259,10 +184,8 @@ if SHOW_PLOTS:
     fig, ax = plot_road_loads()
 
 # %%
-# example for how to use set_default_1d_interp() method for veh.res
-res = veh.res
-res.set_default_1d_interp()
-fsim.set_param_from_path(veh, 'res', res)
-print(veh.res.to_pydict())
+# example for how to use set_default_pwr_interp() method for veh.res
+res = fsim.ReversibleEnergyStorage.from_pydict(sd.to_pydict()['veh']['pt_type']['BatteryElectricVehicle']['res'])
+res.set_default_pwr_interp()
 
 # %%

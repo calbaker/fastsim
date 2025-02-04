@@ -10,8 +10,8 @@ pub(crate) use crate::traits::*;
 pub(crate) use crate::uc;
 pub(crate) use crate::utils;
 pub(crate) use crate::utils::{
-    abs_checked_x_val, almost_eq, almost_le_uom, check_interp_frac_data, check_monotonicity,
-    is_sorted, InterpRange, DIRECT_SET_ERR,
+    abs_checked_x_val, almost_eq, almost_ge_uom, almost_le_uom, check_interp_frac_data,
+    check_monotonicity, is_sorted, InterpRange, DIRECT_SET_ERR,
 };
 pub(crate) use crate::utils::{Pyo3Vec2Wrapper, Pyo3Vec3Wrapper, Pyo3VecWrapper};
 pub(crate) use crate::vehicle::traits::Mass;
@@ -29,7 +29,6 @@ pub(crate) use ndarray::prelude::*;
 pub(crate) use ninterp::*;
 pub(crate) use serde::{Deserialize, Serialize};
 pub(crate) use std::cmp::{self, Ordering};
-pub(crate) use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 pub(crate) use std::error::Error;
 pub(crate) use std::f64::consts::PI;
 pub(crate) use std::ffi::OsStr;

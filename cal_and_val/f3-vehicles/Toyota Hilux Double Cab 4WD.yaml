@@ -226,7 +226,7 @@ pt_type:
       eff_interp:
         Interp0D: 0.95
       save_interval: 1
-    mass: ~
+    mass_kilograms: ~
     alt_eff: 1.0
 chassis:
   drag_coef: 0.4

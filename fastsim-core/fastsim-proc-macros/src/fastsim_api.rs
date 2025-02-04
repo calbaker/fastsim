@@ -171,7 +171,7 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
             self.to_json().map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
-        /// Read (deserialize) an object to a JSON string
+        /// Read (deserialize) an object from a JSON string
         ///
         /// # Arguments
         ///
@@ -185,14 +185,14 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
             Self::from_json(json_str, skip_init.unwrap_or_default()).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
-        /// Write (serialize) an object to a JSON string
+        /// Write (serialize) an object to a message pack
         #[cfg(feature = "msgpack")]
         #[pyo3(name = "to_msg_pack")]
         pub fn to_msg_pack_py(&self) -> PyResult<Vec<u8>> {
             self.to_msg_pack().map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
 
-        /// Read (deserialize) an object to a JSON string
+        /// Read (deserialize) an object from a message pack
         ///
         /// # Arguments
         ///
@@ -204,7 +204,7 @@ fn add_serde_methods(py_impl_block: &mut TokenStream2) {
         #[pyo3(signature = (msg_pack, skip_init=None))]
         pub fn from_msg_pack_py(msg_pack: &Bound<PyBytes>, skip_init: Option<bool>) -> PyResult<Self> {
             Self::from_msg_pack(
-                msg_pack.as_bytes(), 
+                msg_pack.as_bytes(),
                 skip_init.unwrap_or_default()
             ).map_err(|e| PyIOError::new_err(format!("{:?}", e)))
         }
@@ -343,7 +343,7 @@ fn process_named_field_struct(
             format!("{self:?}")
         }
     });
-    
+
     // struct with named fields
     for field in named.iter_mut() {
         impl_getters_and_setters(field);

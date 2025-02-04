@@ -155,7 +155,6 @@ pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
     let mut vec_layers: u8 = 0;
     let mut inner_type = &ftype;
 
-    // TODO: make sure this is being used with `SerdeAPI` also
     if let Some(opt_inner_type) = extract_type_from_option(inner_type) {
         inner_type = opt_inner_type;
     }
@@ -194,8 +193,8 @@ pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
             "Ratio" => extract_units!(uom::si::ratio::ratio),
             "Time" => extract_units!(uom::si::time::second, uom::si::time::hour),
             "HeatTransferCoeff" => extract_units!(
-                uom::si::heat_transfer::watt_per_square_meter_degree_celsius,
-                uom::si::heat_transfer::watt_per_square_meter_kelvin
+                uom::si::heat_transfer::watt_per_square_meter_kelvin,
+                uom::si::heat_transfer::watt_per_square_meter_degree_celsius
             ),
             "HeatCapacity" => {
                 extract_units!(
@@ -203,7 +202,10 @@ pub(crate) fn impl_getters_and_setters(field: &mut syn::Field) -> Option<()> {
                     uom::si::heat_capacity::joule_per_degree_celsius
                 )
             }
-            "Temperature" => extract_units!(uom::si::temperature_interval::kelvin),
+            "TemperatureInterval" => extract_units!(uom::si::temperature_interval::kelvin),
+            "Temperature" => {
+                extract_units!(uom::si::thermodynamic_temperature::kelvin)
+            }
             "ThermalConductance" => {
                 extract_units!(uom::si::thermal_conductance::watt_per_kelvin)
             }

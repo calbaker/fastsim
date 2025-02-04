@@ -105,8 +105,9 @@ impl Init for AuxSource {}
 
     #[cfg(feature = "resources")]
     #[pyo3(name = "list_resources")]
+    #[staticmethod]
     /// list available vehicle resources
-    fn list_resources_py(&self) -> Vec<String> {
+    fn list_resources_py() -> Vec<String> {
         resources::list_resources(Self::RESOURCE_PREFIX)
     }
 
@@ -134,14 +135,15 @@ pub struct Vehicle {
 
     /// Cabin thermal model
     #[serde(default, skip_serializing_if = "CabinOption::is_none")]
+    #[has_state]
     pub cabin: CabinOption,
 
     /// HVAC model
     #[serde(default, skip_serializing_if = "HVACOption::is_none")]
+    #[has_state]
     pub hvac: HVACOption,
 
     /// Total vehicle mass
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mass: Option<si::Mass>,
 
     /// Baseline power required by auxilliary systems
@@ -156,7 +158,7 @@ pub struct Vehicle {
     /// time step interval at which `state` is saved into `history`
     save_interval: Option<usize>,
     /// current state of vehicle
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: VehicleState,
     /// Vector-like history of [Self::state]
     #[serde(default, skip_serializing_if = "VehicleStateHistoryVec::is_empty")]
@@ -293,17 +295,12 @@ impl SetCumulative for Vehicle {
         if let Some(em) = self.em_mut() {
             em.set_cumulative(dt);
         }
-        match &mut self.cabin {
-            CabinOption::LumpedCabin(lumped_cabin) => lumped_cabin.set_cumulative(dt),
-            CabinOption::LumpedCabinWithShell => todo!(),
-            CabinOption::None => {}
-        }
+        self.cabin.set_cumulative(dt);
         self.state.dist += self.state.speed_ach * dt;
     }
 }
 
 impl Vehicle {
-    // TODO: run this assumption by Robin: peak power of all components can be produced concurrently.
     /// # Assumptions
     /// - peak power of all components can be produced concurrently.
     pub fn get_pwr_rated(&self) -> si::Power {
@@ -448,6 +445,13 @@ impl Vehicle {
         let te_fc: Option<si::Temperature> = self.fc().and_then(|fc| fc.temperature());
         let res_temp = self.res().and_then(|res| res.temperature());
         let res_temp_prev = self.res().and_then(|res| res.temp_prev());
+        let pwr_thrml_cab_to_res: si::Power = self
+            .res()
+            .and_then(|res| match &res.thrml {
+                RESThermalOption::RESLumpedThermal(rlt) => Some(rlt.state.pwr_thrml_from_cabin),
+                RESThermalOption::None => None,
+            })
+            .unwrap_or_default();
         let (pwr_thrml_fc_to_cabin, pwr_thrml_hvac_to_res, te_cab): (
             Option<si::Power>,
             Option<si::Power>,
@@ -462,7 +466,13 @@ impl Vehicle {
                     .solve(te_amb_air, te_fc, cab.state, cab.heat_capacitance, dt)
                     .with_context(|| format_dbg!())?;
                 let te_cab = cab
-                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .solve(
+                        te_amb_air,
+                        &self.state,
+                        pwr_thrml_hvac_to_cabin,
+                        Default::default(),
+                        dt,
+                    )
                     .with_context(|| format_dbg!())?;
                 self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 (Some(pwr_thrml_fc_to_cab), None, Some(te_cab))
@@ -485,7 +495,13 @@ impl Vehicle {
                     )
                     .with_context(|| format_dbg!())?;
                 let te_cab = cab
-                    .solve(te_amb_air, &self.state, pwr_thrml_hvac_to_cabin, dt)
+                    .solve(
+                        te_amb_air,
+                        &self.state,
+                        pwr_thrml_hvac_to_cabin,
+                        pwr_thrml_cab_to_res,
+                        dt,
+                    )
                     .with_context(|| format_dbg!())?;
                 self.state.pwr_aux = self.pwr_aux_base + hvac.state.pwr_aux_for_hvac;
                 (
@@ -546,6 +562,9 @@ impl Vehicle {
 pub struct VehicleState {
     /// time step index
     pub i: usize,
+
+    /// elapsed simulation time since start
+    pub time: si::Time,
 
     // power and energy fields
     /// maximum forward propulsive power vehicle can produce
@@ -616,6 +635,7 @@ impl Default for VehicleState {
     fn default() -> Self {
         Self {
             i: Default::default(),
+            time: si::Time::ZERO,
             pwr_prop_fwd_max: si::Power::ZERO,
             pwr_prop_bwd_max: si::Power::ZERO,
             pwr_tractive: si::Power::ZERO,

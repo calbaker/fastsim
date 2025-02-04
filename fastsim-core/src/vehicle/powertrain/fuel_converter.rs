@@ -1,36 +1,38 @@
 use super::*;
 use crate::prelude::*;
-use serde::Deserializer;
 use std::f64::consts::PI;
 
 // TODO: think about how to incorporate life modeling for Fuel Cells and other tech
 
 #[fastsim_api(
-    // // optional, custom, struct-specific pymethods
-    // #[getter("eff_max")]
-    // fn get_eff_max_py(&self) -> f64 {
-    //     self.get_eff_max()
-    // }
+    // optional, custom, struct-specific pymethods
+    #[getter("eff_max")]
+    fn get_eff_max_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_max()?)
+    }
 
-    // #[setter("__eff_max")]
-    // fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
-    //     self.set_eff_max(eff_max).map_err(PyValueError::new_err)
-    // }
+    #[setter("__eff_max")]
+    fn set_eff_max_py(&mut self, eff_max: f64) -> PyResult<()> {
+        self.set_eff_max(eff_max)?;
+        Ok(())
+    }
 
-    // #[getter("eff_min")]
-    // fn get_eff_min_py(&self) -> f64 {
-    //     self.get_eff_min()
-    // }
+    #[getter("eff_min")]
+    fn get_eff_min_py(&self) -> PyResult<f64> {
+        Ok(self.get_eff_min()?)
+    }
 
     // #[getter("eff_range")]
-    // fn get_eff_range_py(&self) -> f64 {
-    //     self.get_eff_range()
+    // fn get_eff_range_py(&self) -> PyResult<f64> {
+    //     self.get_eff_range()?;
+    //     Ok(())
     // }
 
-    // #[setter("__eff_range")]
-    // fn set_eff_range_py(&mut self, eff_range: f64) -> PyResult<()> {
-    //     self.set_eff_range(eff_range).map_err(PyValueError::new_err)
-    // }
+    #[setter("__eff_range")]
+    fn set_eff_range_py(&mut self, eff_range: f64) -> PyResult<()> {
+        self.set_eff_range(eff_range)?;
+        Ok(())
+    }
 
     // TODO: handle `side_effects` and uncomment
     // #[setter("__mass_kg")]
@@ -55,6 +57,7 @@ use std::f64::consts::PI;
 pub struct FuelConverter {
     /// [Self] Thermal plant, including thermal management controls
     #[serde(default, skip_serializing_if = "FuelConverterThermalOption::is_none")]
+    #[has_state]
     pub thrml: FuelConverterThermalOption,
     /// [Self] mass
     #[serde(default)]
@@ -79,7 +82,7 @@ pub struct FuelConverter {
     /// time step interval between saves. 1 is a good option. If None, no saving occurs.
     pub save_interval: Option<usize>,
     /// struct for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: FuelConverterState,
     /// Custom vector of [Self::state]
     #[serde(
@@ -268,7 +271,6 @@ impl FuelConverter {
             )
         );
         self.state.pwr_prop = pwr_out_req;
-        // TODO: make this temperature dependent
         self.state.eff = if fc_on {
             uc::R
                 * self
@@ -351,6 +353,106 @@ impl FuelConverter {
             FuelConverterThermalOption::None => None,
         }
     }
+
+    /// Returns max value of [Self::eff_interp_from_pwr_out]
+    pub fn get_eff_max(&self) -> anyhow::Result<f64> {
+        // since efficiency is all f64 between 0 and 1, NEG_INFINITY is safe
+        Ok(self
+            .eff_interp_from_pwr_out
+            .f_x()?
+            .iter()
+            .fold(f64::NEG_INFINITY, |acc, curr| acc.max(*curr)))
+    }
+
+    /// Returns min value of [Self::eff_interp_from_pwr_out]
+    pub fn get_eff_min(&self) -> anyhow::Result<f64> {
+        // since efficiency is all f64 between 0 and 1, NEG_INFINITY is safe
+        Ok(self
+            .eff_interp_from_pwr_out
+            .f_x()?
+            .iter()
+            .fold(f64::NEG_INFINITY, |acc, curr| acc.min(*curr)))
+    }
+
+    /// Scales eff_interp_fwd and eff_interp_bwd by ratio of new `eff_max` per current calculated max
+    pub fn set_eff_max(&mut self, eff_max: f64) -> anyhow::Result<()> {
+        if (0.0..=1.0).contains(&eff_max) {
+            let old_max = self.get_eff_max()?;
+            let f_x = self.eff_interp_from_pwr_out.f_x()?.to_owned();
+            match &mut self.eff_interp_from_pwr_out {
+                interp @ Interpolator::Interp1D(..) => {
+                    interp.set_f_x(f_x.iter().map(|x| x * eff_max / old_max).collect())?;
+                }
+                _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
+            }
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "`eff_max` ({:.3}) must be between 0.0 and 1.0",
+                eff_max,
+            ))
+        }
+    }
+
+    /// Scales values of `eff_interp_fwd.f_x` and `eff_interp_bwd.f_x` without changing max such that max - min
+    /// is equal to new range.  Will change max if needed to ensure no values are
+    /// less than zero.
+    pub fn set_eff_range(&mut self, eff_range: f64) -> anyhow::Result<()> {
+        let eff_max = self.get_eff_max()?;
+        if eff_range == 0.0 {
+            let f_x = vec![
+                eff_max;
+                self.eff_interp_from_pwr_out
+                    .f_x()
+                    .with_context(|| "eff_interp_fwd does not have f_x field")?
+                    .len()
+            ];
+            self.eff_interp_from_pwr_out.set_f_x(f_x)?;
+            Ok(())
+        } else if (0.0..=1.0).contains(&eff_range) {
+            let old_min = self.get_eff_min()?;
+            let old_range = self.get_eff_max()? - old_min;
+            if old_range == 0.0 {
+                return Err(anyhow!(
+                    "`eff_range` is already zero so it cannot be modified."
+                ));
+            }
+            let f_x_fwd = self.eff_interp_from_pwr_out.f_x()?.to_owned();
+            match &mut self.eff_interp_from_pwr_out {
+                interp @ Interpolator::Interp1D(..) => {
+                    interp.set_f_x(
+                        f_x_fwd
+                            .iter()
+                            .map(|x| eff_max + (x - eff_max) * eff_range / old_range)
+                            .collect(),
+                    )?;
+                }
+                _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
+            }
+            if self.get_eff_min()? < 0.0 {
+                let x_neg = self.get_eff_min()?;
+                let f_x_fwd = self.eff_interp_from_pwr_out.f_x()?.to_owned();
+                match &mut self.eff_interp_from_pwr_out {
+                    interp @ Interpolator::Interp1D(..) => {
+                        interp.set_f_x(f_x_fwd.iter().map(|x| x - x_neg).collect())?;
+                    }
+                    _ => bail!("{}\n", "Only `Interpolator::Interp1D` is allowed."),
+                }
+            }
+            if self.get_eff_max()? > 1.0 {
+                return Err(anyhow!(format!(
+                    "`eff_max` ({:.3}) must be no greater than 1.0",
+                    self.get_eff_max()?
+                )));
+            }
+            Ok(())
+        } else {
+            Err(anyhow!(format!(
+                "`eff_range` ({:.3}) must be between 0.0 and 1.0",
+                eff_range,
+            )))
+        }
+    }
 }
 
 // impl FuelConverter {
@@ -408,6 +510,22 @@ pub enum FuelConverterThermalOption {
     None,
 }
 
+impl SaveState for FuelConverterThermalOption {
+    fn save_state(&mut self) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.save_state(),
+            Self::None => {}
+        }
+    }
+}
+impl Step for FuelConverterThermalOption {
+    fn step(&mut self) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.step(),
+            Self::None => {}
+        }
+    }
+}
 impl Init for FuelConverterThermalOption {
     fn init(&mut self) -> anyhow::Result<()> {
         match self {
@@ -418,6 +536,14 @@ impl Init for FuelConverterThermalOption {
     }
 }
 impl SerdeAPI for FuelConverterThermalOption {}
+impl SetCumulative for FuelConverterThermalOption {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        match self {
+            Self::FuelConverterThermal(fct) => fct.set_cumulative(dt),
+            Self::None => {}
+        }
+    }
+}
 impl FuelConverterThermalOption {
     /// Solve change in temperature and other thermal effects
     /// # Arguments
@@ -490,16 +616,16 @@ pub struct FuelConverterThermal {
     /// parameter for temperature at which thermostat starts to open
     pub tstat_te_sto: Option<si::Temperature>,
     /// temperature delta over which thermostat is partially open
-    pub tstat_te_delta: Option<si::Temperature>,
-    #[serde(skip_serializing, deserialize_with = "tstat_interp_default_de")]
-    pub tstat_interp: Interp1D,
+    pub tstat_te_delta: Option<si::TemperatureInterval>,
+    #[serde(default = "tstat_interp_default")]
+    pub tstat_interp: Interpolator,
     /// Radiator effectiveness -- ratio of active heat rejection from
     /// radiator to passive heat rejection, always greater than 1
     pub radiator_effectiveness: si::Ratio,
     /// Model for [FuelConverter] dependence on efficiency
     pub fc_eff_model: FCTempEffModel,
     /// struct for tracking current state
-    #[serde(default, skip_serializing_if = "EqDefault::eq_default")]
+    #[serde(default)]
     pub state: FuelConverterThermalState,
     /// Custom vector of [Self::state]
     #[serde(
@@ -511,21 +637,13 @@ pub struct FuelConverterThermal {
 }
 
 /// Dummy interpolator that will be overridden in [FuelConverterThermal::init]
-fn tstat_interp_default_de<'de, D>(_deserializer: D) -> Result<Interp1D, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(tstat_interp_default())
-}
-
-fn tstat_interp_default() -> Interp1D {
-    Interp1D::new(
+fn tstat_interp_default() -> Interpolator {
+    Interpolator::new_1d(
         vec![85.0, 90.0],
         vec![0.0, 1.0],
         Strategy::Linear,
         Extrapolate::Clamp,
     )
-    .with_context(|| format_dbg!())
     .unwrap()
 }
 
@@ -537,7 +655,7 @@ lazy_static! {
     pub static ref GASOLINE_DENSITY: si::MassDensity = 0.75 * uc::KG / uc::L;
     /// TODO: find a source for this value
     pub static ref GASOLINE_LHV: si::SpecificEnergy = 33.7 * uc::KWH / uc::GALLON / *GASOLINE_DENSITY;
-    pub static ref TE_ADIABATIC_STD: si::Temperature= Air::get_te_from_u(
+    pub static ref TE_ADIABATIC_STD: si::Temperature = Air::get_te_from_u(
             Air::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                 + (Octane::get_specific_energy(*TE_STD_AIR).with_context(|| format_dbg!()).unwrap()
                     + *GASOLINE_LHV)
@@ -562,8 +680,11 @@ impl FuelConverterThermal {
         veh_speed: si::Velocity,
         dt: si::Time,
     ) -> anyhow::Result<()> {
+        self.state.pwr_thrml_fc_to_cab = pwr_thrml_fc_to_cab;
         // film temperature for external convection calculations
-        let te_air_film = 0.5 * (self.state.temperature + te_amb);
+        let te_air_film: si::Temperature = 0.5
+            * (self.state.temperature.get::<si::kelvin_abs>() + te_amb.get::<si::kelvin_abs>())
+            * uc::KELVIN;
         // Reynolds number = density * speed * diameter / dynamic viscosity
         // NOTE: might be good to pipe in elevation
         let fc_air_film_re =
@@ -573,12 +694,11 @@ impl FuelConverterThermal {
         // calculate heat transfer coeff. from engine to ambient [W / (m ** 2 * K)]
         self.state.htc_to_amb = if veh_speed < 1.0 * uc::MPS {
             // if stopped, scale based on thermostat opening and constant convection
-            (uc::R
-                + self
-                    .tstat_interp
-                    .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                    .with_context(|| format_dbg!())?
-                    * self.radiator_effectiveness)
+            self.state.tstat_open_frac = self
+                .tstat_interp
+                .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
+                .with_context(|| format_dbg!())?;
+            (uc::R + self.state.tstat_open_frac * self.radiator_effectiveness)
                 * self.htc_to_amb_stop
         } else {
             // Calculate heat transfer coefficient for sphere,
@@ -593,15 +713,18 @@ impl FuelConverterThermal {
                 * Air::get_therm_cond(te_air_film).with_context(|| format_dbg!())?
                 / self.length_for_convection;
             // if stopped, scale based on thermostat opening and constant convection
-            self.tstat_interp
+            self.state.tstat_open_frac = self
+                .tstat_interp
                 .interpolate(&[self.state.temperature.get::<si::degree_celsius>()])
-                .with_context(|| format_dbg!())?
-                * htc_to_amb_sphere
+                .with_context(|| format_dbg!())?;
+            self.state.tstat_open_frac * htc_to_amb_sphere
         };
 
-        self.state.heat_to_amb =
+        self.state.pwr_thrml_to_amb =
             self.state.htc_to_amb * PI * self.length_for_convection.powi(typenum::P2::new()) / 4.0
-                * (self.state.temperature - te_amb);
+                * (self.state.temperature.get::<si::degree_celsius>()
+                    - te_amb.get::<si::degree_celsius>())
+                * uc::KELVIN_INT;
 
         // let heat_to_amb = ;
         // assumes fuel/air mixture is entering combustion chamber at block temperature
@@ -616,15 +739,19 @@ impl FuelConverterThermal {
         )
         .with_context(|| format_dbg!())?;
         // heat that will go both to the block and out the exhaust port
-        let heat_gen = fc_state.pwr_fuel - fc_state.pwr_prop;
-        let delta_temp: si::Temperature = (((self.conductance_from_comb
-            * (self.state.te_adiabatic - self.state.temperature))
-            .min(self.max_frac_from_comb * heat_gen)
-            - pwr_thrml_fc_to_cab
-            - self.state.heat_to_amb)
+        self.state.pwr_fuel_as_heat = fc_state.pwr_fuel - (fc_state.pwr_prop + fc_state.pwr_aux);
+        self.state.pwr_thrml_to_tm = (self.conductance_from_comb
+            * (self.state.te_adiabatic.get::<si::degree_celsius>()
+                - self.state.temperature.get::<si::degree_celsius>())
+            * uc::KELVIN_INT)
+            .min(self.max_frac_from_comb * self.state.pwr_fuel_as_heat);
+        let delta_temp: si::TemperatureInterval = ((self.state.pwr_thrml_to_tm
+            - self.state.pwr_thrml_fc_to_cab
+            - self.state.pwr_thrml_to_amb)
             * dt)
             / self.heat_capacitance;
         self.state.temp_prev = self.state.temperature;
+        // Interestingly, it seems to be ok to add a `TemperatureInterval` to a `Temperature` here
         self.state.temperature += delta_temp;
 
         self.state.eff_coeff = match self.fc_eff_model {
@@ -644,39 +771,39 @@ impl FuelConverterThermal {
                 offset,
                 lag,
                 minimum,
-            }) => ((1.0
-                - f64::exp({
-                    (-1.0 / {
-                        let exp_denom: si::Ratio =
-                            (lag / uc::KELVIN) * (self.state.temperature - offset);
-                        exp_denom
-                    })
-                    .get::<si::ratio>()
-                }))
-                * uc::R)
-                .max(minimum),
+            }) => {
+                let dte: si::TemperatureInterval = (self.state.temperature.get::<si::kelvin_abs>()
+                    - offset.get::<si::kelvin_abs>())
+                    * uc::KELVIN_INT;
+                ((1.0 - f64::exp((-dte / lag).get::<si::ratio>())) * uc::R).max(minimum)
+            }
         };
         Ok(())
     }
 }
 impl SerdeAPI for FuelConverterThermal {}
+impl SetCumulative for FuelConverterThermal {
+    fn set_cumulative(&mut self, dt: si::Time) {
+        self.state.set_cumulative(dt);
+    }
+}
 impl Init for FuelConverterThermal {
     fn init(&mut self) -> anyhow::Result<()> {
         self.tstat_te_sto = self
             .tstat_te_sto
-            .or(Some(85. * uc::KELVIN + *uc::CELSIUS_TO_KELVIN));
-        self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN));
-        self.tstat_interp = Interp1D::new(
+            .or(Some((85. + uc::CELSIUS_TO_KELVIN) * uc::KELVIN));
+        self.tstat_te_delta = self.tstat_te_delta.or(Some(5. * uc::KELVIN_INT));
+        self.tstat_interp = Interpolator::new_1d(
             vec![
                 self.tstat_te_sto.unwrap().get::<si::degree_celsius>(),
                 self.tstat_te_sto.unwrap().get::<si::degree_celsius>()
-                    + self.tstat_te_delta.unwrap().get::<si::degree_celsius>(),
+                    + self.tstat_te_delta.unwrap().get::<si::kelvin>(),
             ],
             vec![0.0, 1.0],
             Strategy::Linear,
             Extrapolate::Clamp,
         )
-        .with_context(|| format_dbg!())?;
+        .with_context(|| format_dbg!((self.tstat_te_sto, self.tstat_te_delta)))?;
         Ok(())
     }
 }
@@ -714,12 +841,28 @@ pub struct FuelConverterThermalState {
     pub temperature: si::Temperature,
     /// Engine thermal mass temperature (lumped engine block and coolant) at previous time step
     pub temp_prev: si::Temperature,
+    /// thermostat open fraction (1 = fully open, 0 = fully closed)
+    pub tstat_open_frac: f64,
     /// Current heat transfer coefficient from [FuelConverter] to ambient
     pub htc_to_amb: si::HeatTransferCoeff,
-    /// Current heat transfer to ambient
-    pub heat_to_amb: si::Power,
+    /// Current heat transfer power to ambient
+    pub pwr_thrml_to_amb: si::Power,
+    /// Cumulative heat transfer energy to ambient
+    pub energy_thrml_to_amb: si::Energy,
     /// Efficency coefficient, used to modify [FuelConverter] effciency based on temperature
     pub eff_coeff: si::Ratio,
+    /// Thermal power flowing from fuel converter to cabin
+    pub pwr_thrml_fc_to_cab: si::Power,
+    /// Cumulative thermal energy flowing from fuel converter to cabin
+    pub energy_thrml_fc_to_cab: si::Energy,
+    /// Fuel power that is not converted to mechanical work
+    pub pwr_fuel_as_heat: si::Power,
+    /// Cumulative fuel energy that is not converted to mechanical work
+    pub energy_fuel_as_heat: si::Energy,
+    /// Thermal power flowing from combustion to [FuelConverter] thermal mass
+    pub pwr_thrml_to_tm: si::Power,
+    /// Cumulative thermal energy flowing from combustion to [FuelConverter] thermal mass
+    pub energy_thrml_to_tm: si::Energy,
 }
 
 impl Init for FuelConverterThermalState {}
@@ -731,9 +874,17 @@ impl Default for FuelConverterThermalState {
             te_adiabatic: *TE_ADIABATIC_STD,
             temperature: *TE_STD_AIR,
             temp_prev: *TE_STD_AIR,
+            tstat_open_frac: Default::default(),
             htc_to_amb: Default::default(),
-            heat_to_amb: Default::default(),
             eff_coeff: uc::R,
+            pwr_thrml_fc_to_cab: Default::default(),
+            energy_thrml_fc_to_cab: Default::default(),
+            pwr_thrml_to_amb: Default::default(),
+            energy_thrml_to_amb: Default::default(),
+            pwr_fuel_as_heat: Default::default(),
+            energy_fuel_as_heat: Default::default(),
+            pwr_thrml_to_tm: Default::default(),
+            energy_thrml_to_tm: Default::default(),
         }
     }
 }
@@ -776,7 +927,7 @@ pub struct FCTempEffModelExponential {
     /// temperature at which `fc_eta_temp_coeff` begins to grow
     pub offset: si::Temperature,
     /// exponential lag parameter [K^-1]
-    pub lag: f64,
+    pub lag: si::TemperatureInterval,
     /// minimum value that `fc_eta_temp_coeff` can take
     pub minimum: si::Ratio,
 }
@@ -784,8 +935,9 @@ pub struct FCTempEffModelExponential {
 impl Default for FCTempEffModelExponential {
     fn default() -> Self {
         Self {
-            offset: 0.0 * uc::KELVIN + *uc::CELSIUS_TO_KELVIN,
-            lag: 25.0,
+            // TODO: update after reasonable calibration
+            offset: 0.0 * uc::KELVIN,
+            lag: 25.0 * uc::KELVIN_INT,
             minimum: 0.2 * uc::R,
         }
     }

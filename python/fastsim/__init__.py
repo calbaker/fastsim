@@ -8,7 +8,6 @@ import re
 import inspect
 import pandas as pd
 import polars as pl
-from enum import Enum, auto
 
 from .fastsim import *
 from . import utils
@@ -57,14 +56,13 @@ def set_param_from_path(
         if list_match is not None:
             list_name = list_match.group(1)
             index = int(list_match.group(2))
-            l = container.__getattribute__(list_name).tolist()
-            return l, list_name, index
+            lst = container.__getattribute__(list_name).tolist()
+            return lst, list_name, index
         else:
             return None, None, None
 
     containers = [model]
     lists = [None] * len(path_list)
-    has_list = [False] * len(path_list)
     for i, path_elem in enumerate(path_list):
         container = containers[-1]
 
@@ -111,115 +109,18 @@ ACCEPTED_RUST_STRUCTS = [
 ]
 
 
-def variable_path_list(self, element_as_list: bool = False) -> List[str]:
-    """
-    Returns list of key paths to all variables and sub-variables within
-    dict version of `self`. See example usage in `fastsim/demos/
-    demo_variable_paths.py`.
-
-    # Arguments:  
-    - `element_as_list`: if True, each element is itself a list of the path elements
-    """
-    return variable_path_list_from_py_objs(self.to_pydict(flatten=False), element_as_list=element_as_list)
-
-
-def variable_path_list_from_py_objs(
-    obj: Union[Dict, List],
-    pre_path: Optional[str] = None,
-    element_as_list: bool = False,
-) -> List[str]:
-    """
-    Returns list of key paths to all variables and sub-variables within
-    dict version of class. See example usage in `fastsim/demos/
-    demo_variable_paths.py`.
-
-    # Arguments:  
-    - `obj`: fastsim object in dictionary form from `to_pydict()`
-    - `pre_path`: This is used to call the method recursively and should not be
-        specified by user.  Specifies a path to be added in front of all paths
-        returned by the method.
-    - `element_as_list`: if True, each element is itself a list of the path elements
-    """
-    key_paths = []
-    if isinstance(obj, dict):
-        for key, val in obj.items():
-            key_path = f"['{key}']" if pre_path is None else pre_path + f"['{key}']"
-            # check for nested dicts and call recursively
-            if isinstance(val, dict):
-                key_paths.extend(
-                    variable_path_list_from_py_objs(val, key_path))
-            # check for lists or other iterables that do not contain float data
-            elif ("__iter__" in dir(val)) and (len(val) > 0) and (
-                    not (isinstance(val[0], float) or isinstance(val[0], int))):
-                key_paths.extend(
-                    variable_path_list_from_py_objs(val, key_path))
-            else:
-                key_paths.append(key_path)
-
-    elif isinstance(obj, list):
-        for key, val in enumerate(obj):
-            key_path = f"[{key}]" if pre_path is None else pre_path + f"[{key}]"
-            # check for nested dicts and call recursively
-            if isinstance(val, dict):
-                key_paths.extend(
-                    variable_path_list_from_py_objs(val, key_path))
-            # check for lists or other iterables that do not contain numeric data
-            elif ("__iter__" in dir(val)) and (len(val) > 0) and (
-                    not (isinstance(val[0], float) or isinstance(val[0], int))):
-                key_paths.extend(
-                    variable_path_list_from_py_objs(val, key_path))
-            else:
-                key_paths.append(key_path)
-
-    if element_as_list:
-        re_for_elems = re.compile("\\[('(\\w+)'|(\\w+))\\]")
-        for i, kp in enumerate(key_paths):
-            kp: str
-            groups = re_for_elems.findall(kp)
-            selected = [g[1] if len(g[1]) > 0 else g[2] for g in groups]
-            key_paths[i] = selected
-
-    return key_paths
-
-
 def cyc_keys() -> List[str]:
     import json
     cyc = Cycle.from_resource("udds.csv")
     cyc_dict = json.loads(cyc.to_json())
-    cyc_keys = [key for key, val in cyc_dict.items() if isinstance(val, list)]
+    cyc_keys = [
+        key for key, val in cyc_dict.items() if isinstance(val, list) and len(val) == cyc.len()
+    ]
 
     return cyc_keys
 
 
 CYC_KEYS = cyc_keys()
-
-
-def key_as_str(key):
-    return key if isinstance(key, str) else ".".join(key)
-
-
-def is_cyc_key(key):
-    return any(
-        cyc_key for cyc_key in CYC_KEYS if cyc_key == key[-1]) and "cyc" in key
-
-
-def history_path_list(self, element_as_list: bool = False) -> List[str]:
-    """
-    Returns a list of relative paths to all history variables (all variables
-    that contain history as a subpath). 
-    See example usage in `fastsim/demos/demo_variable_paths.py`.
-
-    # Arguments
-    - `element_as_list`: if True, each element is itself a list of the path elements
-    """
-    var_paths = self.variable_path_list(element_as_list=element_as_list)
-    history_paths = []
-    for key in var_paths:
-        if (("history" in key_as_str(key)) or is_cyc_key(key)):
-            history_paths.append(key)
-
-    return history_paths
-
 
 setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
 
@@ -232,7 +133,7 @@ data_formats = [
 ]
 
 
-def to_pydict(self, flatten: bool = False, data_fmt: str = "msg_pack") -> Dict:
+def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
     """
     Returns self converted to pure python dictionary with no nested Rust objects
     # Arguments
@@ -263,32 +164,42 @@ def to_pydict(self, flatten: bool = False, data_fmt: str = "msg_pack") -> Dict:
 
 
 @classmethod
-def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack") -> Self:
+def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:
     """
     Instantiates Self from pure python dictionary 
     # Arguments
     - `pydict`: dictionary to be converted to FASTSim object
-    - `data_fmt`: data format for intermediate conversion step
+    - `data_fmt`: data format for intermediate conversion step  
+    - `skip_init`: passed to `SerdeAPI` methods to control whether initialization
+      is skipped
     """
     data_fmt = data_fmt.lower()
     assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
     match data_fmt.lower():
         case "yaml":
             import yaml
-            obj = cls.from_yaml(yaml.dump(pydict), skip_init=False)
+            obj = cls.from_yaml(yaml.dump(pydict), skip_init=skip_init)
         case "msg_pack":
             import msgpack
             try:
-                obj = cls.from_msg_pack(msgpack.packb(pydict))
+                obj = cls.from_msg_pack(
+                    msgpack.packb(pydict), skip_init=skip_init)
             except Exception as err:
                 print(
                     f"{err}\nFalling back to YAML.")
-                obj = cls.from_pydict(pydict, data_fmt="yaml")
+                obj = cls.from_pydict(
+                    pydict, data_fmt="yaml", skip_init=skip_init)
         case "json":
             from json import dumps
-            obj = cls.from_json(dumps(pydict))
+            obj = cls.from_json(dumps(pydict), skip_init=skip_init)
 
     return obj
+
+
+def is_cyc_key(k):
+    is_cyc_key = any(
+        cyc_key for cyc_key in CYC_KEYS if cyc_key == k.split(".")[-1]) and "cyc" in k
+    return is_cyc_key
 
 
 def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Union[pd.DataFrame, pl.DataFrame]:
@@ -299,42 +210,40 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
     - `pandas`: returns pandas dataframe if True; otherwise, returns polars dataframe by default
     - `allow_partial`: returns dataframe of length equal to solved time steps if simulation fails early
     """
-    obj_dict = self.to_pydict(flatten=False)
-    history_paths = self.history_path_list(element_as_list=True)
-    cols = [".".join(hp) for hp in history_paths]
-    vals = []
-    for hp in history_paths:
-        obj: Union[dict | list] = obj_dict
-        for elem in hp:
-            try:
-                obj = obj[elem]
-            except:
-                try:
-                    obj = obj[int(elem)]
-                except Error as err:
-                    raise err
-        vals.append(obj)
+    obj_dict = self.to_pydict(flatten=True)
+    history_dict = {}
+    for k, v in obj_dict.items():
+        if is_cyc_key(k) or ('.history.' in k):
+            history_dict[k] = v
+
     if allow_partial:
-        cutoff = min([len(val) for val in vals])
+        cutoff = min([len(val) for val in history_dict.values()])
+
         if not pandas:
             df = pl.DataFrame({col: val[:cutoff]
-                              for col, val in zip(cols, vals)})
+                              for col, val in history_dict.items()})
         else:
             df = pd.DataFrame({col: val[:cutoff]
-                              for col, val in zip(cols, vals)})
+                              for col, val in history_dict.items()})
     else:
         if not pandas:
-            df = pl.DataFrame({col: val for col, val in zip(cols, vals)})
+            try:
+                df = pl.DataFrame(history_dict)
+            except Exception as err:
+                raise (
+                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
         else:
-            df = pd.DataFrame({col: val for col, val in zip(cols, vals)})
+            try:
+                df = pd.DataFrame(history_dict)
+            except Exception as err:
+                raise (
+                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
     return df
 
 
 # adds variable_path_list() and history_path_list() as methods to all classes in
 # ACCEPTED_RUST_STRUCTS
 for item in ACCEPTED_RUST_STRUCTS:
-    setattr(getattr(fastsim, item), "variable_path_list", variable_path_list)
-    setattr(getattr(fastsim, item), "history_path_list", history_path_list)
     setattr(getattr(fastsim, item), "to_pydict", to_pydict)
     setattr(getattr(fastsim, item), "from_pydict", from_pydict)
     setattr(getattr(fastsim, item), "to_dataframe", to_dataframe)

@@ -159,7 +159,7 @@ arr_2d = np.array([
 # is power), as required in order to use this array in a FASTSim-3 interpolator,
 # with x being power. arr_2d_transposed can now be used in FASTSim-3.
 arr_2d_transposed = np.transpose(arr_2d, (1,0))
-# %%
+
 
 # efficiency array as a function of power SOC, and temperature, corresponds to
 # eta_interp_values in Altrios
@@ -452,6 +452,12 @@ arr_3d = [
 # transposing the ALTRIOS array so that the outermost layer is now power, and
 # the innermost layer temperature (in ALTRIOS, the outermost layer is
 # temperature and innermost is power), as required in order to use this array in
-# a FASTSim-3 interpolator, with x being power. arr_2d_transposed can now be
+# a FASTSim-3 interpolator, with x being power. arr_3d_transposed can now be
 # used in FASTSim-3.
 arr_3d_transposed = np.transpose(arr_3d, (2,1,0))
+
+# transposing the ALTRIOS array so that the outermost layer is SOC, then power,
+# then temperature as the innermost layer. Then, taking only the array at 50%
+# SOC, in order to get the 2D array with x being power and y being temperature.
+arr_3d_transposed_for_power_temp = np.transpose(arr_3d, (1,2,0))
+arr_2d_transposed_for_power_temp = arr_3d_transposed_for_power_temp[5]

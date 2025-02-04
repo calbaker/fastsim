@@ -5,20 +5,59 @@ use super::vehicle::Vehicle;
 use crate::imports::*;
 use crate::prelude::*;
 
-#[fastsim_api]
+#[fastsim_api(
+    #[staticmethod]
+    #[pyo3(name = "default")]
+    fn default_py() -> Self {
+        Self::default()
+    }
+)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
 /// Solver parameters
 pub struct SimParams {
+    #[serde(default = "SimParams::def_ach_speed_max_iter")]
+    /// max number of iterations allowed in setting achieved speed when trace
+    /// cannot be achieved
     pub ach_speed_max_iter: u32,
+    #[serde(default = "SimParams::def_ach_speed_tol")]
+    /// tolerance in change in speed guess in setting achieved speed when trace
+    /// cannot be achieved
     pub ach_speed_tol: si::Ratio,
+    #[serde(default = "SimParams::def_ach_speed_solver_gain")]
+    /// Newton method gain for setting achieved speed
     pub ach_speed_solver_gain: f64,
-
+    // TODO: plumb this up to actually do something
+    /// When implemented, this will set the tolerance on how much trace miss
+    /// is allowed
+    #[serde(default = "SimParams::def_trace_miss_tol")]
     pub trace_miss_tol: TraceMissTolerance,
-
+    #[serde(default = "SimParams::def_trace_miss_opts")]
     pub trace_miss_opts: TraceMissOptions,
     /// whether to use FASTSim-2 style air density
+    #[serde(default = "SimParams::def_f2_const_air_density")]
     pub f2_const_air_density: bool,
+}
+
+impl SimParams {
+    fn def_ach_speed_max_iter() -> u32 {
+        Self::default().ach_speed_max_iter
+    }
+    fn def_ach_speed_tol() -> si::Ratio {
+        Self::default().ach_speed_tol
+    }
+    fn def_ach_speed_solver_gain() -> f64 {
+        Self::default().ach_speed_solver_gain
+    }
+    fn def_trace_miss_tol() -> TraceMissTolerance {
+        Self::default().trace_miss_tol
+    }
+    fn def_trace_miss_opts() -> TraceMissOptions {
+        Self::default().trace_miss_opts
+    }
+    fn def_f2_const_air_density() -> bool {
+        Self::default().f2_const_air_density
+    }
 }
 
 impl SerdeAPI for SimParams {}
@@ -28,7 +67,7 @@ impl Default for SimParams {
     fn default() -> Self {
         Self {
             ach_speed_max_iter: 3,
-            ach_speed_tol: 1e-9 * uc::R,
+            ach_speed_tol: 1.0e-3 * uc::R,
             ach_speed_solver_gain: 0.9,
             trace_miss_tol: Default::default(),
             trace_miss_opts: Default::default(),
@@ -171,7 +210,7 @@ impl SimDrive {
 
     /// Run vehicle simulation once
     pub fn walk_once(&mut self) -> anyhow::Result<()> {
-        let len = self.cyc.len().with_context(|| format_dbg!())?;
+        let len = self.cyc.len_checked().with_context(|| format_dbg!())?;
         ensure!(len >= 2, format_dbg!(len < 2));
         self.save_state();
         // to increment `i` to 1 everywhere
@@ -188,6 +227,7 @@ impl SimDrive {
     /// Solves current time step
     pub fn solve_step(&mut self) -> anyhow::Result<()> {
         let i = self.veh.state.i;
+        self.veh.state.time = self.cyc.time[i];
         let dt = self.cyc.dt_at_i(i)?;
         let speed_prev = self.veh.state.speed_ach;
         // maybe make controls like:
@@ -210,6 +250,14 @@ impl SimDrive {
         self.veh.state.pwr_tractive_for_cyc = self.veh.state.pwr_tractive;
         self.set_ach_speed(self.cyc.speed[i], speed_prev, dt)
             .with_context(|| anyhow!(format_dbg!()))?;
+        if self.sim_params.trace_miss_opts.is_allow_checked() {
+            self.sim_params.trace_miss_tol.check_trace_miss(
+                self.cyc.speed[i],
+                self.veh.state.speed_ach,
+                self.cyc.dist[i],
+                self.veh.state.dist,
+            )?;
+        }
         self.veh
             .solve_powertrain(dt)
             .with_context(|| anyhow!(format_dbg!()))?;
@@ -231,8 +279,17 @@ impl SimDrive {
         let i = self.veh.state.i;
         let vs = &mut self.veh.state;
         // TODO: get @mokeefe to give this a serious look and think about grade alignment issues that may arise
+        let interp_pt_dist: &[f64] = match self.cyc.grade_interp {
+            Some(Interpolator::Interp0D(..)) => &[],
+            Some(Interpolator::Interp1D(..)) => &[vs.dist.get::<si::meter>()],
+            _ => unreachable!(),
+        };
         vs.grade_curr = if vs.cyc_met_overall {
-            *self.cyc.grade.get(i).with_context(|| format_dbg!())?
+            *self
+                .cyc
+                .grade
+                .get(i)
+                .with_context(|| format_dbg!(self.cyc.grade.len()))?
         } else {
             uc::R
                 * self
@@ -240,7 +297,8 @@ impl SimDrive {
                     .grade_interp
                     .as_ref()
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
-                    .interpolate(&[vs.dist.get::<si::meter>()])?
+                    .interpolate(interp_pt_dist)
+                    .with_context(|| format_dbg!())?
         };
         vs.elev_curr = if vs.cyc_met_overall {
             *self.cyc.elev.get(i).with_context(|| format_dbg!())?
@@ -251,7 +309,8 @@ impl SimDrive {
                     .elev_interp
                     .as_ref()
                     .with_context(|| format_dbg!("You might have somehow bypassed `init()`"))?
-                    .interpolate(&[vs.dist.get::<si::meter>()])?
+                    .interpolate(interp_pt_dist)
+                    .with_context(|| format_dbg!())?
         };
 
         vs.air_density = if self.sim_params.f2_const_air_density {
@@ -331,6 +390,9 @@ impl SimDrive {
             match self.sim_params.trace_miss_opts {
                 TraceMissOptions::Allow => {
                     // do nothing because `set_ach_speed` should be allowed to proceed to handle this
+                }
+                TraceMissOptions::AllowChecked => {
+                    // this will be handled later
                 }
                 TraceMissOptions::Error => bail!(
                     "{}\nFailed to meet speed trace.
@@ -418,10 +480,10 @@ pwr deficit: {} kW
         // initial guess
         let speed_guess = (1e-3 * uc::MPS).max(cyc_speed);
         // stop criteria
-        let max_iter = self.sim_params.ach_speed_max_iter;
-        let xtol = self.sim_params.ach_speed_tol;
+        let max_iter = &self.sim_params.ach_speed_max_iter;
+        let xtol = &self.sim_params.ach_speed_tol;
         // solver gain
-        let g = self.sim_params.ach_speed_solver_gain;
+        let g = &self.sim_params.ach_speed_solver_gain;
         let pwr_err_fn = |speed_guess: si::Velocity| -> si::Power {
             t3 * speed_guess.powi(typenum::P3::new())
                 + t2 * speed_guess.powi(typenum::P2::new())
@@ -445,10 +507,10 @@ pwr deficit: {} kW
         // speed achieved iteration counter
         let mut spd_ach_iter_counter = 1;
         let mut converged = pwr_err <= si::Power::ZERO;
-        while spd_ach_iter_counter < max_iter && !converged {
+        while &spd_ach_iter_counter < max_iter && !converged {
             let speed_guess = *speed_guesses.iter().last().with_context(|| format_dbg!())?
                 * (1.0 - g)
-                - g * *new_speed_guesses
+                - *g * *new_speed_guesses
                     .iter()
                     .last()
                     .with_context(|| format_dbg!())?
@@ -461,7 +523,7 @@ pwr deficit: {} kW
             d_pwr_err_per_d_speed_guesses.push(pwr_err_per_speed_guess);
             new_speed_guesses.push(new_speed_guess);
             // is the fractional change between previous and current speed guess smaller than `xtol`
-            converged = ((*speed_guesses.iter().last().with_context(|| format_dbg!())?
+            converged = &((*speed_guesses.iter().last().with_context(|| format_dbg!())?
                 - speed_guesses[speed_guesses.len() - 2])
                 / speed_guesses[speed_guesses.len() - 2])
                 .abs()
@@ -497,24 +559,77 @@ pwr deficit: {} kW
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, HistoryMethods)]
 #[non_exhaustive]
+// NOTE: consider embedding this in TraceMissOptions::AllowChecked
 pub struct TraceMissTolerance {
+    /// if the vehicle falls this far behind trace in terms of absolute
+    /// difference and [TraceMissOptions::is_allow_checked], fail
     tol_dist: si::Length,
+    /// if the vehicle falls this far behind trace in terms of fractional
+    /// difference and [TraceMissOptions::is_allow_checked], fail
     tol_dist_frac: si::Ratio,
+    /// if the vehicle falls this far behind instantaneous speed and
+    /// [TraceMissOptions::is_allow_checked], fail
     tol_speed: si::Velocity,
+    /// if the vehicle falls this far behind instantaneous speed in terms of
+    /// fractional difference and [TraceMissOptions::is_allow_checked], fail
     tol_speed_frac: si::Ratio,
 }
 
+impl TraceMissTolerance {
+    fn check_trace_miss(
+        &self,
+        cyc_speed: si::Velocity,
+        ach_speed: si::Velocity,
+        cyc_dist: si::Length,
+        ach_dist: si::Length,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            cyc_speed - ach_speed < self.tol_speed,
+            "{}\n{}\n{}",
+            format_dbg!(cyc_speed),
+            format_dbg!(ach_speed),
+            format_dbg!(self.tol_speed)
+        );
+        // if condition to prevent divide-by-zero errors
+        if cyc_speed > self.tol_speed {
+            ensure!(
+                (cyc_speed - ach_speed) / cyc_speed < self.tol_speed_frac,
+                "{}\n{}\n{}",
+                format_dbg!(cyc_speed),
+                format_dbg!(ach_speed),
+                format_dbg!(self.tol_speed_frac)
+            )
+        }
+        ensure!(
+            (cyc_dist - ach_dist) < self.tol_dist,
+            "{}\n{}\n{}",
+            format_dbg!(cyc_dist),
+            format_dbg!(ach_dist),
+            format_dbg!(self.tol_dist)
+        );
+        // if condition to prevent checking early in cycle
+        if cyc_dist > self.tol_dist * 5.0 {
+            ensure!(
+                (cyc_dist - ach_dist) / cyc_dist < self.tol_dist_frac,
+                "{}\n{}\n{}",
+                format_dbg!(cyc_dist),
+                format_dbg!(ach_dist),
+                format_dbg!(self.tol_dist_frac)
+            )
+        }
+
+        Ok(())
+    }
+}
 impl SerdeAPI for TraceMissTolerance {}
 impl Init for TraceMissTolerance {}
-
 impl Default for TraceMissTolerance {
     fn default() -> Self {
         Self {
-            // TODO: update these values
-            tol_dist: 666. * uc::M,
-            tol_dist_frac: 666. * uc::R,
-            tol_speed: 666. * uc::MPS,
-            tol_speed_frac: 666. * uc::R,
+            tol_dist: 100. * uc::M,
+            tol_dist_frac: 0.05 * uc::R,
+            tol_speed: 10. * uc::MPS,
+            tol_speed_frac: 0.5 * uc::R,
         }
     }
 }
@@ -523,6 +638,8 @@ impl Default for TraceMissTolerance {
 pub enum TraceMissOptions {
     /// Allow trace miss without any fanfare
     Allow,
+    /// Allow trace miss within error tolerance
+    AllowChecked,
     #[default]
     /// Error out when trace miss happens
     Error,
@@ -545,7 +662,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().is_none());
     }
@@ -557,7 +674,7 @@ mod tests {
         let _cyc = Cycle::from_resource("udds.csv", false).unwrap();
         let mut sd = SimDrive::new(_veh, _cyc, Default::default());
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().unwrap().state.energy_fuel > si::Energy::ZERO);
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
     }
@@ -573,38 +690,8 @@ mod tests {
             sim_params: Default::default(),
         };
         sd.walk().unwrap();
-        assert!(sd.veh.state.i == sd.cyc.len().unwrap());
+        assert!(sd.veh.state.i == sd.cyc.len_checked().unwrap());
         assert!(sd.veh.fc().is_none());
         assert!(sd.veh.res().unwrap().state.energy_out_chemical != si::Energy::ZERO);
-    }
-
-    #[test]
-    fn delete_me() {
-        use fastsim_2::traits::SerdeAPI;
-
-        let dir = Path::new("../cal_and_val/f2-vehicles");
-        let output_dir = Path::new("../cal_and_val/f3-vehicles");
-        if !output_dir.exists() {
-            std::fs::create_dir(output_dir).unwrap();
-        }
-        let skip_files = [
-            "2016 CHEVROLET Volt.yaml",
-            "2016 BMW i3 REx PHEV.yaml",
-            "2016 FORD C-MAX (PHEV).yaml",
-            "2017 Prius Prime.yaml",
-            "2016 HYUNDAI Sonata PHEV.yaml",
-        ];
-        assert!(dir.exists());
-        for filepath in std::fs::read_dir(dir).unwrap() {
-            let path = filepath.unwrap().path();
-            assert!(path.exists());
-            let filename = path.file_name().unwrap();
-            if !skip_files.iter().any(|&name| filename == name) {
-                // println!("{path:?}");
-                let f2_veh = fastsim_2::vehicle::RustVehicle::from_file(&path, false).unwrap();
-                let f3_veh = Vehicle::try_from(f2_veh).unwrap();
-                f3_veh.to_file(output_dir.join(filename)).unwrap();
-            }
-        }
     }
 }
