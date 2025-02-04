@@ -22,7 +22,7 @@ lhv_btu_per_lbm = 18_575
 lhv_joules_per_gram = 43_205.450 
 
 # Initialize seaborn plot configuration
-sns.set()
+sns.set_style()
 
 veh = fsim.Vehicle.from_file(Path(__file__).parent / "f3-vehicles/2021_Hyundai_Sonata_Hybrid_Blue.yaml")
 veh_dict = veh.to_pydict()
@@ -108,13 +108,15 @@ def df_to_cyc(df: pd.DataFrame) -> fsim.Cycle:
     }
     return fsim.Cycle.from_pydict(cyc_dict, skip_init=False)
 
+pt_type_var = "HybridElectricVehicle"
+
 def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     vd = deepcopy(veh_dict)
     # initialize SOC
-    vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] = \
+    vd['pt_type'][pt_type_var]['res']['state']['soc'] = \
         dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].iloc[1] / 100
-    assert 0 < vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'] < 1, "\ninit soc: {}\nhead: {}".format(
-        vd['pt_type']['HybridElectricVehicle']['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].head())
+    assert 0 < vd['pt_type'][pt_type_var]['res']['state']['soc'] < 1, "\ninit soc: {}\nhead: {}".format(
+        vd['pt_type'][pt_type_var]['res']['state']['soc'], dfs[cyc_file_stem]["HVBatt_SOC_high_precision_PCAN__per"].head())
     # initialize cabin temp
     vd['cabin']['LumpedCabin']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem][cabin_temp_column][0] + celsius_to_kelvin_offset
@@ -122,10 +124,10 @@ def veh_init(cyc_file_stem: str, dfs: Dict[str, pd.DataFrame]) -> fsim.Vehicle:
     # temperature is not available in test data
     # Also, battery temperature has no effect in the HEV because efficiency data
     # does not go below 23*C and there is no active thermal management
-    vd['pt_type']['HybridElectricVehicle']['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
+    vd['pt_type'][pt_type_var]['res']['thrml']['RESLumpedThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem]["Cabin_Temp[C]"][0] + celsius_to_kelvin_offset
     # initialize engine temperature
-    vd['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
+    vd['pt_type'][pt_type_var]['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] = \
         dfs[cyc_file_stem][eng_clnt_temp_column][0] + celsius_to_kelvin_offset
     # set HVAC set point temperature
     te_set = next(iter([v["set temp [*C]"] for k, v in cyc_files_dict.items() if k.replace(".txt", "") == cyc_file_stem]))
@@ -204,38 +206,38 @@ def new_em_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `ElectricMachine`
     """
-    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type'][pt_type_var]['em'])
     em.__eff_fwd_max = new_eff_max
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    sd_dict['veh']['pt_type'][pt_type_var]['em'] = em.to_pydict()
     return sd_dict
 
 def new_em_eff_range(sd_dict, new_eff_range) -> Dict:
     """
     Set `new_eff_range` in `ElectricMachine`
     """
-    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'])
+    em = fsim.ElectricMachine.from_pydict(sd_dict['veh']['pt_type'][pt_type_var]['em'])
     em.__eff_fwd_range = new_eff_range
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['em'] = em.to_pydict()
+    sd_dict['veh']['pt_type'][pt_type_var]['em'] = em.to_pydict()
     return sd_dict
 
 def new_fc_eff_max(sd_dict, new_eff_max) -> Dict:
     """
     Set `new_eff_max` in `FuelConverter`
     """
-    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
+    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type'][pt_type_var]['fc'])
     fc.__eff_max = new_eff_max
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"] = fc.to_pydict()
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"] = fc.to_pydict()
     return sd_dict
 
 def new_fc_eff_range(sd_dict, new_eff_range) -> Dict:
     """
     Set `new_eff_range` in `FuelConverter`
     """
-    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'])
+    fc = fsim.FuelConverter.from_pydict(sd_dict['veh']['pt_type'][pt_type_var]['fc'])
     fc_eff_max = fc.eff_max
     # TODO: this is a quick and dirty apprach, change to using constraints in PyMOO
     fc.__eff_range = min(new_eff_range, fc_eff_max * 0.95)
-    sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc'] = fc.to_pydict()
+    sd_dict['veh']['pt_type'][pt_type_var]['fc'] = fc.to_pydict()
     return sd_dict
 
 def new_cab_shell_htc_w_per_m2_k(sd_dict, new_val) -> Dict:
@@ -255,31 +257,31 @@ def new_cab_length_m(sd_dict, new_val) -> Dict:
     return sd_dict
 
 def new_speed_soc_disch_buffer_m_per_s(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_meters_per_second"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_meters_per_second"] = new_val
     return sd_dict
     
 def new_speed_soc_disch_buffer_coeff(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_coeff"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["speed_soc_disch_buffer_coeff"] = new_val
     return sd_dict
     
 def new_speed_soc_fc_on_buffer_m_per_s(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_meters_per_second"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_meters_per_second"] = new_val
     return sd_dict
     
 def new_speed_soc_fc_on_buffer_coeff(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_coeff"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["speed_soc_fc_on_buffer_coeff"] = new_val
     return sd_dict
     
 def new_fc_min_time_on_s(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["fc_min_time_on_seconds"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["fc_min_time_on_seconds"] = new_val
     return sd_dict
     
 def new_frac_pwr_demand_fc_forced_on(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_pwr_demand_fc_forced_on"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["frac_pwr_demand_fc_forced_on"] = new_val
     return sd_dict
     
 def new_frac_of_most_eff_pwr_to_run_fc(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["pt_cntrl"]["RGWDB"]["frac_of_most_eff_pwr_to_run_fc"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["pt_cntrl"]["RGWDB"]["frac_of_most_eff_pwr_to_run_fc"] = new_val
     return sd_dict
 
 def new_hvac_p_w_per_k(sd_dict, new_val) -> Dict:
@@ -312,39 +314,39 @@ def new_hvac_frac_of_ideal_cop(sd_dict, new_val) -> Dict:
 #     return sd_dict
     
 def new_fc_thrml_heat_capacitance_j_per_k(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["heat_capacitance_joules_per_kelvin"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["heat_capacitance_joules_per_kelvin"] = new_val
     return sd_dict
 
 def new_fc_thrml_length_for_convection_m(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["length_for_convection_meters"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["length_for_convection_meters"] = new_val
     return sd_dict
 
 def new_fc_thrml_htc_to_amb_stop_w_per_m2_k(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["htc_to_amb_stop_watts_per_square_meter_kelvin"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["htc_to_amb_stop_watts_per_square_meter_kelvin"] = new_val
     return sd_dict
 
 def new_fc_thrml_conductance_from_comb_w_per_k(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["conductance_from_comb_watts_per_kelvin"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["conductance_from_comb_watts_per_kelvin"] = new_val
     return sd_dict
 
 def new_fc_thrml_max_frac_from_comb(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["max_frac_from_comb"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["max_frac_from_comb"] = new_val
     return sd_dict
 
 def new_fc_thrml_radiator_effectiveness(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["radiator_effectiveness"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["radiator_effectiveness"] = new_val
     return sd_dict
 
 def new_fc_thrml_fc_eff_model_Exponential_offset(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["offset"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["offset"] = new_val
     return sd_dict
 
 def new_fc_thrml_fc_eff_model_Exponential_lag(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["lag"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["lag"] = new_val
     return sd_dict
 
 def new_fc_thrml_fc_eff_model_Exponential_minimum(sd_dict, new_val) -> Dict:
-    sd_dict["veh"]["pt_type"]["HybridElectricVehicle"]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["minimum"] = new_val
+    sd_dict["veh"]["pt_type"][pt_type_var]["fc"]["thrml"]["FuelConverterThermal"]["fc_eff_model"]["Exponential"]["minimum"] = new_val
     return sd_dict
 
 # veh.pt_type.HybridElectricVehicle.pt_cntrl.RGWDB.speed_soc_regen_buffer_meters_per_second
@@ -355,13 +357,13 @@ def new_fc_thrml_fc_eff_model_Exponential_minimum(sd_dict, new_val) -> Dict:
 
 # Objective Functions -- `obj_fns`
 def get_mod_soc(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['res']['history']['soc'])
+    return np.array(sd_dict['veh']['pt_type'][pt_type_var]['res']['history']['soc'])
 
 def get_exp_soc(df):
     return df['HVBatt_SOC_high_precision_PCAN__per'] / 100
 
 def get_mod_fc_temp_celsius(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['history']['temperature_kelvin']) - celsius_to_kelvin_offset
+    return np.array(sd_dict['veh']['pt_type'][pt_type_var]['fc']['thrml']['FuelConverterThermal']['history']['temperature_kelvin']) - celsius_to_kelvin_offset
 
 def get_exp_fc_temp_celsius(df):
     return df[eng_clnt_temp_column] 
@@ -379,13 +381,13 @@ def get_exp_speed_m_per_s(df):
     return df[speed_column] * mps_per_mph
 
 def get_mod_pwr_fuel_kw(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['pwr_fuel_watts']) / 1e3
+    return np.array(sd_dict['veh']['pt_type'][pt_type_var]['fc']['history']['pwr_fuel_watts']) / 1e3
 
 def get_exp_pwr_fuel_kw(df):
     return df[fuel_column] * lhv_joules_per_gram / 1e3
 
 def get_mod_energy_fuel_megajoules(sd_dict):
-    return np.array(sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['history']['energy_fuel_joules']) / 1e6
+    return np.array(sd_dict['veh']['pt_type'][pt_type_var]['fc']['history']['energy_fuel_joules']) / 1e6
 
 def get_exp_energy_fuel_megajoules(df):
     pwr_fuel_watts = df[fuel_column] * lhv_joules_per_gram
@@ -405,7 +407,7 @@ def get_exp_pwr_hvac_kw(df):
 
 ## Constraint functions
 def get_fc_temp_too_hot(sd_dict):
-    te_fc_deg_c = sd_dict['veh']['pt_type']['HybridElectricVehicle']['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] - celsius_to_kelvin_offset
+    te_fc_deg_c = sd_dict['veh']['pt_type'][pt_type_var]['fc']['thrml']['FuelConverterThermal']['state']['temperature_kelvin'] - celsius_to_kelvin_offset
     if np.any(te_fc_deg_c > 115):
         return 1
     else:
@@ -529,8 +531,8 @@ def perturb_params(pos_perturb_dec: float = 0.05, neg_perturb_dec: float = 0.1):
     # - `pos_perturb_doc`: perturbation percentage added to all params.  Can be overridden invididually
     # - `neg_perturb_doc`: perturbation percentage subtracted from all params.  Can be overridden invididually
     """
-    em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['em'], skip_init=False)
-    fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type']['HybridElectricVehicle']['fc'], skip_init=False)
+    em = fsim.ElectricMachine.from_pydict(veh_dict['pt_type'][pt_type_var]['em'], skip_init=False)
+    fc = fsim.FuelConverter.from_pydict(veh_dict['pt_type'][pt_type_var]['fc'], skip_init=False)
     baseline_params_and_bounds = [
         (em.eff_fwd_max, None),
         (em.eff_fwd_range, None),

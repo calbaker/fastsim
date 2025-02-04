@@ -19,7 +19,7 @@ from plot_utils  import *
 # if environment var `SHOW_PLOTS=false` is set, no plots are shown
 SHOW_PLOTS = os.environ.get("SHOW_PLOTS", "true").lower() == "true"     
 # if environment var `SAVE_FIGS=true` is set, save plots
-SAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
+kSAVE_FIGS = os.environ.get("SAVE_FIGS", "false").lower() == "true"
 
 # `fastsim3` -- load vehicle and cycle, build simulation, and run 
 # %%
