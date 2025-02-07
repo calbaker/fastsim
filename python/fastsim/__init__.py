@@ -2,16 +2,15 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, List, Union, Dict 
 from typing_extensions import Self
-import logging
 import numpy as np
 import re
 import inspect
 import pandas as pd  # type: ignore[import-untyped]
 import polars as pl
 
+import fastsim
 from .fastsim import *  # noqa: F403
 from .fastsim import Cycle  # type: ignore[attr-defined]
-from . import utils
 
 DEFAULT_LOGGING_CONFIG = dict(
     format="%(asctime)s.%(msecs)03d | %(filename)s:%(lineno)s | %(levelname)s: %(message)s",
@@ -59,7 +58,7 @@ def set_param_from_path(
             return None, None, None
 
     containers = [model]
-    lists = [None] * len(path_list)
+    lists = [(None, None, None)] * len(path_list)
     for i, path_elem in enumerate(path_list):
         container = containers[-1]
 
@@ -119,7 +118,11 @@ def cyc_keys() -> List[str]:
 
 CYC_KEYS = cyc_keys()
 
-setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
+setattr(
+    Pyo3VecWrapper,  # type: ignore[name-defined]  # noqa: F405
+    "__array__",
+    __array__
+)  
 
 # TODO connect to crate features
 data_formats = [
@@ -141,10 +144,10 @@ def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
     assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
     match data_fmt:
         case "msg_pack":
-            import msgpack
+            import msgpack  # type: ignore[import-untyped]
             pydict = msgpack.loads(self.to_msg_pack())
         case "yaml":
-            from yaml import load
+            from yaml import load  # type: ignore[import-untyped]
             try:
                 from yaml import CLoader as Loader
             except ImportError:
@@ -160,8 +163,8 @@ def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
         return next(iter(pd.json_normalize(pydict, sep=".").to_dict(orient='records')))
 
 
-@classmethod
-def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:
+@classmethod  # type: ignore[misc]
+def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:  # type: ignore[misc]
     """
     Instantiates Self from pure python dictionary 
     # Arguments
@@ -202,9 +205,15 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
     - `allow_partial`: returns dataframe of length equal to solved time steps if simulation fails early
     """
     obj_dict = self.to_pydict(flatten=True)
-    history_dict = {}
+    history_dict: Dict[str, Any] = {}
+
+    if len(history_dict) > 0:
+        val0 = next(iter(history_dict.values()))
+    else:
+        val0 = None
+    history_keys = ['.history.']
     for k, v in obj_dict.items():
-        if is_cyc_key(k) or ('.history.' in k):
+        if is_cyc_key(k) or any(k in hk for hk in history_keys) or (val0 is not None and len(v) == len(val0)):
             history_dict[k] = v
 
     if allow_partial:
@@ -221,13 +230,13 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
             try:
                 df = pl.DataFrame(history_dict)
             except Exception as err:
-                raise (
+                raise Exception(
                     f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
         else:
             try:
                 df = pd.DataFrame(history_dict)
             except Exception as err:
-                raise (
+                raise Exception(
                     f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
     return df
 
