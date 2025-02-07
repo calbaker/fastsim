@@ -1,25 +1,22 @@
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, List, Union, Dict, Optional
+from typing import Any, List, Union, Dict 
 from typing_extensions import Self
 import logging
 import numpy as np
 import re
 import inspect
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import polars as pl
 
-from .fastsim import *
+from .fastsim import *  # noqa: F403
+from .fastsim import Cycle  # type: ignore[attr-defined]
 from . import utils
 
 DEFAULT_LOGGING_CONFIG = dict(
     format="%(asctime)s.%(msecs)03d | %(filename)s:%(lineno)s | %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-
-# Set up logging
-logging.basicConfig(**DEFAULT_LOGGING_CONFIG)
-logger = logging.getLogger(__name__)
 
 
 def package_root() -> Path:
