@@ -114,7 +114,7 @@ def get_hist_len(obj: Dict) -> Optional[int]:
         return len(next(iter(obj['history'].values())))
 
     elif next(iter(k for k in obj.keys() if '.history.' in k), None) is not None:
-        return len(next((v for (k, v) in obj.items() if 'history' == k.split(".")[-2])))
+        return len(next((v for (k, v) in obj.items() if '.history.' in k)))
     
     for (k, v) in obj.items():
         if isinstance(v, dict):
