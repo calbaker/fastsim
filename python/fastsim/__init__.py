@@ -213,7 +213,7 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
         val0 = None
     history_keys = ['.history.']
     for k, v in obj_dict.items():
-        if is_cyc_key(k) or any(k in hk for hk in history_keys) or (val0 is not None and len(v) == len(val0)):
+        if is_cyc_key(k) or any(hk in k for hk in history_keys) or (val0 is not None and len(v) == len(val0)):
             history_dict[k] = v
 
     if allow_partial:
