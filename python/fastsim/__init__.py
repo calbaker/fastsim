@@ -1,17 +1,16 @@
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, List, Union, Dict 
+from typing import Any, List, Union, Dict, Optional
 from typing_extensions import Self
-import logging
 import numpy as np
-import re
 import inspect
 import pandas as pd  # type: ignore[import-untyped]
 import polars as pl
 
+import fastsim
 from .fastsim import *  # noqa: F403
 from .fastsim import Cycle  # type: ignore[attr-defined]
-from . import utils
+from . import utils # type: ignore[attr-defined]  # noqa: F401
 
 DEFAULT_LOGGING_CONFIG = dict(
     format="%(asctime)s.%(msecs)03d | %(filename)s:%(lineno)s | %(levelname)s: %(message)s",
@@ -33,65 +32,6 @@ def resources_root() -> Path:
 
 
 __version__ = version("fastsim")
-
-
-def set_param_from_path(
-    model: Any,
-    path: str,
-    value: Any,
-) -> Any:
-    """
-    Set parameter `value` on `model` for `path` to parameter
-
-    Example usage:
-    todo
-    """
-    path_list = path.split(".")
-
-    def _get_list(path_elem, container):
-        list_match = re.match(r"([\w\d]+)\[(\d+)\]", path_elem)
-        if list_match is not None:
-            list_name = list_match.group(1)
-            index = int(list_match.group(2))
-            lst = container.__getattribute__(list_name).tolist()
-            return lst, list_name, index
-        else:
-            return None, None, None
-
-    containers = [model]
-    lists = [None] * len(path_list)
-    for i, path_elem in enumerate(path_list):
-        container = containers[-1]
-
-        list_attr, list_name, list_index = _get_list(path_elem, container)
-        if list_attr is not None:
-            attr = list_attr[list_index]
-            # save for when we repack the containers
-            lists[i] = (list_attr, list_name, list_index)
-        else:
-            attr = container.__getattribute__(path_elem)
-
-        if i < len(path_list) - 1:
-            containers.append(attr)
-
-    prev_container = value
-
-    # iterate through remaining containers, inner to outer
-    for list_tuple, container, path_elem in zip(
-        lists[-1::-1], containers[-1::-1], path_list[-1::-1]
-    ):
-        if list_tuple is not None:
-            list_attr, list_name, list_index = list_tuple
-            list_attr[list_index] = prev_container
-
-            container.__setattr__(list_name, list_attr)
-        else:
-            container.__setattr__(f"__{path_elem}", prev_container)
-
-        prev_container = container
-
-    return model
-
 
 def __array__(self):
     return np.array(self.tolist())
@@ -119,7 +59,11 @@ def cyc_keys() -> List[str]:
 
 CYC_KEYS = cyc_keys()
 
-setattr(Pyo3VecWrapper, "__array__", __array__)  # noqa: F405
+setattr(
+    Pyo3VecWrapper,  # type: ignore[name-defined]  # noqa: F405
+    "__array__",
+    __array__
+)  
 
 # TODO connect to crate features
 data_formats = [
@@ -141,10 +85,10 @@ def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
     assert data_fmt in data_formats, f"`data_fmt` must be one of {data_formats}"
     match data_fmt:
         case "msg_pack":
-            import msgpack
+            import msgpack  # type: ignore[import-untyped]
             pydict = msgpack.loads(self.to_msg_pack())
         case "yaml":
-            from yaml import load
+            from yaml import load  # type: ignore[import-untyped]
             try:
                 from yaml import CLoader as Loader
             except ImportError:
@@ -157,11 +101,58 @@ def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
     if not flatten:
         return pydict
     else:
-        return next(iter(pd.json_normalize(pydict, sep=".").to_dict(orient='records')))
+        hist_len = get_hist_len(pydict)
+        assert hist_len is not None, "Cannot be flattened"
+        flat_dict = get_flattened(pydict, hist_len)
+        return flat_dict
 
+def get_hist_len(obj: Dict) -> Optional[int]: 
+    """
+    Finds nested `history` and gets lenth of first element
+    """
+    if 'history' in obj.keys():
+        return len(next(iter(obj['history'].values())))
 
-@classmethod
-def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:
+    elif next(iter(k for k in obj.keys() if '.history.' in k), None) is not None:
+        return len(next((v for (k, v) in obj.items() if '.history.' in k)))
+    
+    for (k, v) in obj.items():
+        if isinstance(v, dict):
+            hist_len = get_hist_len(v)
+            if hist_len is not None:
+                return hist_len
+    return None
+
+def get_flattened(obj: Dict | List, hist_len: int, prepend_str: str="") -> Dict:
+    """
+    Flattens and returns dictionary, separating keys and indices with a `"."`
+    # Arguments
+    # - `obj`: object to flatten
+    # -  hist_len: length of any lists storing history data
+    # - `prepend_str`: prepend this to all keys in the returned `flat` dict
+    """
+    flat: Dict = {}
+    if isinstance(obj, dict):
+        for (k, v) in obj.items():
+            new_key = k if (len(prepend_str) == 0) else prepend_str + "." + k
+            if isinstance(v, dict) or (isinstance(v, list) and len(v) != hist_len):
+                flat.update(get_flattened(v, hist_len, prepend_str=new_key))
+            else:
+                flat[new_key] = v
+    elif isinstance(obj, list):
+        for (i, v) in enumerate(obj):
+            new_key = i if (len(prepend_str) == 0) else prepend_str + "." + str(i)
+            if isinstance(v, dict) or (isinstance(v, list) and len(v) != hist_len):
+                flat.update(get_flattened(v, hist_len, prepend_str=new_key))
+            else:
+                flat[new_key] = v
+    else:
+        raise TypeError("`obj` should be `dict` or `list`")
+               
+    return flat    
+
+@classmethod  # type: ignore[misc]
+def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:  # type: ignore[misc]
     """
     Instantiates Self from pure python dictionary 
     # Arguments
@@ -178,25 +169,13 @@ def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool =
             obj = cls.from_yaml(yaml.dump(pydict), skip_init=skip_init)
         case "msg_pack":
             import msgpack
-            try:
-                obj = cls.from_msg_pack(
-                    msgpack.packb(pydict), skip_init=skip_init)
-            except Exception as err:
-                print(
-                    f"{err}\nFalling back to YAML.")
-                obj = cls.from_pydict(
-                    pydict, data_fmt="yaml", skip_init=skip_init)
+            obj = cls.from_msg_pack(
+                msgpack.packb(pydict), skip_init=skip_init)
         case "json":
             from json import dumps
             obj = cls.from_json(dumps(pydict), skip_init=skip_init)
 
     return obj
-
-
-def is_cyc_key(k):
-    is_cyc_key = any(
-        cyc_key for cyc_key in CYC_KEYS if cyc_key == k.split(".")[-1]) and "cyc" in k
-    return is_cyc_key
 
 
 def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Union[pd.DataFrame, pl.DataFrame]:
@@ -205,36 +184,49 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
 
     # Arguments
     - `pandas`: returns pandas dataframe if True; otherwise, returns polars dataframe by default
-    - `allow_partial`: returns dataframe of length equal to solved time steps if simulation fails early
+    - `allow_partial`: tries to return dataframe of length equal to solved time steps if simulation fails early
     """
     obj_dict = self.to_pydict(flatten=True)
-    history_dict = {}
+    history_keys = ['.history.', 'cyc.', '.cyc.']
+    hist_len = get_hist_len(obj_dict)
+    assert hist_len is not None
+
+    history_dict: Dict[str, Any] = {}
     for k, v in obj_dict.items():
-        if is_cyc_key(k) or ('.history.' in k):
-            history_dict[k] = v
+        hk_in_k = any(hk in k for hk in history_keys)
+        if hk_in_k and ("__len__" in dir(v)):
+            if (len(v) == hist_len) or allow_partial:
+                history_dict[k] = v
 
     if allow_partial:
         cutoff = min([len(val) for val in history_dict.values()])
 
         if not pandas:
-            df = pl.DataFrame({col: val[:cutoff]
+            try:
+                df = pl.DataFrame({col: val[:cutoff]
                               for col, val in history_dict.items()})
+            except Exception as err:
+                raise Exception(f"{err}\n`save_interval` may not be uniform")
         else:
-            df = pd.DataFrame({col: val[:cutoff]
+            try:
+                df = pd.DataFrame({col: val[:cutoff]
                               for col, val in history_dict.items()})
+            except Exception as err:
+                raise Exception(f"{err}\n`save_interval` may not be uniform")
+
     else:
         if not pandas:
             try:
                 df = pl.DataFrame(history_dict)
             except Exception as err:
-                raise (
-                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
+                raise Exception(
+                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe` or checking for consistent save intervals")
         else:
             try:
                 df = pd.DataFrame(history_dict)
             except Exception as err:
-                raise (
-                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe`")
+                raise Exception(
+                    f"{err}\nTry passing `allow_partial=True` to `to_dataframe` or checking for consistent save intervals")
     return df
 
 
