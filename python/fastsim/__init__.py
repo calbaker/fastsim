@@ -2,6 +2,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, List, Union, Dict, Optional
 from typing_extensions import Self
+import re
 import numpy as np
 import inspect
 import pandas as pd  # type: ignore[import-untyped]
@@ -106,16 +107,16 @@ def to_pydict(self, data_fmt: str = "msg_pack", flatten: bool = False) -> Dict:
         flat_dict = get_flattened(pydict, hist_len)
         return flat_dict
 
-def get_hist_len(obj: Dict) -> Optional[int]: 
+def get_hist_len(obj: Dict) -> Optional[int]:
     """
     Finds nested `history` and gets lenth of first element
     """
     if 'history' in obj.keys():
         return len(next(iter(obj['history'].values())))
 
-    elif next(iter(k for k in obj.keys() if '.history.' in k), None) is not None:
-        return len(next((v for (k, v) in obj.items() if '.history.' in k)))
-    
+    elif next(iter(k for k in obj.keys() if re.search("(history\\.\\w+)$", k) is not None), None) is not None:
+        return len(next((v for (k, v) in obj.items() if re.search("(history\\.\\w+)$", k) is not None)))
+
     for (k, v) in obj.items():
         if isinstance(v, dict):
             hist_len = get_hist_len(v)
@@ -123,7 +124,7 @@ def get_hist_len(obj: Dict) -> Optional[int]:
                 return hist_len
     return None
 
-def get_flattened(obj: Dict | List, hist_len: int, prepend_str: str="") -> Dict:
+def get_flattened(obj: Dict | List, hist_len: int, prepend_str: str = "") -> Dict:
     """
     Flattens and returns dictionary, separating keys and indices with a `"."`
     # Arguments
@@ -134,22 +135,22 @@ def get_flattened(obj: Dict | List, hist_len: int, prepend_str: str="") -> Dict:
     flat: Dict = {}
     if isinstance(obj, dict):
         for (k, v) in obj.items():
-            new_key = k if (len(prepend_str) == 0) else prepend_str + "." + k
+            new_key = k if (prepend_str == "") else prepend_str + "." + k
             if isinstance(v, dict) or (isinstance(v, list) and len(v) != hist_len):
                 flat.update(get_flattened(v, hist_len, prepend_str=new_key))
             else:
                 flat[new_key] = v
     elif isinstance(obj, list):
         for (i, v) in enumerate(obj):
-            new_key = i if (len(prepend_str) == 0) else prepend_str + "." + str(i)
+            new_key = i if (prepend_str == "") else prepend_str + "." + f"[{i}]"
             if isinstance(v, dict) or (isinstance(v, list) and len(v) != hist_len):
                 flat.update(get_flattened(v, hist_len, prepend_str=new_key))
             else:
                 flat[new_key] = v
     else:
         raise TypeError("`obj` should be `dict` or `list`")
-               
-    return flat    
+
+    return flat
 
 @classmethod  # type: ignore[misc]
 def from_pydict(cls, pydict: Dict, data_fmt: str = "msg_pack", skip_init: bool = False) -> Self:  # type: ignore[misc]
@@ -187,7 +188,7 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
     - `allow_partial`: tries to return dataframe of length equal to solved time steps if simulation fails early
     """
     obj_dict = self.to_pydict(flatten=True)
-    history_keys = ['.history.', 'cyc.', '.cyc.']
+    history_keys = ['history.', 'cyc.']
     hist_len = get_hist_len(obj_dict)
     assert hist_len is not None
 
@@ -204,13 +205,13 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
         if not pandas:
             try:
                 df = pl.DataFrame({col: val[:cutoff]
-                              for col, val in history_dict.items()})
+                                   for col, val in history_dict.items()})
             except Exception as err:
                 raise Exception(f"{err}\n`save_interval` may not be uniform")
         else:
             try:
                 df = pd.DataFrame({col: val[:cutoff]
-                              for col, val in history_dict.items()})
+                                   for col, val in history_dict.items()})
             except Exception as err:
                 raise Exception(f"{err}\n`save_interval` may not be uniform")
 
@@ -228,7 +229,6 @@ def to_dataframe(self, pandas: bool = False, allow_partial: bool = False) -> Uni
                 raise Exception(
                     f"{err}\nTry passing `allow_partial=True` to `to_dataframe` or checking for consistent save intervals")
     return df
-
 
 # adds variable_path_list() and history_path_list() as methods to all classes in
 # ACCEPTED_RUST_STRUCTS
